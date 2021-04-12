@@ -1,8 +1,10 @@
 from credentials import BOT_TOKEN, GUILD_NAME
-from clash_utils import GetClashUserData
-from db_utils import AddNewUser, CommitRoles, GetRolesFromDB, GetVacationStatus, OutputToCSV, RemoveUser, UpdateVacationForUser
-import discord
+from clash_utils import GetClashUserData, GetDeckUsageToday
+from db_utils import AddNewUser, CommitRoles, GetPlayerTagFromDB, GetRolesFromDB, GetVacationStatus, OutputToCSV, RemoveUserFromDB, UpdateUserInDB, UpdateVacationForUser
 from discord.ext import commands
+import aiocron
+import asyncio
+import discord
 import os
 
 # Create bot
@@ -25,6 +27,7 @@ NORMAL_ROLES = {
 TIME_OFF_CHANNEL = "time-off"
 LEADER_CHANNEL = "leader-commands"
 RULES_CHANNEL = "rules"
+REMINDER_CHANNEL = "reminders"
 
 
 @bot.event
@@ -37,6 +40,7 @@ async def on_ready():
             NORMAL_ROLES["Visitor"] = discord.utils.get(guild.roles, name="Visitor")
             NORMAL_ROLES["Member"] = discord.utils.get(guild.roles, name="Member")
             NORMAL_ROLES["Elder"] = discord.utils.get(guild.roles, name="Elder")
+
     print("Bot Ready")
 
 
@@ -50,7 +54,7 @@ async def on_member_join(member):
 
 @bot.event
 async def on_member_remove(member):
-    RemoveUser(member.display_name)
+    RemoveUserFromDB(member.display_name)
 
 
 @bot.event
@@ -72,12 +76,38 @@ async def on_message(message):
 
 
 @bot.command()
+async def update_user(ctx, player_name, player_tag):
+    if (ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+        return
+
+    member = discord.utils.get(ctx.guild.members, display_name=player_name)
+    if (member == None):
+        await ctx.send(f"Could not find user: {player_name}")
+        return
+
+    await UpdateUser(ctx, member, player_tag)
+
+
+async def UpdateUser(ctx, member: discord.Member, player_tag = None):
+    if (player_tag == None):
+        player_tag = GetPlayerTagFromDB(member.display_name)
+
+    if (player_tag == None):
+        return
+
+    discord_name = member.name + "#" + member.discriminator
+    clashData = GetClashUserData(player_tag, discord_name)
+    UpdateUserInDB(clashData)
+
+    await member.edit(nick=clashData["player_name"])
+
+
+@bot.command()
 async def vacation(ctx, *args):
     if (ctx.message.channel.name != TIME_OFF_CHANNEL):
         return
 
-    name = ctx.author.display_name
-    vacationStatus = UpdateVacationForUser(name)
+    vacationStatus = UpdateVacationForUser(ctx.author.display_name)
     vacationStatusString = ("NOT " if not vacationStatus else "") + "ON VACATION"
     reply = f"New vacation status for {ctx.author.mention}: {vacationStatusString}"
     await ctx.send(reply)
@@ -85,7 +115,7 @@ async def vacation(ctx, *args):
 
 @bot.command()
 async def set_vacation(ctx, player_name, status):
-    if (ctx.message.channel.name != TIME_OFF_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+    if ((ctx.message.channel.name != TIME_OFF_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles)):
         return
 
     member = discord.utils.get(ctx.guild.members, display_name=player_name)
@@ -99,7 +129,7 @@ async def set_vacation(ctx, player_name, status):
 
 @bot.command()
 async def vacation_list(ctx, *args):
-    if (ctx.message.channel.name != TIME_OFF_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+    if ((ctx.message.channel.name != TIME_OFF_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles)):
         return
 
     vacationList = GetVacationStatus()
@@ -110,8 +140,12 @@ async def vacation_list(ctx, *args):
 
 @bot.command()
 async def export(ctx, *args):
-    if (ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+    if ((ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles)):
         return
+
+    if ((len(args) == 1) and (args[0].lower() == "update")):
+        for member in ctx.guild.members:
+            await UpdateUser(ctx, member)
 
     OutputToCSV("members.csv")
     await ctx.send(file=discord.File("members.csv"))
@@ -119,13 +153,15 @@ async def export(ctx, *args):
 
 @bot.command()
 async def force_rules_check(ctx, *args):
-    if (ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+    if ((ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles)):
         return
 
+    # Get a list of members in guild without any special roles (New, Check Rules, or Leader) and that aren't bots.
     membersList = [member for member in ctx.guild.members if ((len(set(SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
     rolesToRemoveList = list(NORMAL_ROLES.values())
 
     for member in membersList:
+        # Get a list of normal roles (Visitor, Member, or Elder) that a member current has. These will be restored after reacting to rules message.
         roleStringsToCommit = [ role.name for role in list(set(NORMAL_ROLES.values()).intersection(set(member.roles))) ]
         CommitRoles(member.display_name, roleStringsToCommit)
         await member.remove_roles(*rolesToRemoveList)
@@ -154,5 +190,48 @@ async def on_raw_reaction_add(payload):
         savedRoles.append(NORMAL_ROLES[role])
     await member.add_roles(*savedRoles)
 
+
+@bot.command()
+async def send_reminder(ctx, *args):
+    if (ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+        return
+
+    await DeckUsageReminder()
+
+
+# Send reminder every Monday and Tuesday at 00:00 UTC (5pm PDT)
+@aiocron.crontab('0 0 * * 1,2')
+async def AutomatedReminder():
+    await DeckUsageReminder()
+
+
+async def DeckUsageReminder():
+    reminderList = GetDeckUsageToday()
+    membersToRemind = []
+    currentVacationList = GetVacationStatus()
+    otherMembersToRemind = []
+    guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
+    channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
+
+    if (len(reminderList) == 0):
+        return
+
+    for nameTuple in reminderList:
+        if (nameTuple[0] in currentVacationList):
+            continue
+
+        member = discord.utils.get(channel.members, display_name=nameTuple[0])
+
+        if (member == None):
+            otherMembersToRemind.append(f"{nameTuple[0]} - Decks used today: {nameTuple[1]}")
+        else:
+            membersToRemind.append(f"{member.mention} Decks used today: {nameTuple[1]}")
+
+    reminderString = "Please complete your battles by the end of the day:\n" + '\n'.join(membersToRemind)
+
+    if (len(otherMembersToRemind) > 0):
+        reminderString += "\n\nMembers that need to complete battles not in this channel:\n" + '\n'.join(otherMembersToRemind)
+
+    await channel.send(reminderString)
 
 bot.run(BOT_TOKEN)

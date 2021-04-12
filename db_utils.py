@@ -16,7 +16,6 @@ def AddNewUser(clashData: dict) -> bool:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clashData)
     queryResult = cursor.fetchone()
@@ -38,7 +37,7 @@ def AddNewUser(clashData: dict) -> bool:
         db.close()
         return False
 
-    insertUserQuery = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, 0, FALSE, 0, %(clan_id)s)"
+    insertUserQuery = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, FALSE, 0, %(clan_id)s)"
     cursor.execute(insertUserQuery, clashData)
 
     # Get id of newly inserted user.
@@ -60,8 +59,46 @@ def AddNewUser(clashData: dict) -> bool:
     db.close()
     return True
 
+
+# Update existing user.
+def UpdateUserInDB(clashData: dict) -> str:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT * FROM users WHERE player_tag = %(player_tag)s", clashData)
+    queryResult = cursor.fetchone()
+
+    if (queryResult == None):
+        db.close()
+        return False
+
+    updateQuery = "UPDATE users SET player_name = %(player_name)s, discord_name = %(discord_name)s, clan_role = %(clan_role)s WHERE player_tag = %(player_tag)s"
+    cursor.execute(updateQuery, clashData)
+
+    db.commit()
+    db.close()
+    return True
+
+
+def GetPlayerTagFromDB(player_name: str) -> str:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT player_tag FROM users WHERE player_name = %s", (player_name))
+    queryResult = cursor.fetchone()
+
+    if (queryResult == None):
+        db.close()
+        return None
+
+    player_tag = queryResult["player_tag"]
+
+    db.close()
+    return player_tag
+
+
 # Remove user from DB along with any roles assigned to them.
-def RemoveUser(player_name: str):
+def RemoveUserFromDB(player_name: str):
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -219,7 +256,6 @@ def OutputToCSV(file_path: str) -> bool:
     with open(file_path, 'w', newline='') as csvfile:
         fieldsList = list(users[0].keys())
         fieldsList.remove("id")
-        fieldsList.remove("monday_usage")
         fieldsList.remove("clan_id")
         fieldNames = []
 
@@ -236,7 +272,6 @@ def OutputToCSV(file_path: str) -> bool:
 
         for user in users:
             user.pop("id")
-            user.pop("monday_usage")
             clanId = user.pop("clan_id")
 
             keysList = list(user.keys())
