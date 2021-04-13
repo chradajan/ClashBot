@@ -201,7 +201,7 @@ def ClearAllVacation():
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    cursor.execute("UPDATE user SET vacation = FALSE")
+    cursor.execute("UPDATE users SET vacation = FALSE")
 
     db.commit()
     db.close()

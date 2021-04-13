@@ -303,7 +303,7 @@ async def AssignStrikesAndClearVacation():
             if (user not in vacationList):
                 strikeCount = db_utils.AddStrike(user)
                 member = discord.utils.get(guild.members, display_name=user)
-                strikesList.append(f"{member.mention} Number of strikes: {strikeCount}")
+                membersToMention.append(f"{member.mention} Total strikes: {strikeCount}")
 
         if (len(membersToMention) > 0):
             strikeChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
