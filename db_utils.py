@@ -61,23 +61,50 @@ def AddNewUser(clashData: dict) -> bool:
 
 
 # Update existing user.
-def UpdateUser(clashData: dict) -> str:
+def UpdateUser(clashData: dict):
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
-
-    cursor.execute("SELECT * FROM users WHERE player_tag = %(player_tag)s", clashData)
-    queryResult = cursor.fetchone()
-
-    if (queryResult == None):
-        db.close()
-        return False
 
     updateQuery = "UPDATE users SET player_name = %(player_name)s, discord_name = %(discord_name)s, clan_role = %(clan_role)s WHERE player_tag = %(player_tag)s"
     cursor.execute(updateQuery, clashData)
 
     db.commit()
     db.close()
-    return True
+
+
+# Add strike to user.
+def AddStrike(player_name: str) -> int:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("UPDATE users SET strikes = strikes + 1 WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
+    queryResult = cursor.fetchone()
+
+    if (queryResult == None):
+        return 0
+
+    db.commit()
+    db.close()
+
+    return queryResult["strikes"]
+
+
+def SetStrikes(player_name: str, strike_count: int) -> int:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("UPDATE users SET strikes = %s WHERE player_name = %s", (strike_count, player_name))
+    cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
+    queryResult = cursor.fetchone()
+
+    if (queryResult == None):
+        return 0
+
+    db.commit()
+    db.close()
+
+    return queryResult["strikes"]
 
 
 def GetPlayerTag(player_name: str) -> str:
@@ -135,16 +162,14 @@ def UpdateVacationForUser(player_name: str, status=None) -> bool:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    updateVacationQuery = ""
-    if (status != None):
-        updateVacationQuery = "UPDATE users SET vacation = " + str(status).upper() + " WHERE player_name = %s"
+    if (type(status) == bool):
+        updateVacationQuery = "UPDATE users SET vacation = %s WHERE player_name = %s"
+        cursor.execute(updateVacationQuery, (status, player_name))
     else:
         updateVacationQuery = "UPDATE users SET vacation = NOT vacation WHERE player_name = %s"
+        cursor.execute(updateVacationQuery, (player_name))
 
-    checkVacationQuery = "SELECT * FROM users WHERE player_name = %s"
-
-    cursor.execute(updateVacationQuery, (player_name))
-    cursor.execute(checkVacationQuery, (player_name))
+    cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
     queryResult = cursor.fetchone()
 
     if (queryResult == None):
@@ -153,7 +178,7 @@ def UpdateVacationForUser(player_name: str, status=None) -> bool:
     db.commit()
     db.close()
 
-    return bool(queryResult["vacation"])
+    return queryResult["vacation"]
 
 
 # Return a list of player_names currently on vacation.
@@ -163,10 +188,8 @@ def GetVacationStatus() -> list:
 
     cursor.execute("SELECT player_name FROM users WHERE vacation = TRUE")
     vacationDict = cursor.fetchall()
-    vacationList = []
 
-    for user in vacationDict:
-        vacationList.append(user["player_name"])
+    vacationList = [ user["player_name"] for user in vacationDict ]
 
     db.close()
 
@@ -174,7 +197,7 @@ def GetVacationStatus() -> list:
 
 
 # Set vacation to false for all users.
-def DisableAllVacation():
+def ClearAllVacation():
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -184,23 +207,23 @@ def DisableAllVacation():
     db.close()
 
 
-# Toggle whether to send deck usage reminders.
-def SetRemindersStatus(status: bool):
+# Set whether to send deck usage reminders.
+def SetReminderStatus(status: bool):
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    cursor.execute("UPDATE reminders SET send_reminders = %s", (status))
+    cursor.execute("UPDATE automation_status SET send_reminders = %s", (status))
 
     db.commit()
     db.close()
 
 
-# Return whether automated reminders are enabled/disabled.
-def GetRemindersStatus() -> bool:
+# Return current reminder status.
+def GetReminderStatus() -> bool:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    cursor.execute("SELECT * FROM reminders")
+    cursor.execute("SELECT * FROM automation_status")
     queryResult = cursor.fetchone()
 
     if queryResult == None:
@@ -208,6 +231,30 @@ def GetRemindersStatus() -> bool:
         return False
 
     status = queryResult["send_reminders"]
+    db.close()
+    return status
+
+
+# Set whether to send strikes automatically.
+def SetStrikeStatus(status: bool):
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("UPDATE automation_status SET send_strikes = %s", (status))
+
+    db.commit()
+    db.close()
+
+
+# Return current strike status.
+def GetStrikeStatus() -> bool:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT * FROM automation_status")
+    queryResult = cursor.fetchone()
+
+    status = queryResult["send_strikes"]
     db.close()
     return status
 
