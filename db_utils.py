@@ -1,4 +1,5 @@
-from credentials import IP, USERNAME, PASSWORD, DB_NAME
+from config.config import PRIMARY_CLAN_NAME
+from config.credentials import IP, USERNAME, PASSWORD, DB_NAME
 from clash_utils import GetClashUserData
 import csv
 import pymysql
@@ -46,7 +47,7 @@ def AddNewUser(clashData: dict) -> bool:
     user_id = queryResult["id"]
 
     # Check if new user is member or visitor. Get id of relevant discord_role.
-    roleString = "Member" if (clashData["clan_name"] == "False Logic") else "Visistor"
+    roleString = "Member" if (clashData["clan_name"] == PRIMARY_CLAN_NAME) else "Visistor"
     cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (roleString))
     queryResult = cursor.fetchone()
     discord_role_id = queryResult["id"]
@@ -333,22 +334,22 @@ def CommitRoles(player_name: str, roles: list):
     db.close()
 
 
-def OutputToCSV(file_path: str, false_logic_only: bool) -> bool:
+def OutputToCSV(file_path: str, primary_clan_only: bool) -> bool:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     clans = None
     falseLogicId = None
 
-    if false_logic_only:
-        cursor.execute("SELECT * FROM clans WHERE clan_name = %s", ("False Logic"))
+    if primary_clan_only:
+        cursor.execute("SELECT * FROM clans WHERE clan_name = %s", (PRIMARY_CLAN_NAME))
         clans = cursor.fetchall()
         falseLogicId = clans[0]["id"]
     else:
         cursor.execute("SELECT * FROM clans")
         clans = cursor.fetchall()
 
-    if false_logic_only:
+    if primary_clan_only:
         cursor.execute("SELECT * FROM users WHERE clan_id = %s", (falseLogicId))
     else:
         cursor.execute("SELECT * FROM users")

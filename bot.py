@@ -1,4 +1,5 @@
-from credentials import BOT_TOKEN, GUILD_NAME
+from config.config import GUILD_NAME, ADMIN_ROLE_NAME, LEADER_ROLE_NAME, ELDER_ROLE_NAME, MEMBER_ROLE_NAME, VISITOR_ROLE_NAME, CHECK_RULES_ROLE_NAME, NEW_ROLE_NAME
+from config.credentials import BOT_TOKEN
 from discord.ext import commands
 import aiocron
 import asyncio
@@ -14,7 +15,7 @@ intents.members = True
 bot = commands.Bot(command_prefix='!', help_command=help_command, intents=intents)
 
 SPECIAL_ROLES = {
-    "Leader": None,
+    "Admin": None,
     "New": None,
     "Check Rules": None
 }
@@ -22,11 +23,12 @@ SPECIAL_ROLES = {
 NORMAL_ROLES = {
     "Visitor": None,
     "Member": None,
-    "Elder": None
+    "Elder": None,
+    "Leader": None
 }
 
 TIME_OFF_CHANNEL = "time-off"
-LEADER_CHANNEL = "leader-commands"
+COMMANDS_CHANNEL = "leader-commands"
 RULES_CHANNEL = "rules"
 REMINDER_CHANNEL = "reminders"
 STRIKES_CHANNEL = "strikes"
@@ -37,17 +39,23 @@ def is_leader_command_check(CHANNEL_NAME):
         return ((ctx.message.channel.name == CHANNEL_NAME) and (SPECIAL_ROLES["Leader"] in ctx.author.roles))
     return commands.check(predicate)
 
+def is_admin_command_check(CHANNEL_NAME):
+    async def predicate(ctx):
+        return ((ctx.message.channel.name == CHANNEL_NAME) and (SPECIAL_ROLES["Admin"] in ctx.author.roles))
+    return commands.check(predicate)
+
 
 @bot.event
 async def on_ready():
     for guild in bot.guilds:
         if guild.name == GUILD_NAME:
-            SPECIAL_ROLES["Leader"] = discord.utils.get(guild.roles, name="Leader")
-            SPECIAL_ROLES["New"] = discord.utils.get(guild.roles, name="New")
-            SPECIAL_ROLES["Check Rules"] = discord.utils.get(guild.roles, name="Check Rules")
-            NORMAL_ROLES["Visitor"] = discord.utils.get(guild.roles, name="Visitor")
-            NORMAL_ROLES["Member"] = discord.utils.get(guild.roles, name="Member")
-            NORMAL_ROLES["Elder"] = discord.utils.get(guild.roles, name="Elder")
+            SPECIAL_ROLES["Admin"] = discord.utils.get(guild.roles, name=ADMIN_ROLE_NAME)
+            SPECIAL_ROLES["Leader"] = discord.utils.get(guild.roles, name=LEADER_ROLE_NAME)
+            SPECIAL_ROLES["New"] = discord.utils.get(guild.roles, name=NEW_ROLE_NAME)
+            SPECIAL_ROLES["Check Rules"] = discord.utils.get(guild.roles, name=CHECK_RULES_ROLE_NAME)
+            NORMAL_ROLES["Visitor"] = discord.utils.get(guild.roles, name=VISITOR_ROLE_NAME)
+            NORMAL_ROLES["Member"] = discord.utils.get(guild.roles, name=MEMBER_ROLE_NAME)
+            NORMAL_ROLES["Elder"] = discord.utils.get(guild.roles, name=ELDER_ROLE_NAME)
 
     print("Bot Ready")
 
@@ -70,12 +78,12 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    if (message.channel.name == "welcome"):
+    if message.channel.name == "welcome":
         discord_name = message.author.name + "#" + message.author.discriminator
         clashData = clash_utils.GetClashUserData(message.content, discord_name)
-        if (clashData != None):
-            if (db_utils.AddNewUser(clashData)):
-                if (SPECIAL_ROLES["Leader"] not in message.author.roles):
+        if clashData != None:
+            if db_utils.AddNewUser(clashData):
+                if SPECIAL_ROLES["Leader"] not in message.author.roles:
                     await message.author.edit(nick=clashData["player_name"])
                 await message.author.add_roles(SPECIAL_ROLES["Check Rules"])
                 await message.author.remove_roles(SPECIAL_ROLES["New"])
@@ -94,7 +102,7 @@ async def on_raw_reaction_add(payload):
     if (channel.name != RULES_CHANNEL) or (SPECIAL_ROLES["Check Rules"] not in member.roles) or (member == bot.user) or (member.bot):
         return
 
-    if SPECIAL_ROLES["Leader"] in member.roles:
+    if SPECIAL_ROLES["Admin"] in member.roles:
         await member.remove_roles(SPECIAL_ROLES["Check Rules"])
         rolesToAdd = list(NORMAL_ROLES.values())
         await member.add_roles(*rolesToAdd)
@@ -109,9 +117,9 @@ async def on_raw_reaction_add(payload):
 
 
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_leader_command_check(COMMANDS_CHANNEL)
 async def update_user(ctx, member: discord.Member, player_tag: str):
-    "Leader only. Update selected user to use information associated with given player_tag. Changes information in database and updates Discord nickname"
+    "Leader/Admin only. Update selected user to use information associated with given player_tag. Change information in database and update Discord nickname"
     await UpdateUser(ctx, member, player_tag)
     await ctx.send(f"{player_name} has been updated.")
 
@@ -124,9 +132,9 @@ async def update_user_error(ctx, error):
 
 
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_admin_command_check(COMMANDS_CHANNEL)
 async def reset_user(ctx, member: discord.Member):
-    "Leader only. Delete selected user from database. Resets their role to New."
+    "Admin only. Delete selected user from database. Reset their role to New."
     await ResetUser(member, True)
     await ctx.send(f"{player_name} has been reset.")
 
@@ -138,11 +146,10 @@ async def reset_user_error(ctx, error):
         await ctx.send("Error. Command should be formatted as:\n!reset_user (user)")
 
 
-# Remove all users from DB and assign New role.
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_admin_command_check(COMMANDS_CHANNEL)
 async def reset_all_users(ctx, safety_message):
-    "Leader only. Deletes all users from database, removes roles, and assigns New role. Leaders retain Leader role. Leaders must still resend player tag in welcome channel and react to rules message."
+    "Admin only. Deletes all users from database, removes roles, and assigns New role. Leaders retain Leader role. Leaders must still resend player tag in welcome channel and react to rules message."
     confirmationMessage = "Yes, I really want to drop all players from the database and reset roles."
 
     if (safety_message != confirmationMessage):
@@ -175,7 +182,7 @@ async def vacation(ctx):
 @bot.command()
 @is_leader_command_check(TIME_OFF_CHANNEL)
 async def set_vacation(ctx, member: discord.Member, status: bool):
-    "Leader only. Sets vacation status of target user."
+    "Leader/Admin only. Sets vacation status of target user."
     vacationStatus = db_utils.UpdateVacationForUser(player_name, status)
     vacationStatusString = ("NOT " if not vacationStatus else "") + "ON VACATION"
     await ctx.send(f"Updated vacation status of {member.mention} to: {vacationStatusString}.")
@@ -191,17 +198,16 @@ async def set_vacation_error(ctx, error):
 @bot.command()
 @is_leader_command_check(TIME_OFF_CHANNEL)
 async def vacation_list(ctx):
-    "Leader only. Gets list of all users currently on vacation. Used in time off channel."
+    "Leader/Admin only. Gets list of all users currently on vacation. Used in time off channel."
     vacationList = db_utils.GetVacationStatus()
     vacationString = '\n'.join(vacationList)
-
     await ctx.send(f"This is the list of players currently on vacation:\n{vacationString}")
 
 
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_leader_command_check(COMMANDS_CHANNEL)
 async def export(ctx, UpdateBeforeExport: bool=True, FalseLogicOnly: bool=True):
-    "Leader only. Export database to csv file."
+    "Leader/Admin only. Export database to csv file."
     if (UpdateBeforeExport):
         for member in ctx.guild.members:
             await UpdateUser(ctx, member)
@@ -215,30 +221,30 @@ async def export_error(ctx, error):
 
 
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_admin_command_check(COMMANDS_CHANNEL)
 async def force_rules_check(ctx):
-    "Leader only. Strip roles from all non-leaders until they acknowledge new rules."
-    # Get a list of members in guild without any special roles (New, Check Rules, or Leader) and that aren't bots.
+    "Admin only. Strip roles from all non-leaders until they acknowledge new rules."
+    # Get a list of members in guild without any special roles (New, Check Rules, or Admin) and that aren't bots.
     membersList = [member for member in ctx.guild.members if ((len(set(SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
     rolesToRemoveList = list(NORMAL_ROLES.values())
 
     for member in membersList:
-        # Get a list of normal roles (Visitor, Member, or Elder) that a member current has. These will be restored after reacting to rules message.
+        # Get a list of normal roles (Visitor, Member, Elder, or Leader) that a member current has. These will be restored after reacting to rules message.
         roleStringsToCommit = [ role.name for role in list(set(NORMAL_ROLES.values()).intersection(set(member.roles))) ]
         db_utils.CommitRoles(member.display_name, roleStringsToCommit)
         await member.remove_roles(*rolesToRemoveList)
         await member.add_roles(SPECIAL_ROLES["Check Rules"])
 
     rulesChannel = discord.utils.get(ctx.guild.channels, name=RULES_CHANNEL)
-    await rulesChannel.purge(limit=5, check=lambda message: message.author == bot.user)
-    newReactMessage = await rulesChannel.send(content="@everyone React to this message for roles.")
+    await rulesChannel.purge(limit=10, check=lambda message: message.author == bot.user)
+    newReactMessage = await rulesChannel.send(content="@everyone After you've read the rules, react to this message for roles.")
     await newReactMessage.add_reaction(u"\u2705")
 
 
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_leader_command_check(COMMANDS_CHANNEL)
 async def set_strike_count(ctx, member: discord.Member, strikes: int):
-    "Leader only. Set specified user's strike count to target value."
+    "Leader/Admin only. Set specified user's strike count to target value."
     newStrikeCount = db_utils.SetStrikes(member.display_name, strikes)
     await ctx.send(f"New strike count for {member.display_name}: {newStrikeCount}")
 
@@ -251,16 +257,16 @@ async def set_strike_count_error(ctx, error):
 
 
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_leader_command_check(COMMANDS_CHANNEL)
 async def send_reminder(ctx):
-    "Leader only. Send message to reminders channel tagging users who still have battles to complete."
+    "Leader/Admin only. Send message to reminders channel tagging users who still have battles to complete."
     await DeckUsageReminder()
 
 
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_admin_command_check(COMMANDS_CHANNEL)
 async def set_automated_reminders(ctx, status: bool):
-    "Leader only. Set whether automated reminders should be sent."
+    "Admin only. Set whether automated reminders should be sent."
     db_utils.SetReminderStatus(status)
     await ctx.channel.send("Automated deck usage reminders are now " + ("ENABLED" if status else "DISABLED") + ".")
 
@@ -270,9 +276,9 @@ async def set_automated_reminders_error(ctx, error):
 
 
 @bot.command()
-@is_leader_command_check(LEADER_CHANNEL)
+@is_admin_command_check(COMMANDS_CHANNEL)
 async def set_automated_strikes(ctx, status: bool):
-    "Leader only. Set whether automated strikes should be given."
+    "Admin only. Set whether automated strikes should be given."
     db_utils.SetStrikeStatus(status)
     await ctx.channel.send("Automated strikes for low deck usage are now " + ("ENABLED" if status else "DISABLED") + ".")
 
@@ -294,20 +300,29 @@ async def AssignStrikesAndClearVacation():
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     vacationChannel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
 
-    if (db_utils.GetStrikeStatus()):
+    if db_utils.GetStrikeStatus():
         vacationList = db_utils.GetVacationStatus()
         lowDeckUsageList = clash_utils.GetDeckUsage()
-        membersToMention = []
+        membersToStrike = []
+        otherMembersToStrike = []
+        strikeChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
 
-        for user in lowDeckUsageList:
-            if (user not in vacationList):
-                strikeCount = db_utils.AddStrike(user)
-                member = discord.utils.get(guild.members, display_name=user)
-                membersToMention.append(f"{member.mention} Total strikes: {strikeCount}")
+        for nameTuple in lowDeckUsageList:
+            if (nameTuple[0] not in vacationList):
+                strikeCount = db_utils.AddStrike(nameTuple[0])
+                member = discord.utils.get(strikeChannel.members, display_name=nameTuple[0])
 
-        if (len(membersToMention) > 0):
-            strikeChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
-            await strikeChannel.send("The following members have received a strike for failing to complete their battles:\n" + '\n'.join(membersToMention))
+                if member == None:
+                    otherMembersToStrike.append(f"{nameTuple[0]} - Decks used: {nameTuple[1]}")
+                else:
+                    membersToStrike.append(f"{member.mention} Decks used: {nameTuple[1]}   Total strikes: {strikeCount}")
+
+        strikeString = "The following members have received a strike for failing to complete their battles:\n" + '\n'.join(membersToStrike)
+
+        if len(otherMembersToStrike) > 0:
+            strikeString += "\n\nMembers that failed to complete their battles not in this channel:\n" + '\n'.join(otherMembersToStrike)
+
+        await strikeChannel.send(strikeString)
 
     db_utils.ClearAllVacation()
     await vacationChannel.send("Vacation status for all users has been set to false. Make sure to use !vacation before the next war if you're going to miss it.")
@@ -315,13 +330,13 @@ async def AssignStrikesAndClearVacation():
 
 async def DeckUsageReminder():
     reminderList = clash_utils.GetDeckUsageToday()
-    membersToRemind = []
     currentVacationList = db_utils.GetVacationStatus()
+    membersToRemind = []
     otherMembersToRemind = []
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
 
-    if (len(reminderList) == 0):
+    if len(reminderList) == 0:
         return
 
     for nameTuple in reminderList:
@@ -330,14 +345,14 @@ async def DeckUsageReminder():
 
         member = discord.utils.get(channel.members, display_name=nameTuple[0])
 
-        if (member == None):
+        if member == None:
             otherMembersToRemind.append(f"{nameTuple[0]} - Decks used today: {nameTuple[1]}")
         else:
             membersToRemind.append(f"{member.mention} Decks used today: {nameTuple[1]}")
 
     reminderString = "Please complete your battles by the end of the day:\n" + '\n'.join(membersToRemind)
 
-    if (len(otherMembersToRemind) > 0):
+    if len(otherMembersToRemind) > 0:
         reminderString += "\n\nMembers that need to complete battles not in this channel:\n" + '\n'.join(otherMembersToRemind)
 
     await channel.send(reminderString)
