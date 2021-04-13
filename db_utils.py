@@ -61,7 +61,7 @@ def AddNewUser(clashData: dict) -> bool:
 
 
 # Update existing user.
-def UpdateUserInDB(clashData: dict) -> str:
+def UpdateUser(clashData: dict) -> str:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -80,7 +80,7 @@ def UpdateUserInDB(clashData: dict) -> str:
     return True
 
 
-def GetPlayerTagFromDB(player_name: str) -> str:
+def GetPlayerTag(player_name: str) -> str:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -98,7 +98,7 @@ def GetPlayerTagFromDB(player_name: str) -> str:
 
 
 # Remove user from DB along with any roles assigned to them.
-def RemoveUserFromDB(player_name: str):
+def RemoveUser(player_name: str):
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -114,38 +114,6 @@ def RemoveUserFromDB(player_name: str):
 
     cursor.execute("DELETE FROM assigned_roles WHERE user_id = %s", (user_id))
     cursor.execute("DELETE FROM users WHERE id = %s", (user_id))
-    db.commit()
-    db.close()
-
-
-# Get current normal roles possesed by user.
-def CommitRoles(player_name: str, roles: list):
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
-    cursor = db.cursor(pymysql.cursors.DictCursor)
-
-    # Get user_id from player_name.
-    cursor.execute("SELECT id FROM users WHERE player_name = %s", (player_name))
-    queryResult = cursor.fetchone()
-
-    if (queryResult == None):
-        db.close()
-        return
-    
-    user_id = queryResult["id"]
-
-    cursor.execute("DELETE FROM assigned_roles WHERE user_id = %s", (user_id))
-
-    for role in roles:
-        cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role))
-        queryResult = cursor.fetchone()
-
-        if (queryResult == None):
-            continue
-
-        discord_role_id = queryResult["id"]
-
-        cursor.execute("INSERT INTO assigned_roles VALUES (%s, %s)", (user_id, discord_role_id))
-
     db.commit()
     db.close()
 
@@ -193,8 +161,46 @@ def GetVacationStatus() -> list:
     return vacationList
 
 
+# Set vacation to false for all users.
+def DisableAllVacation():
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("UPDATE user SET vacation = FALSE")
+
+    db.commit()
+    db.close()
+
+
+# Toggle whether to send deck usage reminders.
+def SetRemindersStatus(status: bool):
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("UPDATE reminders SET send_reminders = %s", (status))
+
+    db.commit()
+    db.close()
+
+
+# Return whether automated reminders are enabled/disabled.
+def GetRemindersStatus() -> bool:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT * FROM reminders")
+    queryResult = cursor.fetchone()
+
+    if queryResult == None:
+        db.close()
+        return False
+
+    status = queryResult["send_reminders"]
+    db.close()
+    return status
+
 # Return a list of discord role_names corresponding to a user.
-def GetRolesFromDB(player_name: str) -> list:
+def GetRoles(player_name: str) -> list:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -234,6 +240,38 @@ def GetRolesFromDB(player_name: str) -> list:
         roles.append(queryResult["role_name"])
 
     return roles
+
+
+# Get current normal roles possesed by user.
+def CommitRoles(player_name: str, roles: list):
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    # Get user_id from player_name.
+    cursor.execute("SELECT id FROM users WHERE player_name = %s", (player_name))
+    queryResult = cursor.fetchone()
+
+    if (queryResult == None):
+        db.close()
+        return
+    
+    user_id = queryResult["id"]
+
+    cursor.execute("DELETE FROM assigned_roles WHERE user_id = %s", (user_id))
+
+    for role in roles:
+        cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role))
+        queryResult = cursor.fetchone()
+
+        if (queryResult == None):
+            continue
+
+        discord_role_id = queryResult["id"]
+
+        cursor.execute("INSERT INTO assigned_roles VALUES (%s, %s)", (user_id, discord_role_id))
+
+    db.commit()
+    db.close()
 
 
 def OutputToCSV(file_path: str) -> bool:

@@ -1,6 +1,6 @@
 from credentials import BOT_TOKEN, GUILD_NAME
 from clash_utils import GetClashUserData, GetDeckUsageToday
-from db_utils import AddNewUser, CommitRoles, GetPlayerTagFromDB, GetRolesFromDB, GetVacationStatus, OutputToCSV, RemoveUserFromDB, UpdateUserInDB, UpdateVacationForUser
+import db_utils
 from discord.ext import commands
 import aiocron
 import asyncio
@@ -54,7 +54,7 @@ async def on_member_join(member):
 
 @bot.event
 async def on_member_remove(member):
-    RemoveUserFromDB(member.display_name)
+    db_utilsRemoveUser(member.display_name)
 
 
 @bot.event
@@ -66,13 +66,31 @@ async def on_message(message):
         discord_name = message.author.name + "#" + message.author.discriminator
         clashData = GetClashUserData(message.content, discord_name)
         if (clashData != None):
-            if (AddNewUser(clashData)):
+            if (db_utils.AddNewUser(clashData)):
                 await message.author.edit(nick=clashData["player_name"])
                 await message.author.add_roles(SPECIAL_ROLES["Check Rules"])
                 await message.author.remove_roles(SPECIAL_ROLES["New"])
         await message.delete()
 
     await bot.process_commands(message)
+
+
+@bot.event
+async def on_raw_reaction_add(payload):
+    guild = bot.get_guild(payload.guild_id)
+    channel = await bot.fetch_channel(payload.channel_id)
+    message = await channel.fetch_message(payload.message_id)
+    member = guild.get_member(payload.user_id)
+
+    if ((channel.name != RULES_CHANNEL) or (SPECIAL_ROLES["Check Rules"] not in member.roles) or (member == bot.user) or (member.bot)):
+        return
+
+    await member.remove_roles(SPECIAL_ROLES["Check Rules"])
+    dbRoles = db_utils.GetRoles(member.display_name)
+    savedRoles = []
+    for role in dbRoles:
+        savedRoles.append(NORMAL_ROLES[role])
+    await member.add_roles(*savedRoles)
 
 
 @bot.command()
@@ -88,26 +106,12 @@ async def update_user(ctx, player_name, player_tag):
     await UpdateUser(ctx, member, player_tag)
 
 
-async def UpdateUser(ctx, member: discord.Member, player_tag = None):
-    if (player_tag == None):
-        player_tag = GetPlayerTagFromDB(member.display_name)
-
-    if (player_tag == None):
-        return
-
-    discord_name = member.name + "#" + member.discriminator
-    clashData = GetClashUserData(player_tag, discord_name)
-    UpdateUserInDB(clashData)
-
-    await member.edit(nick=clashData["player_name"])
-
-
 @bot.command()
 async def vacation(ctx, *args):
     if (ctx.message.channel.name != TIME_OFF_CHANNEL):
         return
 
-    vacationStatus = UpdateVacationForUser(ctx.author.display_name)
+    vacationStatus = db_utils.UpdateVacationForUser(ctx.author.display_name)
     vacationStatusString = ("NOT " if not vacationStatus else "") + "ON VACATION"
     reply = f"New vacation status for {ctx.author.mention}: {vacationStatusString}"
     await ctx.send(reply)
@@ -122,7 +126,7 @@ async def set_vacation(ctx, player_name, status):
     if (member == None):
         await ctx.send(f"Could not find user: {player_name}")
 
-    vacationStatus = UpdateVacationForUser(player_name, status)
+    vacationStatus = db_utils.UpdateVacationForUser(player_name, status)
     vacationStatusString = ("NOT " if not vacationStatus else "") + "ON VACATION"
     await ctx.send(f"Updated vacation status of {member.mention} to: {vacationStatusString}")
 
@@ -132,7 +136,7 @@ async def vacation_list(ctx, *args):
     if ((ctx.message.channel.name != TIME_OFF_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles)):
         return
 
-    vacationList = GetVacationStatus()
+    vacationList = db_utils.GetVacationStatus()
     vacationString = '\n'.join(vacationList)
 
     await ctx.send(f"This is the list of players currently on vacation:\n{vacationString}")
@@ -147,7 +151,7 @@ async def export(ctx, *args):
         for member in ctx.guild.members:
             await UpdateUser(ctx, member)
 
-    OutputToCSV("members.csv")
+    db_utils.OutputToCSV("members.csv")
     await ctx.send(file=discord.File("members.csv"))
 
 
@@ -163,7 +167,7 @@ async def force_rules_check(ctx, *args):
     for member in membersList:
         # Get a list of normal roles (Visitor, Member, or Elder) that a member current has. These will be restored after reacting to rules message.
         roleStringsToCommit = [ role.name for role in list(set(NORMAL_ROLES.values()).intersection(set(member.roles))) ]
-        CommitRoles(member.display_name, roleStringsToCommit)
+        db_utils.CommitRoles(member.display_name, roleStringsToCommit)
         await member.remove_roles(*rolesToRemoveList)
         await member.add_roles(SPECIAL_ROLES["Check Rules"])
 
@@ -171,24 +175,6 @@ async def force_rules_check(ctx, *args):
     await rulesChannel.purge(limit=5, check=lambda message: message.author == bot.user)
     newReactMessage = await rulesChannel.send(content="React to this message for roles.")
     await newReactMessage.add_reaction(u"\u2705")
-
-
-@bot.event
-async def on_raw_reaction_add(payload):
-    guild = bot.get_guild(payload.guild_id)
-    channel = await bot.fetch_channel(payload.channel_id)
-    message = await channel.fetch_message(payload.message_id)
-    member = guild.get_member(payload.user_id)
-
-    if ((channel.name != RULES_CHANNEL) or (SPECIAL_ROLES["Check Rules"] not in member.roles) or (member == bot.user) or (member.bot)):
-        return
-
-    await member.remove_roles(SPECIAL_ROLES["Check Rules"])
-    dbRoles = GetRolesFromDB(member.display_name)
-    savedRoles = []
-    for role in dbRoles:
-        savedRoles.append(NORMAL_ROLES[role])
-    await member.add_roles(*savedRoles)
 
 
 @bot.command()
@@ -199,16 +185,41 @@ async def send_reminder(ctx, *args):
     await DeckUsageReminder()
 
 
-# Send reminder every Monday and Tuesday at 00:00 UTC (5pm PDT)
-@aiocron.crontab('0 0 * * 1,2')
-async def AutomatedReminder():
-    await DeckUsageReminder()
+@bot.command()
+async def set_reminders(ctx, status):
+    if (ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+        return
 
+    newStatus = None
+
+    if (status.lower() == "true"):
+        newStatus = True
+    elif (status.lower() == "false"):
+        newStatus = False
+    else:
+        await ctx.channel.send(f"Invalid argument: {status}. Valid set_reminder args are: true, false")
+
+    db_utils.SetRemindersStatus(newStatus)
+    await ctx.channel.send("Automated deck usage reminders and strikes are now " + ("ENABLED" if newStatus else "DISABLED"))
+
+
+
+# Send reminder every Tuesday and Wednesday at 00:00 UTC (Monday and Tuesday at 5pm PDT)
+@aiocron.crontab('0 0 * * 2,3')
+async def AutomatedReminder():
+    if (db_utils.GetRemindersStatus()):
+        await DeckUsageReminder()
+
+
+# Turn off vacation for all users and assign strikes to members that have not completed battles.
+@aiocron.crontab('0 19 * * 3')
+async def AssignStrikesAndClearVacation():
+    return
 
 async def DeckUsageReminder():
     reminderList = GetDeckUsageToday()
     membersToRemind = []
-    currentVacationList = GetVacationStatus()
+    currentVacationList = db_utils.GetVacationStatus()
     otherMembersToRemind = []
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
@@ -233,5 +244,20 @@ async def DeckUsageReminder():
         reminderString += "\n\nMembers that need to complete battles not in this channel:\n" + '\n'.join(otherMembersToRemind)
 
     await channel.send(reminderString)
+
+
+async def UpdateUser(ctx, member: discord.Member, player_tag = None):
+    if (player_tag == None):
+        player_tag = db_utils.GetPlayerTag(member.display_name)
+
+    if (player_tag == None):
+        return
+
+    discord_name = member.name + "#" + member.discriminator
+    clashData = GetClashUserData(player_tag, discord_name)
+    db_utils.UpdateUser(clashData)
+
+    await member.edit(nick=clashData["player_name"])
+
 
 bot.run(BOT_TOKEN)

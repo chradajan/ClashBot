@@ -41,6 +41,11 @@ def GetDeckUsageToday(clan_tag = "#JVQJRV0") -> list:
     jsonDump = json.dumps(req.json())
     jsonObj = json.loads(jsonDump)
 
-    participantList = [ (participant["name"], participant["decksUsedToday"]) for participant in jsonObj["clan"]["participants"] if (participant["decksUsedToday"] < 4) ]
+    participantList = []
+
+    try:
+        participantList = [ (participant["name"], participant["decksUsedToday"]) for participant in jsonObj["clan"]["participants"] if (participant["decksUsedToday"] < 4) ]
+    except:
+        print("Failed to get decksUsedToday")
 
     return participantList
