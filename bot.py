@@ -67,7 +67,8 @@ async def on_message(message):
         clashData = GetClashUserData(message.content, discord_name)
         if (clashData != None):
             if (db_utils.AddNewUser(clashData)):
-                await message.author.edit(nick=clashData["player_name"])
+                if (SPECIAL_ROLES["Leader"] not in message.author.roles):
+                    await message.author.edit(nick=clashData["player_name"])
                 await message.author.add_roles(SPECIAL_ROLES["Check Rules"])
                 await message.author.remove_roles(SPECIAL_ROLES["New"])
         await message.delete()
@@ -85,6 +86,12 @@ async def on_raw_reaction_add(payload):
     if ((channel.name != RULES_CHANNEL) or (SPECIAL_ROLES["Check Rules"] not in member.roles) or (member == bot.user) or (member.bot)):
         return
 
+    if (SPECIAL_ROLES["Leader"] in member.roles):
+        await member.remove_roles(SPECIAL_ROLES["Check Rules"])
+        rolesToAdd = list(NORMAL_ROLES.values())
+        await member.add_roles(*rolesToAdd)
+        return
+
     await member.remove_roles(SPECIAL_ROLES["Check Rules"])
     dbRoles = db_utils.GetRoles(member.display_name)
     savedRoles = []
@@ -100,10 +107,45 @@ async def update_user(ctx, player_name, player_tag):
 
     member = discord.utils.get(ctx.guild.members, display_name=player_name)
     if (member == None):
-        await ctx.send(f"Could not find user: {player_name}")
+        await ctx.send(f"Could not find user: {player_name}.")
         return
 
     await UpdateUser(ctx, member, player_tag)
+
+
+# Remove from DB and assign New role.
+@bot.command()
+async def reset_user(ctx, player_name):
+    if (ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+        return
+
+    member = discord.utils.get(ctx.guild.members, display_name=player_name)
+    if (member == None):
+        await ctx.send(f"Could not find user: {player_name}.")
+        return
+
+    await ResetUser(member, True)
+    await ctx.send(f"{player_name} has been reset.")
+
+
+# Remove all users from DB and assign New role.
+@bot.command()
+async def reset_all_users(ctx, safety_check):
+    if (ctx.message.channel.name != LEADER_CHANNEL) or (SPECIAL_ROLES["Leader"] not in ctx.author.roles):
+        return
+
+    confirmationMessage = "Yes, I really want to drop all players from the database and reset roles."
+
+    if (safety_check != confirmationMessage):
+        await ctx.send("Users NOT reset. Must type the following confirmation message exactly, in quotes, along with reset_all_users command:\n" + confirmationMessage)
+        return
+
+    db_utils.RemoveAllUsers()
+
+    for member in ctx.guild.members:
+        await ResetUser(member, False)
+
+    await ctx.send("All users have been reset.")
 
 
 @bot.command()
@@ -113,7 +155,7 @@ async def vacation(ctx, *args):
 
     vacationStatus = db_utils.UpdateVacationForUser(ctx.author.display_name)
     vacationStatusString = ("NOT " if not vacationStatus else "") + "ON VACATION"
-    reply = f"New vacation status for {ctx.author.mention}: {vacationStatusString}"
+    reply = f"New vacation status for {ctx.author.mention}: {vacationStatusString}."
     await ctx.send(reply)
 
 
@@ -124,11 +166,11 @@ async def set_vacation(ctx, player_name, status):
 
     member = discord.utils.get(ctx.guild.members, display_name=player_name)
     if (member == None):
-        await ctx.send(f"Could not find user: {player_name}")
+        await ctx.send(f"Could not find user: {player_name}.")
 
     vacationStatus = db_utils.UpdateVacationForUser(player_name, status)
     vacationStatusString = ("NOT " if not vacationStatus else "") + "ON VACATION"
-    await ctx.send(f"Updated vacation status of {member.mention} to: {vacationStatusString}")
+    await ctx.send(f"Updated vacation status of {member.mention} to: {vacationStatusString}.")
 
 
 @bot.command()
@@ -200,7 +242,7 @@ async def set_reminders(ctx, status):
         await ctx.channel.send(f"Invalid argument: {status}. Valid set_reminder args are: true, false")
 
     db_utils.SetRemindersStatus(newStatus)
-    await ctx.channel.send("Automated deck usage reminders and strikes are now " + ("ENABLED" if newStatus else "DISABLED"))
+    await ctx.channel.send("Automated deck usage reminders and strikes are now " + ("ENABLED" if newStatus else "DISABLED") + ".")
 
 
 
@@ -258,6 +300,16 @@ async def UpdateUser(ctx, member: discord.Member, player_tag = None):
     db_utils.UpdateUser(clashData)
 
     await member.edit(nick=clashData["player_name"])
+
+
+async def ResetUser(member: discord.Member, removeFromDB: bool):
+    rolesToRemoveList = list(NORMAL_ROLES.values())
+    rolesToRemoveList.append(SPECIAL_ROLES["Check Rules"])
+    await member.remove_roles(*rolesToRemoveList)
+    await member.add_roles(SPECIAL_ROLES["New"])
+
+    if (removeFromDB):
+        db_utils.RemoveUser(member.display_name)
 
 
 bot.run(BOT_TOKEN)

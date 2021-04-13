@@ -118,6 +118,18 @@ def RemoveUser(player_name: str):
     db.close()
 
 
+# Drop all users and assigned roles.
+def RemoveAllUsers():
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("DELETE FROM assigned_roles")
+    cursor.execute("DELETE FROM users")
+
+    db.commit()
+    db.close()
+
+
 # Set user to opposite of their current vacation status. Returns new status.
 def UpdateVacationForUser(player_name: str, status=None) -> bool:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
