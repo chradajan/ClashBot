@@ -333,18 +333,30 @@ def CommitRoles(player_name: str, roles: list):
     db.close()
 
 
-def OutputToCSV(file_path: str) -> bool:
+def OutputToCSV(file_path: str, false_logic_only: bool) -> bool:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    cursor.execute("SELECT * FROM users")
+    clans = None
+    falseLogicId = None
+
+    if false_logic_only:
+        cursor.execute("SELECT * FROM clans WHERE clan_name = %s", ("False Logic"))
+        clans = cursor.fetchall()
+        falseLogicId = clans[0]["id"]
+    else:
+        cursor.execute("SELECT * FROM clans")
+        clans = cursor.fetchall()
+
+    if false_logic_only:
+        cursor.execute("SELECT * FROM users WHERE clan_id = %s", (falseLogicId))
+    else:
+        cursor.execute("SELECT * FROM users")
+
     users = cursor.fetchall()
 
-    if (users == None):
+    if users == None:
         return False
-
-    cursor.execute("SELECT * FROM clans")
-    clans = cursor.fetchall()
 
     clansDict = {}
     for clan in clans:

@@ -8,9 +8,10 @@ import discord
 import os
 
 # Create bot
+help_command = commands.DefaultHelpCommand(no_category="Clash Bot Commands")
 intents = discord.Intents.default()
 intents.members = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', help_command=help_command, intents=intents)
 
 SPECIAL_ROLES = {
     "Leader": None,
@@ -90,10 +91,10 @@ async def on_raw_reaction_add(payload):
     message = await channel.fetch_message(payload.message_id)
     member = guild.get_member(payload.user_id)
 
-    if ((channel.name != RULES_CHANNEL) or (SPECIAL_ROLES["Check Rules"] not in member.roles) or (member == bot.user) or (member.bot)):
+    if (channel.name != RULES_CHANNEL) or (SPECIAL_ROLES["Check Rules"] not in member.roles) or (member == bot.user) or (member.bot):
         return
 
-    if (SPECIAL_ROLES["Leader"] in member.roles):
+    if SPECIAL_ROLES["Leader"] in member.roles:
         await member.remove_roles(SPECIAL_ROLES["Check Rules"])
         rolesToAdd = list(NORMAL_ROLES.values())
         await member.add_roles(*rolesToAdd)
@@ -109,36 +110,42 @@ async def on_raw_reaction_add(payload):
 
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
-async def update_user(ctx, player_name, player_tag):
-    member = discord.utils.get(ctx.guild.members, display_name=player_name)
-    if (member == None):
-        await ctx.send(f"Could not find user: {player_name}.")
-        return
-
+async def update_user(ctx, member: discord.Member, player_tag: str):
+    "Leader only. Update selected user to use information associated with given player_tag. Changes information in database and updates Discord nickname"
     await UpdateUser(ctx, member, player_tag)
     await ctx.send(f"{player_name} has been updated.")
 
+@update_user.error
+async def update_user_error(ctx, error):
+    if isinstance(error, commands.errors.MemberNotFound):
+        await ctx.send("Member not found.")
+    else:
+        await ctx.send("Error. Command should be formatted as:\n!update_user (user) (player_tag)")
 
-# Remove from DB and assign New role.
+
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
-async def reset_user(ctx, player_name):
-    member = discord.utils.get(ctx.guild.members, display_name=player_name)
-    if (member == None):
-        await ctx.send(f"Could not find user: {player_name}.")
-        return
-
+async def reset_user(ctx, member: discord.Member):
+    "Leader only. Delete selected user from database. Resets their role to New."
     await ResetUser(member, True)
     await ctx.send(f"{player_name} has been reset.")
+
+@reset_user.error
+async def reset_user_error(ctx, error):
+    if isinstance(error, commands.errors.MemberNotFound):
+        await ctx.send("Member not found.")
+    else:
+        await ctx.send("Error. Command should be formatted as:\n!reset_user (user)")
 
 
 # Remove all users from DB and assign New role.
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
-async def reset_all_users(ctx, safety_check):
+async def reset_all_users(ctx, safety_message):
+    "Leader only. Deletes all users from database, removes roles, and assigns New role. Leaders retain Leader role. Leaders must still resend player tag in welcome channel and react to rules message."
     confirmationMessage = "Yes, I really want to drop all players from the database and reset roles."
 
-    if (safety_check != confirmationMessage):
+    if (safety_message != confirmationMessage):
         await ctx.send("Users NOT reset. Must type the following confirmation message exactly, in quotes, along with reset_all_users command:\n" + confirmationMessage)
         return
 
@@ -149,9 +156,14 @@ async def reset_all_users(ctx, safety_check):
 
     await ctx.send("All users have been reset.")
 
+@reset_all_users.error
+async def reset_all_users_error(ctx, error):
+    await ctx.send("Error. Command should be formatted as:\n!reset_all_users (confirmation message)")
+
 
 @bot.command()
-async def vacation(ctx, *args):
+async def vacation(ctx):
+    "Toggles vacation status."
     if (ctx.message.channel.name != TIME_OFF_CHANNEL):
         return
 
@@ -162,19 +174,24 @@ async def vacation(ctx, *args):
 
 @bot.command()
 @is_leader_command_check(TIME_OFF_CHANNEL)
-async def set_vacation(ctx, player_name, status):
-    member = discord.utils.get(ctx.guild.members, display_name=player_name)
-    if (member == None):
-        await ctx.send(f"Could not find user: {player_name}.")
-
+async def set_vacation(ctx, member: discord.Member, status: bool):
+    "Leader only. Sets vacation status of target user."
     vacationStatus = db_utils.UpdateVacationForUser(player_name, status)
     vacationStatusString = ("NOT " if not vacationStatus else "") + "ON VACATION"
     await ctx.send(f"Updated vacation status of {member.mention} to: {vacationStatusString}.")
 
+@set_vacation.error
+async def set_vacation_error(ctx, error):
+    if isinstance(error, commands.errors.MemberNotFound):
+        await ctx.send("Member not found.")
+    else:
+        await ctx.send("Error. Command should be formatted as:\n!set_vacation (user) (yes or no)")
+
 
 @bot.command()
 @is_leader_command_check(TIME_OFF_CHANNEL)
-async def vacation_list(ctx, *args):
+async def vacation_list(ctx):
+    "Leader only. Gets list of all users currently on vacation. Used in time off channel."
     vacationList = db_utils.GetVacationStatus()
     vacationString = '\n'.join(vacationList)
 
@@ -183,18 +200,24 @@ async def vacation_list(ctx, *args):
 
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
-async def export(ctx, *args):
-    if ((len(args) == 1) and (args[0].lower() == "update")):
+async def export(ctx, UpdateBeforeExport: bool=True, FalseLogicOnly: bool=True):
+    "Leader only. Export database to csv file."
+    if (UpdateBeforeExport):
         for member in ctx.guild.members:
             await UpdateUser(ctx, member)
 
-    db_utils.OutputToCSV("members.csv")
+    db_utils.OutputToCSV("members.csv", FalseLogicOnly)
     await ctx.send(file=discord.File("members.csv"))
+
+@export.error
+async def export_error(ctx, error):
+    await ctx.send("Error. Command should be formatted as:\n!export (update DB before export)")
 
 
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
-async def force_rules_check(ctx, *args):
+async def force_rules_check(ctx):
+    "Leader only. Strip roles from all non-leaders until they acknowledge new rules."
     # Get a list of members in guild without any special roles (New, Check Rules, or Leader) and that aren't bots.
     membersList = [member for member in ctx.guild.members if ((len(set(SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
     rolesToRemoveList = list(NORMAL_ROLES.values())
@@ -215,6 +238,7 @@ async def force_rules_check(ctx, *args):
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
 async def set_strike_count(ctx, member: discord.Member, strikes: int):
+    "Leader only. Set specified user's strike count to target value."
     newStrikeCount = db_utils.SetStrikes(member.display_name, strikes)
     await ctx.send(f"New strike count for {member.display_name}: {newStrikeCount}")
 
@@ -225,42 +249,36 @@ async def set_strike_count_error(ctx, error):
     else:
         await ctx.send("Error. Command should be formatted as:\n!set_strike_count (user) (count)")
 
+
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
-async def send_reminder(ctx, *args):
+async def send_reminder(ctx):
+    "Leader only. Send message to reminders channel tagging users who still have battles to complete."
     await DeckUsageReminder()
 
 
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
-async def set_automated_reminders(ctx, status):
-    newStatus = None
+async def set_automated_reminders(ctx, status: bool):
+    "Leader only. Set whether automated reminders should be sent."
+    db_utils.SetReminderStatus(status)
+    await ctx.channel.send("Automated deck usage reminders are now " + ("ENABLED" if status else "DISABLED") + ".")
 
-    if (status.lower() == "true"):
-        newStatus = True
-    elif (status.lower() == "false"):
-        newStatus = False
-    else:
-        await ctx.channel.send(f"Invalid argument: {status}. Valid set_reminder args are: true, false")
-
-    db_utils.SetReminderStatus(newStatus)
-    await ctx.channel.send("Automated deck usage reminders are now " + ("ENABLED" if newStatus else "DISABLED") + ".")
+@set_automated_reminders.error
+async def set_automated_reminders_error(ctx, error):
+    await ctx.send("Error. Command should be formatted as:\n!set_automated_reminders (yes or no)")
 
 
 @bot.command()
 @is_leader_command_check(LEADER_CHANNEL)
-async def set_automated_strikes(ctx, status):
-    newStatus = None
+async def set_automated_strikes(ctx, status: bool):
+    "Leader only. Set whether automated strikes should be given."
+    db_utils.SetStrikeStatus(status)
+    await ctx.channel.send("Automated strikes for low deck usage are now " + ("ENABLED" if status else "DISABLED") + ".")
 
-    if (status.lower() == "true"):
-        newStatus = True
-    elif (status.lower() == "false"):
-        newStatus = False
-    else:
-        await ctx.channel.send(f"Invalid argument: {status}. Valid set_automated_strikes args are: true, false")
-
-    db_utils.SetStrikeStatus(newStatus)
-    await ctx.channel.send("Automated strikes for low deck usage are now " + ("ENABLED" if newStatus else "DISABLED") + ".")
+@set_automated_strikes.error
+async def set_automated_strikes_error(ctx, error):
+    await ctx.send("Error. Command should be formatted as:\n!set_automated_strikes (yes or no)")
 
 
 # Send reminder every Tuesday and Wednesday at 00:00 UTC (Monday and Tuesday at 5pm PDT)
@@ -340,6 +358,9 @@ async def UpdateUser(ctx, member: discord.Member, player_tag = None):
 
 
 async def ResetUser(member: discord.Member, removeFromDB: bool):
+    if member.bot:
+        return
+
     rolesToRemoveList = list(NORMAL_ROLES.values())
     rolesToRemoveList.append(SPECIAL_ROLES["Check Rules"])
     await member.remove_roles(*rolesToRemoveList)
