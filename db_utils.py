@@ -1,5 +1,5 @@
-from config.config import PRIMARY_CLAN_NAME
-from config.credentials import IP, USERNAME, PASSWORD, DB_NAME
+from config import PRIMARY_CLAN_NAME
+from credentials import IP, USERNAME, PASSWORD, DB_NAME
 from clash_utils import GetClashUserData
 import csv
 import pymysql
@@ -47,7 +47,7 @@ def AddNewUser(clashData: dict) -> bool:
     user_id = queryResult["id"]
 
     # Check if new user is member or visitor. Get id of relevant discord_role.
-    roleString = "Member" if (clashData["clan_name"] == PRIMARY_CLAN_NAME) else "Visistor"
+    roleString = "Member" if (clashData["clan_name"] == PRIMARY_CLAN_NAME) else "Visitor"
     cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (roleString))
     queryResult = cursor.fetchone()
     discord_role_id = queryResult["id"]
