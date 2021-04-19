@@ -413,7 +413,7 @@ async def set_automated_strikes_error(ctx, error):
 @is_leader_command_check()
 @channel_check(COMMANDS_CHANNEL)
 async def top_fame(ctx):
-    "Leader/Admin only. Get top users by fame and send to hall-of-fame."
+    "Leader/Admin only. Send a list of top users by fame in the fame channel."
     await TopFame()
 
 @top_fame.error
@@ -432,7 +432,7 @@ async def top_fame_error(ctx, error):
 @is_leader_command_check()
 @channel_check(COMMANDS_CHANNEL)
 async def fame_check(ctx, threshold: int):
-    "Leader/Admin only. Mention users below fame threshold."
+    "Leader/Admin only. Mention users below fame threshold in the fame channel."
     await FameCheck(threshold)
 
 @fame_check.error
@@ -473,6 +473,33 @@ async def mention_users_error(ctx, error):
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !mention_users <members> <channel> <message>")
         raise error
+
+
+# Get river race status
+
+@bot.command()
+@is_leader_command_check()
+@channel_check(COMMANDS_CHANNEL)
+async def river_race_status(ctx):
+    "Leader/Admin only. Send a list of clans in the current river race and their number of decks remaining today."
+    clanList = clash_utils.GetOtherClanDecksRemaining()
+    channel = discord.utils.get(ctx.guild.channels, name=REMINDER_CHANNEL)
+    messageString = "Current River Race Status:\n\n"
+
+    for clanTuple in clanList:
+        messageString += f"{clanTuple[0]} - Decks remaining: {clanTuple[1]}"
+
+    await channel.send(messageString)
+
+@river_race_status.error
+async def river_race_status_error(ctx, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+        await ctx.send(f"!river_race_status command can only be sent in {channel.mention} by Leaders/Admins.")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !current_river_race_status")
+        raise error
+
 
 
 # Send reminder every Tuesday and Wednesday at 00:00 UTC (Monday and Tuesday at 5pm PDT)

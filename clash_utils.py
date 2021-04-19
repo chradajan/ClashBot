@@ -105,3 +105,24 @@ def GetHallOfShame(threshold: int, clan_tag = PRIMARY_CLAN_TAG) -> list:
     participantList.sort(key = lambda x : (x[1], x[0]), reverse = True)
 
     return participantList
+
+def GetOtherClanDecksRemaining(clan_tag = PRIMARY_CLAN_TAG) -> dict:
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
+
+    if (req.status_code != 200):
+        return []
+
+    jsonDump = json.dumps(req.json())
+    jsonObj = json.loads(jsonDump)
+
+    returnList = []
+
+    for clan in jsonObj["clans"]:
+        decksRemaining = 0
+        for participant in clan["participants"]:
+            decksRemaining += 4 - participant["decksUsedToday"]
+        returnList.append((clan["name"], decksRemaining))
+
+    returnList.sort(key = lambda x : (x[1], x[0]))
+
+    return returnList
