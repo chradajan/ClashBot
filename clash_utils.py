@@ -4,6 +4,18 @@ import json
 import re
 import requests
 
+def GetActiveMembersInClan(clan_tag: str) -> list:
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if (req.status_code != 200):
+            return []
+
+    jsonDump = json.dumps(req.json())
+    jsonObj = json.loads(jsonDump)
+
+    return [ member["name"] for member in jsonObj["items"] ]
+
+
 def ParsePlayerTag(message: str) -> str:
     foundPattern = re.search(r"(#[A-Z0-9]+)", message)
     if foundPattern != None:
@@ -17,7 +29,7 @@ def GetClashUserData(message: str, discordName: str) -> dict:
     if player_tag == None:
         return None
 
-    req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
+    req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
         return None
@@ -39,7 +51,7 @@ def GetClashUserData(message: str, discordName: str) -> dict:
 
 # Get a list of users who have not used 4 decks today.
 def GetDeckUsageToday(clan_tag = PRIMARY_CLAN_TAG) -> list:
-    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
         return []
@@ -47,7 +59,9 @@ def GetDeckUsageToday(clan_tag = PRIMARY_CLAN_TAG) -> list:
     jsonDump = json.dumps(req.json())
     jsonObj = json.loads(jsonDump)
 
-    participantList = [ (participant["name"], participant["decksUsedToday"]) for participant in jsonObj["clan"]["participants"] if (participant["decksUsedToday"] < 4) ]
+    activeMembers = GetActiveMembersInClan(clan_tag)
+
+    participantList = [ (participant["name"], participant["decksUsedToday"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["name"] in activeMembers)) ]
     participantList.sort(key = lambda x : (x[1], x[0]))
 
     return participantList
@@ -55,7 +69,7 @@ def GetDeckUsageToday(clan_tag = PRIMARY_CLAN_TAG) -> list:
 
 # Get a list of user who have not used 8 decks during current river race.
 def GetDeckUsage(clan_tag = PRIMARY_CLAN_TAG) -> list:
-    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
         return []
@@ -63,13 +77,15 @@ def GetDeckUsage(clan_tag = PRIMARY_CLAN_TAG) -> list:
     jsonDump = json.dumps(req.json())
     jsonObj = json.loads(jsonDump)
 
-    participantList = [ (participant["name"], participant["decksUsed"]) for participant in jsonObj["clan"]["participants"] if (participant["decksUsed"] < 8) ]
+    activeMembers = GetActiveMembersInClan(clan_tag)
+
+    participantList = [ (participant["name"], participant["decksUsed"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsed"] < 8) and (participant["name"] in activeMembers)) ]
     participantList.sort(key = lambda x : (x[1], x[0]))
 
     return participantList
 
 def GetTopFameUsers(topN :int=3, clan_tag = PRIMARY_CLAN_TAG) -> list:
-    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
         return []
@@ -77,7 +93,9 @@ def GetTopFameUsers(topN :int=3, clan_tag = PRIMARY_CLAN_TAG) -> list:
     jsonDump = json.dumps(req.json())
     jsonObj = json.loads(jsonDump)
 
-    fameList = [ (participant["name"], participant["fame"]) for participant in jsonObj["clan"]["participants"] ]
+    activeMembers = GetActiveMembersInClan(clan_tag)
+
+    fameList = [ (participant["name"], participant["fame"]) for participant in jsonObj["clan"]["participants"] if participant["name"] in activeMembers ]
     fameList.sort(key = lambda x : x[1], reverse = True)
 
     if len(fameList) <= topN:
@@ -101,7 +119,9 @@ def GetHallOfShame(threshold: int, clan_tag = PRIMARY_CLAN_TAG) -> list:
     jsonDump = json.dumps(req.json())
     jsonObj = json.loads(jsonDump)
 
-    participantList = [ (participant["name"], participant["fame"]) for participant in jsonObj["clan"]["participants"] if participant["fame"] < threshold ]
+    activeMembers = GetActiveMembersInClan(clan_tag)
+
+    participantList = [ (participant["name"], participant["fame"]) for participant in jsonObj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["name"] in activeMembers)) ]
     participantList.sort(key = lambda x : (x[1], x[0]), reverse = True)
 
     return participantList
@@ -118,9 +138,13 @@ def GetOtherClanDecksRemaining(clan_tag = PRIMARY_CLAN_TAG) -> dict:
     returnList = []
 
     for clan in jsonObj["clans"]:
+        activeMembers = GetActiveMembersInClan(clan["tag"])
         decksRemaining = 0
+
         for participant in clan["participants"]:
-            decksRemaining += 4 - participant["decksUsedToday"]
+            if participant["name"] in activeMembers:
+                decksRemaining += (4 - participant["decksUsedToday"])
+
         returnList.append((clan["name"], decksRemaining))
 
     returnList.sort(key = lambda x : (x[1], x[0]))

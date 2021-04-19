@@ -82,7 +82,7 @@ def AddStrike(player_name: str) -> int:
     cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
     queryResult = cursor.fetchone()
 
-    if (queryResult == None):
+    if queryResult == None:
         return 0
 
     db.commit()
@@ -91,21 +91,33 @@ def AddStrike(player_name: str) -> int:
     return queryResult["strikes"]
 
 
-def SetStrikes(player_name: str, strike_count: int) -> int:
+def SetStrikes(player_name: str, strike_count: int) -> tuple:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
+    cursor.execute("SELECT strikes FROM users WHERE player_name = %s", (player_name))
+    queryResult = cursor.fetchone()
+
+    if queryResult == None:
+        db.close()
+        return None
+
+    previousStrikes = queryResult["strikes"]
+
     cursor.execute("UPDATE users SET strikes = %s WHERE player_name = %s", (strike_count, player_name))
-    cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT strikes FROM users WHERE player_name = %s", (player_name))
     queryResult = cursor.fetchone()
 
     if (queryResult == None):
-        return 0
+        db.close()
+        return None
+
+    newStrikes = queryResult["strikes"]
 
     db.commit()
     db.close()
 
-    return queryResult["strikes"]
+    return (previousStrikes, newStrikes)
 
 
 def GetPlayerTag(player_name: str) -> str:

@@ -133,6 +133,8 @@ async def update_user_error(ctx, error):
     elif isinstance(error, commands.errors.CheckFailure):
         channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
         await ctx.send(f"!update_user command can only be sent in {channel.mention} by Leaders/Admins.")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing arguments. Command should be formatted as:  !update_user <member> <player_tag>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !update_user <member> <player_tag>")
         raise error
@@ -155,6 +157,8 @@ async def reset_user_error(ctx, error):
     elif isinstance(error, commands.errors.CheckFailure):
         channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
         await ctx.send(f"!reset_user command can only be sent in {channel.mention} by Admins.")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing arguments. Command should be formatted as:  !reset_user <member>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !reset_user <member>")
         raise error
@@ -165,7 +169,7 @@ async def reset_user_error(ctx, error):
 @bot.command()
 @is_admin_command_check()
 @channel_check(COMMANDS_CHANNEL)
-async def reset_all_users(ctx, safety_message):
+async def reset_all_users(ctx, confirmation: str):
     "Admin only. Deletes all users from database, removes roles, and assigns New role. Leaders retain Leader role. Leaders must still resend player tag in welcome channel and react to rules message."
     confirmationMessage = "Yes, I really want to drop all players from the database and reset roles."
 
@@ -187,8 +191,10 @@ async def reset_all_users_error(ctx, error):
     if isinstance(error, commands.errors.CheckFailure):
         channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
         await ctx.send(f"!reset_all_users command can only be sent in {channel.mention} by Admins.")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing confirmation. Command should be formatted as:  !reset_all_users <confirmation>. Make sure to enclose the confirmation message in quotes.")
     else:
-        await ctx.send("Something went wrong. Command should be formatted as:  !reset_all_users <safety_message>")
+        await ctx.send("Something went wrong. Command should be formatted as:  !reset_all_users <confirmation>. Make sure to enclose the confirmation message in quotes.")
         raise error
 
 
@@ -231,7 +237,9 @@ async def set_vacation_error(ctx, error):
         channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
         await ctx.send(f"!set_vacation command can only be sent in {channel.mention} by Leaders/Admins.")
     elif isinstance(error, commands.errors.BadBoolArgument):
-        await ctx.send(f"Invalid second argument. Valid statuses: 'yes', 'y', 'true', 't', '1', 'enable', 'on', 'no', 'n', 'false', 'f', '0', 'disable', 'off'")
+        await ctx.send(f"Invalid second argument. Valid statuses: on or off")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing arguments. Command should be formatted as:  !set_vacation <member> <status>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !set_vacation <member> <status>")
         raise error
@@ -324,8 +332,13 @@ async def force_rules_check_error(ctx, error):
 @channel_check(COMMANDS_CHANNEL)
 async def set_strike_count(ctx, member: discord.Member, strikes: int):
     "Leader/Admin only. Set specified user's strike count to specified value."
-    newStrikeCount = db_utils.SetStrikes(member.display_name, strikes)
-    await ctx.send(f"New strike count for {member.display_name}: {newStrikeCount}")
+    strikeTuple = db_utils.SetStrikes(member.display_name, strikes)
+
+    if strikeTuple == None:
+        await ctx.send("Player not found in database. No strike adjustments have been made.")
+
+    channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
+    await channel.send(f"Strikes updated for {member.mention}.  {strikeTuple[0]} -> {strikeTuple[1]}")
 
 @set_strike_count.error
 async def set_strike_count_error(ctx, error):
@@ -336,6 +349,8 @@ async def set_strike_count_error(ctx, error):
         await ctx.send(f"!set_stike_count command can only be sent in {channel.mention} by Leaders/Admins.")
     elif isinstance(error,commands.errors.BadArgument):
         await ctx.send("Invalid strikes value. Strikes must be an integer value.")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing arguments. Command should be formatted as:  !set_strike_count <member> <strikes>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !set_strike_count <member> <strikes>")
         raise error
@@ -380,6 +395,8 @@ async def set_automated_reminders_error(ctx, error):
         await ctx.send(f"!set_automated_reminders command can only be sent in {channel.mention} by Admins.")
     elif isinstance(error, commands.errors.BadBoolArgument):
         await ctx.send("Invalid argument. Valid statuses are: on or off")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing arguments. Command should be formatted as:  !set_automated_reminders <status>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !set_automated_reminders <status>")
         raise error
@@ -402,6 +419,8 @@ async def set_automated_strikes_error(ctx, error):
         await ctx.send(f"!set_automated_strikes command can only be sent in {channel.mention} by Admins.")
     elif isinstance(error, commands.errors.BadBoolArgument):
         await ctx.send("Invalid argument. Valid statuses are: on or off")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing arguments. Command should be formatted as:  !set_automated_strikes <status>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !set_automated_strikes <status>")
         raise error
@@ -442,6 +461,8 @@ async def fame_check_error(ctx, error):
         await ctx.send(f"!fame_check command can only be sent in {channel.mention} by Leaders/Admins.")
     elif isinstance(error, commands.errors.BadArgument):
         await ctx.send("Invalid fame threshold. Fame must be an integer value.")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing arguments. Command should be formatted as:  !fame_check <threshold>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !fame_check <threshold>")
         raise error
@@ -487,7 +508,7 @@ async def river_race_status(ctx):
     messageString = "Current River Race Status:\n\n"
 
     for clanTuple in clanList:
-        messageString += f"{clanTuple[0]} - Decks remaining: {clanTuple[1]}"
+        messageString += f"{clanTuple[0]} - Decks remaining: {clanTuple[1]}" + "\n"
 
     await channel.send(messageString)
 
