@@ -1,6 +1,7 @@
 from config import *
 from credentials import BOT_TOKEN
 from discord.ext import commands
+from prettytable import PrettyTable
 import aiocron
 import asyncio
 import clash_utils
@@ -184,7 +185,7 @@ async def reset_all_users(ctx, confirmation: str):
     for member in ctx.guild.members:
         await ResetUser(member, False)
 
-    await ctx.send("All users have been reset. Admins, please send your player tags in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back.")
+    await ctx.send(f"All users have been reset. If you are a {SPECIAL_ROLES["Admin"].mention}, please send your player tags in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back.")
 
 @reset_all_users.error
 async def reset_all_users_error(ctx, error):
@@ -253,8 +254,16 @@ async def set_vacation_error(ctx, error):
 async def vacation_list(ctx):
     "Leader/Admin only. Gets list of all users currently on vacation. Used in time off channel."
     vacationList = db_utils.GetVacationStatus()
-    vacationString = '\n'.join(vacationList)
-    await ctx.send(f"This is the list of players currently on vacation:\n{vacationString}")
+    table = PrettyTable()
+    table.field_names = ["Member"]
+    embed = discord.Embed()
+
+    for user in vacationList:
+        table.add_row([user])
+
+    embed.add_field(name="Vacation List", value="```\n" + table.get_string() + "```")
+
+    await ctx.send(embed=embed)
 
 @vacation_list.error
 async def vacation_list_error(ctx, error):
@@ -505,12 +514,17 @@ async def river_race_status(ctx):
     "Leader/Admin only. Send a list of clans in the current river race and their number of decks remaining today."
     clanList = clash_utils.GetOtherClanDecksRemaining()
     channel = discord.utils.get(ctx.guild.channels, name=REMINDER_CHANNEL)
-    messageString = "Current River Race Status:\n\n"
+    embed = discord.Embed(title="Current River Race Status")
 
-    for clanTuple in clanList:
-        messageString += f"{clanTuple[0]} - Decks remaining: {clanTuple[1]}" + "\n"
+    table = PrettyTable()
+    table.field_names = ["Clan", "Decks"]
 
-    await channel.send(messageString)
+    for clan in clanList:
+        table.add_row([clan[0], clan[1]])
+
+    embed.add_field(name="Remaining decks for each clan", value="```\n" + table.get_string() + "```")
+
+    await channel.send(embed=embed)
 
 @river_race_status.error
 async def river_race_status_error(ctx, error):
@@ -582,9 +596,9 @@ async def DeckUsageReminder(message: str=DEFAULT_REMINDER_MESSAGE):
         member = discord.utils.get(channel.members, display_name=nameTuple[0])
 
         if member == None:
-            otherMembersToRemind.append(f"{nameTuple[0]} - Decks used today: {nameTuple[1]}")
+            otherMembersToRemind.append(f"{nameTuple[0]} - Decks left: {nameTuple[1]}")
         else:
-            membersToRemind.append(f"{member.mention} Decks used today: {nameTuple[1]}")
+            membersToRemind.append(f"{member.mention} Decks left: {nameTuple[1]}")
 
     reminderString = message + "\n" + '\n'.join(membersToRemind)
 
@@ -598,13 +612,16 @@ async def TopFame():
     topUsers = clash_utils.GetTopFameUsers()
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     channel = discord.utils.get(guild.channels, name=FAME_CHANNEL)
+    table = PrettyTable()
+    table.field_names = ["Member", "Fame"]
+    embed = discord.Embed()
 
-    membersString = ""
+    for user in topUsers:
+        table.add_row([user[0], user[1]])
 
-    for nameTuple in topUsers:
-        membersString += f"{nameTuple[0]}: {nameTuple[1]}" + "\n"
+    embed.add_field(name="Top members by fame", value="```\n" + table.get_string() + "```")
 
-    await channel.send("Top members by fame:\n" + membersString)
+    await channel.send(embed=embed)
 
 
 async def FameCheck(threshold: int):

@@ -61,8 +61,8 @@ def GetDeckUsageToday(clan_tag = PRIMARY_CLAN_TAG) -> list:
 
     activeMembers = GetActiveMembersInClan(clan_tag)
 
-    participantList = [ (participant["name"], participant["decksUsedToday"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["name"] in activeMembers)) ]
-    participantList.sort(key = lambda x : (x[1], x[0]))
+    participantList = [ (participant["name"], 4 - participant["decksUsedToday"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["name"] in activeMembers)) ]
+    participantList.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participantList
 
@@ -80,7 +80,7 @@ def GetDeckUsage(clan_tag = PRIMARY_CLAN_TAG) -> list:
     activeMembers = GetActiveMembersInClan(clan_tag)
 
     participantList = [ (participant["name"], participant["decksUsed"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsed"] < 8) and (participant["name"] in activeMembers)) ]
-    participantList.sort(key = lambda x : (x[1], x[0]))
+    participantList.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participantList
 
@@ -122,7 +122,7 @@ def GetHallOfShame(threshold: int, clan_tag = PRIMARY_CLAN_TAG) -> list:
     activeMembers = GetActiveMembersInClan(clan_tag)
 
     participantList = [ (participant["name"], participant["fame"]) for participant in jsonObj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["name"] in activeMembers)) ]
-    participantList.sort(key = lambda x : (x[1], x[0]), reverse = True)
+    participantList.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participantList
 
