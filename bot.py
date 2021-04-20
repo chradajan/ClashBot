@@ -185,7 +185,8 @@ async def reset_all_users(ctx, confirmation: str):
     for member in ctx.guild.members:
         await ResetUser(member, False)
 
-    await ctx.send(f"All users have been reset. If you are a {SPECIAL_ROLES["Admin"].mention}, please send your player tags in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back.")
+    adminRole = SPECIAL_ROLES["Admin"]
+    await ctx.send(f"All users have been reset. If you are a {adminRole.mention}, please send your player tags in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back.")
 
 @reset_all_users.error
 async def reset_all_users_error(ctx, error):
