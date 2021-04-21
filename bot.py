@@ -224,12 +224,13 @@ async def vacation_error(ctx, error):
 
 @bot.command()
 @is_leader_command_check()
-@channel_check(TIME_OFF_CHANNEL)
+@channel_check(COMMANDS_CHANNEL)
 async def set_vacation(ctx, member: discord.Member, status: bool):
     "Leader/Admin only. Sets vacation status of target user."
+    channel = discord.utils.get(ctx.guild.channels, TIME_OFF_CHANNEL)
     vacationStatus = db_utils.UpdateVacationForUser(player_name, status)
     vacationStatusString = ("NOT " if not vacationStatus else "") + "ON VACATION"
-    await ctx.send(f"Updated vacation status of {member.mention} to: {vacationStatusString}.")
+    await channel.send(f"Updated vacation status of {member.mention} to: {vacationStatusString}.")
 
 @set_vacation.error
 async def set_vacation_error(ctx, error):
@@ -251,9 +252,9 @@ async def set_vacation_error(ctx, error):
 
 @bot.command()
 @is_leader_command_check()
-@channel_check(TIME_OFF_CHANNEL)
+@channel_check(COMMANDS_CHANNEL)
 async def vacation_list(ctx):
-    "Leader/Admin only. Gets list of all users currently on vacation. Used in time off channel."
+    "Leader/Admin only. Gets list of all users currently on vacation."
     vacationList = db_utils.GetVacationStatus()
     table = PrettyTable()
     table.field_names = ["Member"]
@@ -269,7 +270,7 @@ async def vacation_list(ctx):
 @vacation_list.error
 async def vacation_list_error(ctx, error):
     if isinstance(error, commands.errors.CheckFailure):
-        channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
+        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
         await ctx.send(f"!vacation_list command can only be sent in {channel.mention} by Leaders/Admins.")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !vacation_list")
@@ -387,6 +388,36 @@ async def send_reminder_error(ctx, error):
         await ctx.send("Something went wrong. Command should be formatted as:  !send_reminder <message (optional)>")
         raise error
 
+
+# Status report
+@bot.command()
+@is_leader_command_check()
+@channel_check(COMMANDS_CHANNEL)
+async def status_report(ctx):
+    "Leader/Admin only. Get a report of players with decks remaining today."
+    usageList = clash_utils.GetDeckUsageToday()
+    vacationList = db_utils.GetVacationStatus()
+    table = PrettyTable()
+    table.field_names = ["Member", "Decks"]
+    embed = discord.Embed(title="Status Report", footer="Users on vacation are not included in this list")
+
+    for player_name, decks_remaining in usageList:
+        if player_name in vacationList:
+            continue
+
+        table.add_row([player_name, decks_remaining])
+
+    embed.add_field(name="Players with more decks still available", value = "```\n" + table.get_string() + "```")
+    await ctx.send(embed=embed)
+
+@status_report.error
+async def status_report_error(ctx, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+        await ctx.send(f"!status_report command can only be sent in {channel.mention} by Leaders/Admins.")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !status_report")
+        raise error
 
 # Set automated reminders
 
@@ -544,67 +575,84 @@ async def AutomatedReminder():
     if (db_utils.GetReminderStatus()):
         await DeckUsageReminder()
 
-
-# Turn off vacation for all users and assign strikes to members that have not completed battles.
-@aiocron.crontab('0 19 * * 3')
+# Assign strikes, clear vacation
+# Occurs every Wednesday 10:00 UTC (Wednesday 3:00am PDT)
+@aiocron.crontab('0 10 * * 3')
 async def AssignStrikesAndClearVacation():
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     vacationChannel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
+    strikesChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
+    savedMessage = ""
 
     if db_utils.GetStrikeStatus():
         vacationList = db_utils.GetVacationStatus()
-        lowDeckUsageList = clash_utils.GetDeckUsage()
-        membersToStrike = []
-        otherMembersToStrike = []
-        strikeChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
+        deckUsageList = clash_utils.GetDeckUsage()
 
-        for nameTuple in lowDeckUsageList:
-            if (nameTuple[0] not in vacationList):
-                strikeCount = db_utils.AddStrike(nameTuple[0])
-                member = discord.utils.get(strikeChannel.members, display_name=nameTuple[0])
+        memberString = ""
+        nonMemberString = ""
 
-                if member == None:
-                    otherMembersToStrike.append(f"{nameTuple[0]} - Decks used: {nameTuple[1]}")
-                else:
-                    membersToStrike.append(f"{member.mention} Decks used: {nameTuple[1]}   Total strikes: {strikeCount}")
+        for player_name, deck_usage in deckUsageList:
+            if player_name in vacationList:
+                continue
 
-        strikeString = "The following members have received a strike for failing to complete their battles:\n" + '\n'.join(membersToStrike)
+            member = discord.utils.get(strikesChannel.members, display_name=player_name)
+            strikes = db_utils.AddStrike(player_name)
 
-        if len(otherMembersToStrike) > 0:
-            strikeString += "\n\nMembers that failed to complete their battles not in this channel:\n" + '\n'.join(otherMembersToStrike)
+            if member == None:
+                prevStrikes = 0 if strikes == 0 else strikes - 1
+                nonMemberString += f"{player_name} - Decks used: {deck_usage},  Strikes: {prevStrikes} -> {strikes}" + "\n"
+            else:
+                memberString += f"{member.mention} - Decks used: {deck_usage},  Strikes: {strikes - 1} -> {strikes}" + "\n"
 
-        await strikeChannel.send(strikeString)
+        if (len(memberString) == 0) and (len(nonMemberString) == 0):
+            savedMessage = "Everyone completed their battles this week. Good job!"
+        else:
+            savedMessage = "The following members have received strikes for failing to complete 8 battles:\n" + memberString + nonMemberString
+    else:
+        savedMessage = "Automated strikes are currently disabled so no strikes have been given out."
 
+    db_utils.SetSavedMessage(savedMessage)
     db_utils.ClearAllVacation()
     await vacationChannel.send("Vacation status for all users has been set to false. Make sure to use !vacation before the next war if you're going to miss it.")
 
 
+# Send saved message of who received automated strikes
+# Occurs every Wednesday 18:00 UTC (Wednesday 11:00am PDT)
+@aiocron.crontab('0 18 * * 3')
+async def SendSavedMessage():
+    guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
+    strikesChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
+    message = db_utils.GetSavedMessage()
+    await strikesChannel.send(message)
+
+
 async def DeckUsageReminder(message: str=DEFAULT_REMINDER_MESSAGE):
     reminderList = clash_utils.GetDeckUsageToday()
-    currentVacationList = db_utils.GetVacationStatus()
-    membersToRemind = []
-    otherMembersToRemind = []
+    vacationList = db_utils.GetVacationStatus()
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
 
     if len(reminderList) == 0:
         return
 
-    for nameTuple in reminderList:
-        if (nameTuple[0] in currentVacationList):
+    memberString = ""
+    nonMemberString = ""
+
+    for player_name, decks_remaining in reminderList:
+        if player_name in vacationList:
             continue
 
-        member = discord.utils.get(channel.members, display_name=nameTuple[0])
+        member = discord.utils.get(channel.members, display_name=player_name)
 
         if member == None:
-            otherMembersToRemind.append(f"{nameTuple[0]} - Decks left: {nameTuple[1]}")
+            nonMemberString += f"{player_name} - Decks left: {decks_remaining}" + "\n"
         else:
-            membersToRemind.append(f"{member.mention} Decks left: {nameTuple[1]}")
+            memberString += f"{member.mention} - Decks left: {decks_remaining}" + "\n"
 
-    reminderString = message + "\n" + '\n'.join(membersToRemind)
+    if (len(memberString) == 0) and (len(nonMemberString) == 0):
+        return
 
-    if len(otherMembersToRemind) > 0:
-        reminderString += "\n\nMembers not in this channel:\n" + '\n'.join(otherMembersToRemind)
+    reminderString = message + "\n" + memberString + nonMemberString
 
     await channel.send(reminderString)
 

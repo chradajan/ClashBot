@@ -38,7 +38,7 @@ def AddNewUser(clashData: dict) -> bool:
         db.close()
         return False
 
-    insertUserQuery = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, FALSE, 0, %(clan_id)s)"
+    insertUserQuery = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, 0, FALSE, 0, %(clan_id)s)"
     cursor.execute(insertUserQuery, clashData)
 
     # Get id of newly inserted user.
@@ -118,6 +118,32 @@ def SetStrikes(player_name: str, strike_count: int) -> tuple:
     db.close()
 
     return (previousStrikes, newStrikes)
+
+
+def SetSavedMessage(message: str):
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("UPDATE saved_message SET message = %s", (message))
+
+    db.commit()
+    db.close()
+
+
+def GetSavedMessage() -> str:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT * FROM saved_message")
+    queryResult = cursor.fetchone()
+
+    if queryResult == None:
+        db.close()
+        return ""
+
+    message = queryResult["message"]
+    db.close()
+    return message
 
 
 def GetPlayerTag(player_name: str) -> str:

@@ -4,7 +4,7 @@ import json
 import re
 import requests
 
-def GetActiveMembersInClan(clan_tag: str) -> list:
+def GetActiveMembersInClan(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -50,7 +50,8 @@ def GetClashUserData(message: str, discordName: str) -> dict:
 
 
 # Get a list of users who have not used 4 decks today.
-def GetDeckUsageToday(clan_tag = PRIMARY_CLAN_TAG) -> list:
+# Returns [(player_name, decks_remaining)]
+def GetDeckUsageToday(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -67,8 +68,9 @@ def GetDeckUsageToday(clan_tag = PRIMARY_CLAN_TAG) -> list:
     return participantList
 
 
-# Get a list of user who have not used 8 decks during current river race.
-def GetDeckUsage(clan_tag = PRIMARY_CLAN_TAG) -> list:
+# Get a list of members in specified clan with fewer than 8 decks used.
+# Returns [(player_name, decks_used)]
+def GetDeckUsage(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -80,11 +82,10 @@ def GetDeckUsage(clan_tag = PRIMARY_CLAN_TAG) -> list:
     activeMembers = GetActiveMembersInClan(clan_tag)
 
     participantList = [ (participant["name"], participant["decksUsed"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsed"] < 8) and (participant["name"] in activeMembers)) ]
-    participantList.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participantList
 
-def GetTopFameUsers(topN :int=3, clan_tag = PRIMARY_CLAN_TAG) -> list:
+def GetTopFameUsers(topN : int=3, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -110,7 +111,7 @@ def GetTopFameUsers(topN :int=3, clan_tag = PRIMARY_CLAN_TAG) -> list:
 
     return returnList
 
-def GetHallOfShame(threshold: int, clan_tag = PRIMARY_CLAN_TAG) -> list:
+def GetHallOfShame(threshold: int, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
 
     if (req.status_code != 200):
@@ -126,7 +127,7 @@ def GetHallOfShame(threshold: int, clan_tag = PRIMARY_CLAN_TAG) -> list:
 
     return participantList
 
-def GetOtherClanDecksRemaining(clan_tag = PRIMARY_CLAN_TAG) -> dict:
+def GetOtherClanDecksRemaining(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
 
     if (req.status_code != 200):
