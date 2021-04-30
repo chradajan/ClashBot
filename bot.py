@@ -117,14 +117,67 @@ async def on_raw_reaction_add(payload):
     await member.add_roles(*savedRoles)
 
 
+# Update
+
+@bot.command()
+async def update(ctx, player_tag: str):
+    "Update yourself with information associated with given player tag (include # symbol). Updates your Clash username, Discord username, and clan role in database. Changes your nickname to Clash username. Use this command if you've updated your Discord username or Clash username, or your clan role has changed."
+    discord_name = ctx.author.name + "#" + ctx.author.discriminator
+    clashData = clash_utils.GetClashUserData(player_tag, discord_name)
+
+    if clashData == None:
+        await ctx.send("Something went wrong. Your information has not been updated.")
+        return
+
+    memberStatus = db_utils.UpdateUser(clashData)
+
+    if SPECIAL_ROLES["Admin"] in ctx.author.roles:
+        if clashData["player_name"] != ctx.author.display_name:
+            await ctx.send(f"{ctx.author.display_name} has been updated in the database, but their in-game name no longer matches their Discord nickname. {ctx.author.mention} Admins need to update their nicknames manually due to permissions.")
+    else:
+        rolesToRemoveList = [NORMAL_ROLES["Member"], NORMAL_ROLES["Visitor"]]
+        await ctx.author.remove_roles(*rolesToRemoveList)
+        await ctx.author.add_roles(NORMAL_ROLES[memberStatus])
+        await ctx.author.edit(nick=clashData["player_name"])
+
+    await ctx.send("Your information has been updated.")
+
+@update.error
+async def update_error(ctx, error):
+    if isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing argument. Command should be formatted as:  !update <player_tag>")
+    elif isinstance(error, commands.errors.CommandInvokeError):
+        await ctx.send("Something went wrong. Make sure the player tag you entered doesn't belong to another user in this server. Command should be formatted as:  !update <player_tag>")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !update <player_tag>")
+        raise error
+
+
 # Update user
 
 @bot.command()
 @is_leader_command_check()
 @channel_check(COMMANDS_CHANNEL)
 async def update_user(ctx, member: discord.Member, player_tag: str):
-    "Leader/Admin only. Update selected user to use information associated with given player_tag. Change information in database and update Discord nickname"
-    await UpdateUser(ctx, member, player_tag)
+    "Leader/Admin only. Update selected user to use information associated with given player tag (include # symbol). Updates Clash username, Discord username, and clan data in database. Changes nickname to Clash username."
+    discord_name = member.name + "#" + member.discriminator
+    clashData = clash_utils.GetClashUserData(player_tag, discord_name)
+
+    if clashData == None:
+        await ctx.send("Something went wrong. Your information has not been updated.")
+        return
+
+    memberStatus = db_utils.UpdateUser(clashData)
+
+    if SPECIAL_ROLES["Admin"] in member.roles:
+        if clashData["player_name"] != member.display_name:
+            await ctx.send(f"{member.display_name} has been updated in the database, but their in-game name no longer matches their Discord nickname. {member.mention} Admins need to update their nicknames manually due to permissions.")
+    else:
+        rolesToRemoveList = [NORMAL_ROLES["Member"], NORMAL_ROLES["Visitor"]]
+        await member.remove_roles(*rolesToRemoveList)
+        await member.add_roles(NORMAL_ROLES[memberStatus])
+        await member.edit(nick=clashData["player_name"])
+
     await ctx.send(f"{member.display_name} has been updated.")
 
 @update_user.error
@@ -136,6 +189,8 @@ async def update_user_error(ctx, error):
         await ctx.send(f"!update_user command can only be sent in {channel.mention} by Leaders/Admins.")
     elif isinstance(error, commands.errors.MissingRequiredArgument):
         await ctx.send("Missing arguments. Command should be formatted as:  !update_user <member> <player_tag>")
+    elif isinstance(error, commands.errors.CommandInvokeError):
+        await ctx.send("Something went wrong. Make sure the player tag you entered doesn't belong to another user in this server. Command should be formatted as:  !update <player_tag>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !update_user <member> <player_tag>")
         raise error
@@ -147,7 +202,7 @@ async def update_user_error(ctx, error):
 @is_admin_command_check()
 @channel_check(COMMANDS_CHANNEL)
 async def reset_user(ctx, member: discord.Member):
-    "Admin only. Delete selected user from database. Reset their role to New."
+    "Admin only. Delete selected user from database. Set their role to New."
     await ResetUser(member, True)
     await ctx.send(f"{member.display_name} has been reset.")
 
@@ -174,7 +229,7 @@ async def reset_all_users(ctx, confirmation: str):
     "Admin only. Deletes all users from database, removes roles, and assigns New role. Leaders retain Leader role. Leaders must still resend player tag in welcome channel and react to rules message."
     confirmationMessage = "Yes, I really want to drop all players from the database and reset roles."
 
-    if (safety_message != confirmationMessage):
+    if (confirmation != confirmationMessage):
         await ctx.send("Users NOT reset. Must type the following confirmation message exactly, in quotes, along with reset_all_users command:\n" + confirmationMessage)
         return
 
@@ -185,8 +240,10 @@ async def reset_all_users(ctx, confirmation: str):
     for member in ctx.guild.members:
         await ResetUser(member, False)
 
+    await SendRulesMessage(ctx)
+
     adminRole = SPECIAL_ROLES["Admin"]
-    await ctx.send(f"All users have been reset. If you are a {adminRole.mention}, please send your player tags in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back.")
+    await ctx.send(f"All users have been reset. If you are a {adminRole.mention}, please send your player tag in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back.")
 
 @reset_all_users.error
 async def reset_all_users_error(ctx, error):
@@ -224,7 +281,6 @@ async def vacation_error(ctx, error):
 
 @bot.command()
 @is_leader_command_check()
-@channel_check(COMMANDS_CHANNEL)
 async def set_vacation(ctx, member: discord.Member, status: bool):
     "Leader/Admin only. Sets vacation status of target user."
     channel = discord.utils.get(ctx.guild.channels, TIME_OFF_CHANNEL)
@@ -237,8 +293,7 @@ async def set_vacation_error(ctx, error):
     if isinstance(error, commands.errors.MemberNotFound):
         await ctx.send("Member not found.")
     elif isinstance(error, commands.errors.CheckFailure):
-        channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
-        await ctx.send(f"!set_vacation command can only be sent in {channel.mention} by Leaders/Admins.")
+        await ctx.send(f"!set_vacation command can only be sent by Leaders/Admins.")
     elif isinstance(error, commands.errors.BadBoolArgument):
         await ctx.send(f"Invalid second argument. Valid statuses: on or off")
     elif isinstance(error, commands.errors.MissingRequiredArgument):
@@ -252,7 +307,6 @@ async def set_vacation_error(ctx, error):
 
 @bot.command()
 @is_leader_command_check()
-@channel_check(COMMANDS_CHANNEL)
 async def vacation_list(ctx):
     "Leader/Admin only. Gets list of all users currently on vacation."
     vacationList = db_utils.GetVacationStatus()
@@ -265,13 +319,15 @@ async def vacation_list(ctx):
 
     embed.add_field(name="Vacation List", value="```\n" + table.get_string() + "```")
 
-    await ctx.send(embed=embed)
+    try:
+        await ctx.send(embed=embed)
+    except:
+        await ctx.send("Vacation List\n" + "```\n" + table.get_string() + "```")
 
 @vacation_list.error
 async def vacation_list_error(ctx, error):
     if isinstance(error, commands.errors.CheckFailure):
-        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-        await ctx.send(f"!vacation_list command can only be sent in {channel.mention} by Leaders/Admins.")
+        await ctx.send(f"!vacation_list command can only be sent by Leaders/Admins.")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !vacation_list")
         raise error
@@ -321,10 +377,7 @@ async def force_rules_check(ctx):
         await member.remove_roles(*rolesToRemoveList)
         await member.add_roles(SPECIAL_ROLES["Check Rules"])
 
-    rulesChannel = discord.utils.get(ctx.guild.channels, name=RULES_CHANNEL)
-    await rulesChannel.purge(limit=10, check=lambda message: message.author == bot.user)
-    newReactMessage = await rulesChannel.send(content="@everyone After you've read the rules, react to this message for roles.")
-    await newReactMessage.add_reaction(u"\u2705")
+    await SendRulesMessage(ctx)
 
 @force_rules_check.error
 async def force_rules_check_error(ctx, error):
@@ -367,6 +420,48 @@ async def set_strike_count_error(ctx, error):
         raise error
 
 
+# Strikes
+
+@bot.command()
+async def strikes(ctx):
+    "Get your current strike count."
+    strikes = db_utils.GetStrikes(ctx.author.display_name)
+    message = ""
+
+    if strikes == None:
+        message = "Error, you were not found in the database."
+    else:
+        message = f"You currently have {strikes} strikes."
+
+    await ctx.send(message)
+
+@strikes.error
+async def strikes_error(ctx, error):
+    await ctx.send("Something went wrong. Command should be formatted as:  !strikes")
+    raise error
+
+
+# Reset all strikes
+
+@bot.command()
+@is_leader_command_check()
+@channel_check(COMMANDS_CHANNEL)
+async def reset_all_strikes(ctx):
+    "Leader/Admin only. Reset each member's strikes to 0."
+    db_utils.ResetStrikes()
+    channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
+    await channel.send("Strikes for all members have been reset to 0.")
+
+@reset_all_strikes.error
+async def reset_all_strikes_error(ctx, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+        await ctx.send(f"!send_reminder command can only be sent in {channel.mention} by Leaders/Admins.")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !reset_all_strikes")
+        raise error
+
+
 # Send reminder
 
 @bot.command()
@@ -390,6 +485,7 @@ async def send_reminder_error(ctx, error):
 
 
 # Status report
+
 @bot.command()
 @is_leader_command_check()
 @channel_check(COMMANDS_CHANNEL)
@@ -408,7 +504,11 @@ async def status_report(ctx):
         table.add_row([player_name, decks_remaining])
 
     embed.add_field(name="Players with more decks still available", value = "```\n" + table.get_string() + "```")
-    await ctx.send(embed=embed)
+
+    try:
+        await ctx.send(embed=embed)
+    except:
+        await ctx.send("Players with more decks still available\n" + "```\n" + table.get_string() + "```")
 
 @status_report.error
 async def status_report_error(ctx, error):
@@ -537,15 +637,12 @@ async def mention_users_error(ctx, error):
         raise error
 
 
-# Get river race status
+# River race status
 
 @bot.command()
-@is_leader_command_check()
-@channel_check(COMMANDS_CHANNEL)
 async def river_race_status(ctx):
-    "Leader/Admin only. Send a list of clans in the current river race and their number of decks remaining today."
+    "Send a list of clans in the current river race and their number of decks remaining today."
     clanList = clash_utils.GetOtherClanDecksRemaining()
-    channel = discord.utils.get(ctx.guild.channels, name=REMINDER_CHANNEL)
     embed = discord.Embed(title="Current River Race Status")
 
     table = PrettyTable()
@@ -556,16 +653,12 @@ async def river_race_status(ctx):
 
     embed.add_field(name="Remaining decks for each clan", value="```\n" + table.get_string() + "```")
 
-    await channel.send(embed=embed)
+    await ctx.send(embed=embed)
 
 @river_race_status.error
 async def river_race_status_error(ctx, error):
-    if isinstance(error, commands.errors.CheckFailure):
-        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-        await ctx.send(f"!river_race_status command can only be sent in {channel.mention} by Leaders/Admins.")
-    else:
-        await ctx.send("Something went wrong. Command should be formatted as:  !current_river_race_status")
-        raise error
+    await ctx.send("Something went wrong. Command should be formatted as:  !current_river_race_status")
+    raise error
 
 
 
@@ -670,7 +763,10 @@ async def TopFame():
 
     embed.add_field(name="Top members by fame", value="```\n" + table.get_string() + "```")
 
-    await channel.send(embed=embed)
+    try:
+        await ctx.send(embed=embed)
+    except:
+        await ctx.send("Top members by fame\n" + "```\n" + table.get_string() + "```")
 
 
 async def FameCheck(threshold: int):
@@ -696,15 +792,19 @@ async def FameCheck(threshold: int):
     await channel.send(fameString)
 
 
-async def UpdateUser(ctx, member: discord.Member, player_tag = None):
+async def UpdateUser(ctx, member: discord.Member, player_tag = None) -> bool:
     if (player_tag == None):
         player_tag = db_utils.GetPlayerTag(member.display_name)
 
     if (player_tag == None):
-        return
+        return False
 
     discord_name = member.name + "#" + member.discriminator
     clashData = clash_utils.GetClashUserData(player_tag, discord_name)
+
+    if clashData == None:
+        return False
+
     db_utils.UpdateUser(clashData)
 
     if SPECIAL_ROLES["Admin"] in member.roles:
@@ -712,6 +812,8 @@ async def UpdateUser(ctx, member: discord.Member, player_tag = None):
             await ctx.send(f"{member.display_name} has been updated in the database, but their in-game name no longer matches their Discord nickname. {member.mention} Admins need to update their nicknames manually due to permissions.")
     else:
         await member.edit(nick=clashData["player_name"])
+
+    return True
 
 
 async def ResetUser(member: discord.Member, removeFromDB: bool):
@@ -725,6 +827,13 @@ async def ResetUser(member: discord.Member, removeFromDB: bool):
 
     if (removeFromDB):
         db_utils.RemoveUser(member.display_name)
+
+
+async def SendRulesMessage(ctx):
+    rulesChannel = discord.utils.get(ctx.guild.channels, name=RULES_CHANNEL)
+    await rulesChannel.purge(limit=10, check=lambda message: message.author == bot.user)
+    newReactMessage = await rulesChannel.send(content="@everyone After you've read the rules, react to this message for roles.")
+    await newReactMessage.add_reaction(u"\u2705")
 
 
 bot.run(BOT_TOKEN)

@@ -41,10 +41,16 @@ def GetClashUserData(message: str, discordName: str) -> dict:
         "player_tag": player_tag,
         "player_name": jsonObj["name"],
         "discord_name": discordName,
-        "clan_role": jsonObj["role"],
-        "clan_name": jsonObj["clan"]["name"],
-        "clan_tag": jsonObj["clan"]["tag"]
     }
+
+    if "clan" in jsonObj.keys():
+        userDict["clan_role"] = jsonObj["role"]
+        userDict["clan_name"] = jsonObj["clan"]["name"]
+        userDict["clan_tag"] = jsonObj["clan"]["tag"]
+    else:
+        userDict["clan_role"] = "None"
+        userDict["clan_name"] = "None"
+        userDict["clan_tag"] = "None"
 
     return userDict
 

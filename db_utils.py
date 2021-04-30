@@ -1,6 +1,5 @@
 from config import PRIMARY_CLAN_NAME
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
-from clash_utils import GetClashUserData
 import csv
 import pymysql
 
@@ -38,7 +37,7 @@ def AddNewUser(clashData: dict) -> bool:
         db.close()
         return False
 
-    insertUserQuery = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, 0, FALSE, 0, %(clan_id)s)"
+    insertUserQuery = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, FALSE, 0, %(clan_id)s)"
     cursor.execute(insertUserQuery, clashData)
 
     # Get id of newly inserted user.
@@ -62,15 +61,29 @@ def AddNewUser(clashData: dict) -> bool:
 
 
 # Update existing user.
-def UpdateUser(clashData: dict):
+def UpdateUser(clashData: dict) -> str:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    updateQuery = "UPDATE users SET player_name = %(player_name)s, discord_name = %(discord_name)s, clan_role = %(clan_role)s WHERE player_tag = %(player_tag)s"
+    # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
+    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clashData)
+    queryResult = cursor.fetchone()
+
+    if (queryResult == None):
+        insertClanQuery = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
+        cursor.execute(insertClanQuery, clashData)
+        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clashData)
+        queryResult = cursor.fetchone()
+
+    clashData["clan_id"] = queryResult["id"]
+
+    updateQuery = "UPDATE users SET player_name = %(player_name)s, discord_name = %(discord_name)s, clan_role = %(clan_role)s, clan_id = %(clan_id)s WHERE player_tag = %(player_tag)s"
     cursor.execute(updateQuery, clashData)
 
     db.commit()
     db.close()
+
+    return "Member" if (clashData["clan_name"] == PRIMARY_CLAN_NAME) else "Visitor"
 
 
 # Add strike to user.
@@ -89,6 +102,28 @@ def AddStrike(player_name: str) -> int:
     db.close()
 
     return queryResult["strikes"]
+
+def GetStrikes(player_name: str) -> int:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT strikes FROM users WHERE player_name = %s", (player_name))
+    queryResult = cursor.fetchone()
+
+    if queryResult == None:
+        return None
+
+    strikes = queryResult["strikes"]
+    db.close()
+    return strikes
+
+def ResetStrikes():
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("UPDATE users SET strikes = 0")
+    db.commit()
+    db.close()
 
 
 def SetStrikes(player_name: str, strike_count: int) -> tuple:
