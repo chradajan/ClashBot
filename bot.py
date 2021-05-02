@@ -164,21 +164,33 @@ async def update_user(ctx, member: discord.Member, player_tag: str):
     clashData = clash_utils.GetClashUserData(player_tag, discord_name)
 
     if clashData == None:
-        await ctx.send("Something went wrong. Your information has not been updated.")
+        await ctx.send(f"Something went wrong retrieving Clash information from player tag {player_tag}. Information for {member.display_name} has not been updated.")
         return
 
-    memberStatus = db_utils.UpdateUser(clashData)
+    db_utils.RemoveUser(member.display_name)
 
-    if SPECIAL_ROLES["Admin"] in member.roles:
+    rolesToRemoveList = list(NORMAL_ROLES.values())
+    rolesToRemoveList.append(SPECIAL_ROLES["New"])
+    rolesToRemoveList.append(SPECIAL_ROLES["Check Rules"])
+    await member.remove_roles(*rolesToRemoveList)
+
+    if not db_utils.AddNewUser(clashData):
+        await ctx.send(f"{member.display_name} was removed from database but there was an issue adding them back with new player tag. They might need to be reset now.")
+        return
+
+    dbRoles = db_utils.GetRoles(clashData["player_name"])
+    savedRoles = []
+    for role in dbRoles:
+        savedRoles.append(NORMAL_ROLES[role])
+    await member.add_roles(*savedRoles)
+
+    if (SPECIAL_ROLES["Admin"] in member.roles) or (member.guild_permissions.administrator):
         if clashData["player_name"] != member.display_name:
             await ctx.send(f"{member.display_name} has been updated in the database, but their in-game name no longer matches their Discord nickname. {member.mention} Admins need to update their nicknames manually due to permissions.")
     else:
-        rolesToRemoveList = [NORMAL_ROLES["Member"], NORMAL_ROLES["Visitor"]]
-        await member.remove_roles(*rolesToRemoveList)
-        await member.add_roles(NORMAL_ROLES[memberStatus])
         await member.edit(nick=clashData["player_name"])
 
-    await ctx.send(f"{member.display_name} has been updated.")
+    await ctx.send(f"{member.display_name} has been updated. If they were a leader or elder, they must be reassigned those roles manually.")
 
 @update_user.error
 async def update_user_error(ctx, error):
@@ -233,7 +245,7 @@ async def reset_all_users(ctx, confirmation: str):
         await ctx.send("Users NOT reset. Must type the following confirmation message exactly, in quotes, along with reset_all_users command:\n" + confirmationMessage)
         return
 
-    await ctx.send("Deleting all users... This might take a minute.")
+    await ctx.send("Deleting all users from database... This might take a couple minutes.")
 
     db_utils.RemoveAllUsers()
 
@@ -243,7 +255,7 @@ async def reset_all_users(ctx, confirmation: str):
     await SendRulesMessage(ctx)
 
     adminRole = SPECIAL_ROLES["Admin"]
-    await ctx.send(f"All users have been reset. If you are a {adminRole.mention}, please send your player tag in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back.")
+    await ctx.send(f"All users have been reset. If you are a {adminRole.mention}, please send your player tag in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back. Finally, update your Discord nickname to match your in-game username.")
 
 @reset_all_users.error
 async def reset_all_users_error(ctx, error):
@@ -341,6 +353,7 @@ async def vacation_list_error(ctx, error):
 async def export(ctx, UpdateBeforeExport: bool=True, FalseLogicOnly: bool=True):
     "Leader/Admin only. Export database to csv file. Optionally specify whether to update users in database before exporting and whether to only export False Logic users. These are both enabled by default"
     if (UpdateBeforeExport):
+        await ctx.send("Starting export and updating all player information. This might take a minute.")
         for member in ctx.guild.members:
             await UpdateUser(ctx, member)
 
@@ -472,7 +485,7 @@ async def send_reminder(ctx, *message):
     reminderMessage = ' '.join(message)
     if len(reminderMessage) == 0:
         reminderMessage = DEFAULT_REMINDER_MESSAGE
-    await DeckUsageReminder(reminderMessage)
+    await DeckUsageReminder(None, reminderMessage, False)
 
 @send_reminder.error
 async def send_reminder_error(ctx, error):
@@ -503,12 +516,12 @@ async def status_report(ctx):
 
         table.add_row([player_name, decks_remaining])
 
-    embed.add_field(name="Players with more decks still available", value = "```\n" + table.get_string() + "```")
+    embed.add_field(name="Players with decks remaining", value = "```\n" + table.get_string() + "```")
 
     try:
         await ctx.send(embed=embed)
     except:
-        await ctx.send("Players with more decks still available\n" + "```\n" + table.get_string() + "```")
+        await ctx.send("Players with decks remaining\n" + "```\n" + table.get_string() + "```")
 
 @status_report.error
 async def status_report_error(ctx, error):
@@ -661,12 +674,42 @@ async def river_race_status_error(ctx, error):
     raise error
 
 
+@bot.command()
+async def set_reminder_time(ctx, reminder_time: str):
+    "Set reminder time to either US or EU. US reminders go out at 01:00 UTC. EU reminders go out at 17:00 UTC."
+    timeZone = None
+    if reminder_time == "US":
+        timeZone = True
+    elif reminder_time == "EU":
+        timeZone = False
+    else:
+        await ctx.send("Invalid time zone. Valid reminder times are US or EU")
+        return
 
-# Send reminder every Tuesday and Wednesday at 00:00 UTC (Monday and Tuesday at 5pm PDT)
-@aiocron.crontab('0 0 * * 2,3')
-async def AutomatedReminder():
+    db_utils.UpdateTimeZone(ctx.author.display_name, timeZone)
+    await ctx.send("Your reminder time preference has been updated.")
+
+@set_reminder_time.error
+async def set_reminder_time_error(ctx, error):
+    if isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("You need to specify a reminder time. Valid reminder times are US or EU")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !set_reminder_time <reminder_time>")
+        raise error
+
+
+# Send reminder every Monday and Tuesday at 19:00 UTC (Monday and Tuesday at 7pm GMT)
+@aiocron.crontab('0 19 * * 1,2')
+async def AutomatedReminderEU():
     if (db_utils.GetReminderStatus()):
-        await DeckUsageReminder()
+        await DeckUsageReminder(US_time=False)
+
+
+# Send reminder every Tuesday and Wednesday at 01:00 UTC (Monday and Tuesday at 6pm PDT)
+@aiocron.crontab('0 1 * * 2,3')
+async def AutomatedReminderUS():
+    if (db_utils.GetReminderStatus()):
+        await DeckUsageReminder(US_time=True)
 
 # Assign strikes, clear vacation
 # Occurs every Wednesday 10:00 UTC (Wednesday 3:00am PDT)
@@ -719,7 +762,7 @@ async def SendSavedMessage():
     await strikesChannel.send(message)
 
 
-async def DeckUsageReminder(message: str=DEFAULT_REMINDER_MESSAGE):
+async def DeckUsageReminder(US_time: bool=None, message: str=DEFAULT_REMINDER_MESSAGE, automated: bool=True):
     reminderList = clash_utils.GetDeckUsageToday()
     vacationList = db_utils.GetVacationStatus()
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
@@ -731,8 +774,19 @@ async def DeckUsageReminder(message: str=DEFAULT_REMINDER_MESSAGE):
     memberString = ""
     nonMemberString = ""
 
+    checkTimeZones = (US_time != None)
+    timeZoneList = []
+
+    if checkTimeZones:
+        timeZoneList = db_utils.GetMembersInTimezone(US_time)
+        if timeZoneList == None:
+            checkTimeZones = False
+
     for player_name, decks_remaining in reminderList:
         if player_name in vacationList:
+            continue
+
+        if (checkTimeZones and (player_name not in timeZoneList)):
             continue
 
         member = discord.utils.get(channel.members, display_name=player_name)
@@ -746,6 +800,9 @@ async def DeckUsageReminder(message: str=DEFAULT_REMINDER_MESSAGE):
         return
 
     reminderString = message + "\n" + memberString + nonMemberString
+
+    if automated:
+        reminderString += "\n\n" + DEFAULT_REMINDER_FOOTER
 
     await channel.send(reminderString)
 
@@ -793,7 +850,7 @@ async def FameCheck(threshold: int):
 
 
 async def UpdateUser(ctx, member: discord.Member, player_tag = None) -> bool:
-    if (player_tag == None):
+    if (member.bot or player_tag == None):
         player_tag = db_utils.GetPlayerTag(member.display_name)
 
     if (player_tag == None):
@@ -807,7 +864,7 @@ async def UpdateUser(ctx, member: discord.Member, player_tag = None) -> bool:
 
     db_utils.UpdateUser(clashData)
 
-    if SPECIAL_ROLES["Admin"] in member.roles:
+    if (SPECIAL_ROLES["Admin"] in member.roles) or (member.guild_permissions.administrator):
         if clashData["player_name"] != member.display_name:
             await ctx.send(f"{member.display_name} has been updated in the database, but their in-game name no longer matches their Discord nickname. {member.mention} Admins need to update their nicknames manually due to permissions.")
     else:

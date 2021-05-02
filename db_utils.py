@@ -37,7 +37,7 @@ def AddNewUser(clashData: dict) -> bool:
         db.close()
         return False
 
-    insertUserQuery = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, FALSE, 0, %(clan_id)s)"
+    insertUserQuery = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, 0, %(clan_id)s)"
     cursor.execute(insertUserQuery, clashData)
 
     # Get id of newly inserted user.
@@ -263,6 +263,10 @@ def GetVacationStatus() -> list:
     cursor.execute("SELECT player_name FROM users WHERE vacation = TRUE")
     vacationDict = cursor.fetchall()
 
+    if vacationDict == None:
+        db.close()
+        return []
+
     vacationList = [ user["player_name"] for user in vacationDict ]
 
     db.close()
@@ -405,6 +409,34 @@ def CommitRoles(player_name: str, roles: list):
 
     db.commit()
     db.close()
+
+
+# True = US, False = EU
+def UpdateTimeZone(player_name: str, US_time: bool):
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("UPDATE users SET US_time = %s WHERE player_name = %s", (US_time, player_name))
+
+    db.commit()
+    db.close()
+
+
+def GetMembersInTimezone(US_time: bool) -> list:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT player_name FROM users WHERE US_time = %s", (US_time))
+    queryResult = cursor.fetchall()
+
+    if queryResult == None:
+        db.close()
+        return None
+
+    memberList = [ user["player_name"] for user in queryResult ]
+
+    db.close()
+    return memberList
 
 
 def OutputToCSV(file_path: str, primary_clan_only: bool) -> bool:
