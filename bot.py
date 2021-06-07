@@ -413,6 +413,7 @@ async def set_strike_count(ctx, member: discord.Member, strikes: int):
 
     if strikeTuple == None:
         await ctx.send("Player not found in database. No strike adjustments have been made.")
+        return
 
     channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
     await channel.send(f"Strikes updated for {member.mention}.  {strikeTuple[0]} -> {strikeTuple[1]}")
@@ -430,6 +431,39 @@ async def set_strike_count_error(ctx, error):
         await ctx.send("Missing arguments. Command should be formatted as:  !set_strike_count <member> <strikes>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !set_strike_count <member> <strikes>")
+        raise error
+
+
+@bot.command()
+@is_leader_command_check()
+@channel_check(COMMANDS_CHANNEL)
+async def give_strike(ctx, members: commands.Greedy[discord.Member]):
+    "Leader/Admin only. Specify a list of members and increment each user's strike count by 1."
+    channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
+    strikeString = "The following members have each received a strike:\n"
+    memberString = ""
+
+    for member in members:
+        newStrikeCount = db_utils.AddStrike(member.display_name)
+        if newStrikeCount == 0:
+            continue
+
+        memberString += f"{member.mention}: {newStrikeCount - 1} -> {newStrikeCount}" + "\n"
+
+    if len(memberString) == 0:
+        await ctx.send("You either didn't specify any members, or none of the members you specified exist in the database. No strikes have been assigned.")
+        return
+
+    strikeString += memberString
+    await channel.send(strikeString)
+
+@give_strike.error
+async def give_strike_error(ctx, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+        await ctx.send(f"!mention_users command can only be sent in {channel.mention} by Leaders/Admins.")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !give_strike <members>")
         raise error
 
 
@@ -475,6 +509,38 @@ async def reset_all_strikes_error(ctx, error):
         raise error
 
 
+# Strike report
+
+@bot.command()
+@is_leader_command_check()
+@channel_check(COMMANDS_CHANNEL)
+async def status_report_strikes(ctx):
+    "Leader/Admin only. Get a report of players with strikes."
+    strikeList = db_utils.GetStrikes()
+    table = PrettyTable()
+    table.field_names = ["Member", "Strikes"]
+    embed = discord.Embed(title="Status Report")
+
+    for player_name, strikes in strikeList:
+        table.add_row([player_name, strikes])
+
+    embed.add_field(name="Players with at least 1 strike", value = "```\n" + table.get_string() + "```")
+
+    try:
+        await ctx.send(embed=embed)
+    except:
+        await ctx.send("Players with at least 1 strike\n" + "```\n" + table.get_string() + "```")
+
+@status_report_strikes.error
+async def status_report_strikes_error(ctx, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+        await ctx.send(f"!status_report_strikes command can only be sent in {channel.mention} by Leaders/Admins.")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !status_report_strikes")
+        raise error
+
+
 # Send reminder
 
 @bot.command()
@@ -497,12 +563,12 @@ async def send_reminder_error(ctx, error):
         raise error
 
 
-# Status report
+# Status report decks
 
 @bot.command()
 @is_leader_command_check()
 @channel_check(COMMANDS_CHANNEL)
-async def status_report(ctx):
+async def status_report_decks(ctx):
     "Leader/Admin only. Get a report of players with decks remaining today."
     usageList = clash_utils.GetDeckUsageToday()
     vacationList = db_utils.GetVacationStatus()
@@ -523,22 +589,22 @@ async def status_report(ctx):
     except:
         await ctx.send("Players with decks remaining\n" + "```\n" + table.get_string() + "```")
 
-@status_report.error
-async def status_report_error(ctx, error):
+@status_report_decks.error
+async def status_report_decks_error(ctx, error):
     if isinstance(error, commands.errors.CheckFailure):
         channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-        await ctx.send(f"!status_report command can only be sent in {channel.mention} by Leaders/Admins.")
+        await ctx.send(f"!status_report_decks command can only be sent in {channel.mention} by Leaders/Admins.")
     else:
-        await ctx.send("Something went wrong. Command should be formatted as:  !status_report")
+        await ctx.send("Something went wrong. Command should be formatted as:  !status_report_decks")
         raise error
 
 # Set automated reminders
 
 @bot.command()
-@is_admin_command_check()
+@is_leader_command_check()
 @channel_check(COMMANDS_CHANNEL)
 async def set_automated_reminders(ctx, status: bool):
-    "Admin only. Set whether automated reminders should be sent."
+    "Leader/Admin only. Set whether automated reminders should be sent."
     db_utils.SetReminderStatus(status)
     await ctx.channel.send("Automated deck usage reminders are now " + ("ENABLED" if status else "DISABLED") + ".")
 
@@ -546,7 +612,7 @@ async def set_automated_reminders(ctx, status: bool):
 async def set_automated_reminders_error(ctx, error):
     if isinstance(error, commands.errors.CheckFailure):
         channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-        await ctx.send(f"!set_automated_reminders command can only be sent in {channel.mention} by Admins.")
+        await ctx.send(f"!set_automated_reminders command can only be sent in {channel.mention} by Leaders/Admins.")
     elif isinstance(error, commands.errors.BadBoolArgument):
         await ctx.send("Invalid argument. Valid statuses are: on or off")
     elif isinstance(error, commands.errors.MissingRequiredArgument):
@@ -559,10 +625,10 @@ async def set_automated_reminders_error(ctx, error):
 # Set automated strikes
 
 @bot.command()
-@is_admin_command_check()
+@is_leader_command_check()
 @channel_check(COMMANDS_CHANNEL)
 async def set_automated_strikes(ctx, status: bool):
-    "Admin only. Set whether automated strikes should be given."
+    "Leader/Admin only. Set whether automated strikes should be given."
     db_utils.SetStrikeStatus(status)
     await ctx.channel.send("Automated strikes for low deck usage are now " + ("ENABLED" if status else "DISABLED") + ".")
 
@@ -570,13 +636,35 @@ async def set_automated_strikes(ctx, status: bool):
 async def set_automated_strikes_error(ctx, error):
     if isinstance(error, commands.errors.CheckFailure):
         channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-        await ctx.send(f"!set_automated_strikes command can only be sent in {channel.mention} by Admins.")
+        await ctx.send(f"!set_automated_strikes command can only be sent in {channel.mention} by Leaders/Admins.")
     elif isinstance(error, commands.errors.BadBoolArgument):
         await ctx.send("Invalid argument. Valid statuses are: on or off")
     elif isinstance(error, commands.errors.MissingRequiredArgument):
         await ctx.send("Missing arguments. Command should be formatted as:  !set_automated_strikes <status>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !set_automated_strikes <status>")
+        raise error
+
+
+# Get automation status
+
+@bot.command()
+@is_leader_command_check()
+@channel_check(COMMANDS_CHANNEL)
+async def get_automation_status(ctx):
+    "Leader/Admin only. Get status of whether automated strikes and reminders are enabled."
+    strikeStatus = "ENABLED" if db_utils.GetStrikeStatus() else "DISABLED"
+    reminderStatus = "ENABLED" if db_utils.GetReminderStatus() else "DISABLED"
+    statusString = f"Automated reminders are currently {reminderStatus}" + "\n" + f"Automated strikes are currently {strikeStatus}"
+    await ctx.send(statusString)
+
+@get_automation_status.error
+async def get_automation_status_error(ctx, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+        await ctx.send(f"!get_automation_status command can only be sent in {channel.mention} by Leaders/Admins.")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !get_automation_status")
         raise error
 
 
@@ -605,8 +693,32 @@ async def top_fame_error(ctx, error):
 @is_leader_command_check()
 @channel_check(COMMANDS_CHANNEL)
 async def fame_check(ctx, threshold: int):
-    "Leader/Admin only. Mention users below fame threshold in the fame channel."
-    await FameCheck(threshold)
+    "Leader/Admin only. Mention users below the specified fame threshold. Ignores users on vacation."
+    hallOfShame = clash_utils.GetHallOfShame(threshold)
+    vacationList = db_utils.GetVacationStatus()
+    channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
+
+    memberString = ""
+    nonMemberString = ""
+
+    for player_name, fame in hallOfShame:
+        if player_name in vacationList:
+            continue
+
+        member = discord.utils.get(channel.members, display_name=player_name)
+
+        if member == None:
+            nonMemberString += f"{player_name} - Fame: {fame}" + "\n"
+        else:
+            memberString += f"{member.mention} - Fame: {fame}" + "\n"
+
+    if (len(memberString) == 0) and (len(nonMemberString) == 0):
+        await ctx.send("There are currently no members currently below the threshold you specified.")
+        return
+
+    fameString = f"The following members are below {threshold} fame:" + "\n" + memberString + nonMemberString
+
+    await channel.send(fameString)
 
 @fame_check.error
 async def fame_check_error(ctx, error):
@@ -619,6 +731,44 @@ async def fame_check_error(ctx, error):
         await ctx.send("Missing arguments. Command should be formatted as:  !fame_check <threshold>")
     else:
         await ctx.send("Something went wrong. Command should be formatted as:  !fame_check <threshold>")
+        raise error
+
+
+# Status report fame
+
+@bot.command()
+@is_leader_command_check()
+@channel_check(COMMANDS_CHANNEL)
+async def status_report_fame(ctx, threshold: int):
+    "Leader/Admin only. Get a report of players below specifiec fame threshold. Ignores users on vacation. Users are not mentioned."
+    hallOfShame = clash_utils.GetHallOfShame(threshold)
+    vacationList = db_utils.GetVacationStatus()
+    table = PrettyTable()
+    table.field_names = ["Member", "Fame"]
+    embed = discord.Embed(title="Status Report", footer="Users on vacation are not included in this list")
+
+    for player_name, fame in hallOfShame:
+        if player_name in vacationList:
+            continue
+
+        table.add_row([player_name, fame])
+
+    embed.add_field(name="Players below fame threshold", value = "```\n" + table.get_string() + "```")
+
+    try:
+        await ctx.send(embed=embed)
+    except:
+        await ctx.send("Players below fame threshold\n" + "```\n" + table.get_string() + "```")
+
+@status_report_fame.error
+async def status_report_fame_error(ctx, error):
+    if isinstance(error, commands.errors.CheckFailure):
+        channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+        await ctx.send(f"!status_report_fame command can only be sent in {channel.mention} by Leaders/Admins.")
+    elif isinstance(error, commands.errors.MissingRequiredArgument):
+        await ctx.send("Missing arguments. Command should be formatted as:  !status_report_fame <threshold>")
+    else:
+        await ctx.send("Something went wrong. Command should be formatted as:  !status_report_fame <threshold>")
         raise error
 
 
@@ -713,7 +863,7 @@ async def AutomatedReminderUS():
 
 # Assign strikes, clear vacation
 # Occurs every Wednesday 10:00 UTC (Wednesday 3:00am PDT)
-@aiocron.crontab('0 10 * * 3')
+@aiocron.crontab('32 9 * * 3')
 async def AssignStrikesAndClearVacation():
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     vacationChannel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
@@ -759,6 +909,7 @@ async def SendSavedMessage():
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     strikesChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
     message = db_utils.GetSavedMessage()
+    db_utils.SetSavedMessage("")
     await strikesChannel.send(message)
 
 
@@ -797,12 +948,23 @@ async def DeckUsageReminder(US_time: bool=None, message: str=DEFAULT_REMINDER_ME
             memberString += f"{member.mention} - Decks left: {decks_remaining}" + "\n"
 
     if (len(memberString) == 0) and (len(nonMemberString) == 0):
+        if checkTimeZones:
+            zone = "US" if US_time else "EU"
+            noReminderString = f"Everyone that receives {zone} reminders has already used all their decks today. Good job!"
+            await channel.send(noReminderString)
+        else:
+            await channel.send("Everyone has already used all their decks today. Good job!")
         return
 
     reminderString = message + "\n" + memberString + nonMemberString
 
     if automated:
-        reminderString += "\n\n" + DEFAULT_REMINDER_FOOTER
+        automatedMessage = ''
+        if US_time:
+            automatedMessage = 'This is an automated reminder. If this reminder is in the middle of the night for you, consider switching your reminder time to 7PM GMT with command "!set_reminder_time EU"'
+        else:
+            automatedMessage = 'This is an automated reminder. If this reminder is in the middle of the day for you, consider switching your reminder time to 6PM PDT with command "!set_reminder_time US"'
+        reminderString += "\n\n" + automatedMessage
 
     await channel.send(reminderString)
 
@@ -821,32 +983,9 @@ async def TopFame():
     embed.add_field(name="Top members by fame", value="```\n" + table.get_string() + "```")
 
     try:
-        await ctx.send(embed=embed)
+        await channel.send(embed=embed)
     except:
-        await ctx.send("Top members by fame\n" + "```\n" + table.get_string() + "```")
-
-
-async def FameCheck(threshold: int):
-    hallOfShame = clash_utils.GetHallOfShame(threshold)
-    guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
-    channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
-
-    membersString = ""
-    otherMembersString = ""
-
-    for nameTuple in hallOfShame:
-        member = discord.utils.get(channel.members, display_name=nameTuple[0])
-        if member == None:
-            otherMembersString += f"{nameTuple[0]}: - Fame: {nameTuple[1]}" + "\n"
-        else:
-            membersString += f"{member.mention} Fame: {nameTuple[1]}" + "\n"
-
-    fameString = f"The following members are below the fame threshold of {threshold}:" + "\n" + membersString
-
-    if len(otherMembersString) > 0:
-        fameString += "\nMembers below the threshold not in this channel:\n" + otherMembersString
-
-    await channel.send(fameString)
+        await channel.send("Top members by fame\n" + "```\n" + table.get_string() + "```")
 
 
 async def UpdateUser(ctx, member: discord.Member, player_tag = None) -> bool:

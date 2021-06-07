@@ -88,6 +88,7 @@ def GetDeckUsage(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     activeMembers = GetActiveMembersInClan(clan_tag)
 
     participantList = [ (participant["name"], participant["decksUsed"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsed"] < 8) and (participant["name"] in activeMembers)) ]
+    participantList.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participantList
 
@@ -117,6 +118,7 @@ def GetTopFameUsers(topN : int=3, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
 
     return returnList
 
+# [(player_name, fame)]
 def GetHallOfShame(threshold: int, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
 

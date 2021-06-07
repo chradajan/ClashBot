@@ -155,6 +155,25 @@ def SetStrikes(player_name: str, strike_count: int) -> tuple:
     return (previousStrikes, newStrikes)
 
 
+# [(player_name, strikes),]
+def GetStrikes() -> list:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT player_name, strikes FROM users WHERE strikes > 0")
+    queryResult = cursor.fetchall()
+
+    if (queryResult == None):
+        db.close()
+        return []
+
+    strikeList = [ (user["player_name"], user["strikes"]) for user in queryResult ]
+    strikeList.sort(key = lambda x : (x[1], x[0].lower()))
+
+    db.close()
+    return strikeList
+
+
 def SetSavedMessage(message: str):
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
