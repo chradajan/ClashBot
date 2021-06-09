@@ -1,6 +1,8 @@
 from config import PRIMARY_CLAN_NAME
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
 import csv
+import datetime
+import os
 import pymysql
 
 
@@ -458,7 +460,21 @@ def GetMembersInTimezone(US_time: bool) -> list:
     return memberList
 
 
-def OutputToCSV(file_path: str, primary_clan_only: bool) -> bool:
+def get_file_path() ->str:
+    path = 'export_files'
+    files = [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+    files.sort(key = lambda x : os.path.getmtime(x))
+
+    if len(files) >= 5:
+        os.remove(files[0])
+
+    file_name = "members_" + str(datetime.datetime.now().date()) + ".csv"
+    new_path = os.path.join(path, file_name)
+
+    return new_path
+
+
+def OutputToCSV(primary_clan_only: bool) -> str:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -481,11 +497,13 @@ def OutputToCSV(file_path: str, primary_clan_only: bool) -> bool:
     users = cursor.fetchall()
 
     if users == None:
-        return False
+        return None
 
     clansDict = {}
     for clan in clans:
         clansDict[clan["id"]] = {"Clan Tag": clan["clan_tag"], "Clan Name": clan["clan_name"]}
+
+    file_path = get_file_path()
 
     with open(file_path, 'w', newline='') as csvfile:
         fieldsList = list(users[0].keys())
@@ -518,4 +536,4 @@ def OutputToCSV(file_path: str, primary_clan_only: bool) -> bool:
 
             writer.writerow(user)
 
-    return True
+    return file_path

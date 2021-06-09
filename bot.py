@@ -357,8 +357,8 @@ async def export(ctx, UpdateBeforeExport: bool=True, FalseLogicOnly: bool=True):
         for member in ctx.guild.members:
             await UpdateUser(ctx, member)
 
-    db_utils.OutputToCSV("members.csv", FalseLogicOnly)
-    await ctx.send(file=discord.File("members.csv"))
+    path = db_utils.OutputToCSV(FalseLogicOnly)
+    await ctx.send(file=discord.File(path))
 
 @export.error
 async def export_error(ctx, error):
