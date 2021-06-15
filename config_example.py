@@ -18,6 +18,11 @@ RULES_CHANNEL = ""
 REMINDER_CHANNEL = ""
 STRIKES_CHANNEL = ""
 FAME_CHANNEL = ""
+NEW_CHANNEL = ""
 
-# Clan name
+# Clan information
 PRIMARY_CLAN_NAME = ""
+PRIMARY_CLAN_TAG = ""
+
+# Messages
+DEFAULT_REMINDER_MESSAGE = ""

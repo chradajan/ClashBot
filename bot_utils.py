@@ -1,12 +1,14 @@
+from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
+from config import *
 import discord
 import checks
 import clash_utils
 import db_utils
-from config import *
+import roles
 
 async def send_rules_message(ctx, user_to_purge: discord.ClientUser):
     rules_channel = discord.utils.get(ctx.guild.channels, name=RULES_CHANNEL)
-    await rules_channel.purge(limit=10, check=lambda message: message.author == bot.user)
+    await rules_channel.purge(limit=10, check=lambda message: message.author == user_to_purge)
     new_react_message = await rules_channel.send(content="@everyone After you've read the rules, react to this message for roles.")
     await new_react_message.add_reaction(u"\u2705")
 
@@ -85,15 +87,15 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
 
     member_status = db_utils.update_user(clash_data, member.display_name)
 
-    if not is_admin(member):
-        if clash_data["player_name"] != member.display_name
+    if not await is_admin(member):
+        if clash_data["player_name"] != member.display_name:
             await member.edit(nick = clash_data["player_name"])
 
-        roles_to_remove = [roles.NORMAL_ROLES["Member"], roles.NORMAL_ROLES["Visitor"], roles.NORMAL_ROLES["Elder"]]
+        roles_to_remove = [roles.NORMAL_ROLES[MEMBER_ROLE_NAME], roles.NORMAL_ROLES[VISITOR_ROLE_NAME], roles.NORMAL_ROLES[ELDER_ROLE_NAME]]
         await member.remove_roles(*roles_to_remove)
         await member.add_roles(roles.NORMAL_ROLES[member_status])
 
         if clash_data["clan_role"] == "elder":
-            await member.add_roles(roles.NORMAL_ROLES["Elder"])
+            await member.add_roles(roles.NORMAL_ROLES[ELDER_ROLE_NAME])
 
     return True

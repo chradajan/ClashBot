@@ -1,6 +1,7 @@
+from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
-import checks
+from prettytable import PrettyTable
 import db_utils
 import discord
 
@@ -14,7 +15,7 @@ class Vacation(commands.Cog):
 
     Toggle the vacation status of the user who issued the command.
     """
-    @commands.command
+    @commands.command()
     @channel_check(TIME_OFF_CHANNEL)
     async def vacation(self, ctx):
         """Toggles vacation status."""
@@ -24,12 +25,12 @@ class Vacation(commands.Cog):
 
     @vacation.error
     async def vacation_error(self, ctx, error):
-    if isinstance(error, commands.errors.CheckFailure):
-        channel = discord.utils.get(ctx.guild.members, name=TIME_OFF_CHANNEL)
-        await ctx.send(f"!vacation command can only be sent in {channel.mention}.")
-    else:
-        await ctx.send("Something went wrong. Command should be formatted as:  !vacation")
-        raise error
+        if isinstance(error, commands.errors.CheckFailure):
+            channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
+            await ctx.send(f"!vacation command can only be sent in {channel.mention}.")
+        else:
+            await ctx.send("Something went wrong. Command should be formatted as:  !vacation")
+            raise error
 
 
     """
@@ -37,12 +38,12 @@ class Vacation(commands.Cog):
 
     Toggle the vacation status of the specified user.
     """
-    @commands.command
+    @commands.command()
     @is_leader_command_check()
     async def set_vacation(self, ctx, member: discord.Member, status: bool):
         """Set vacation status for the specified member."""
-        channel = discord.utils.get(ctx.guild.channels, TIME_OFF_CHANNEL)
-        vacation_status = db_utils.update_vacation_for_user(player_name, status)
+        channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
+        vacation_status = db_utils.update_vacation_for_user(member.display_name, status)
         vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
         await channel.send(f"Updated vacation status of {member.mention} to: {vacation_status_string}.")
 
@@ -66,9 +67,9 @@ class Vacation(commands.Cog):
 
     Print a list of all users currently on vacation.
     """
-    @commands.command
+    @commands.command()
     @is_leader_command_check()
-    async def vacation_list(self, self, ctx):
+    async def vacation_list(self, ctx):
         """Get a list of all users currently on vacation."""
         users_on_vacation = db_utils.get_vacation_list()
         table = PrettyTable()

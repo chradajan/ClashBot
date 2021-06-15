@@ -33,10 +33,11 @@ import Vacation
 #                                                      #
 ########################################################
 
-help_command = commands.DefaultHelpCommand(no_category="Clash Bot Commands")
+# help_command = commands.DefaultHelpCommand(no_category="Clash Bot Commands")
 intents = discord.Intents.default()
 intents.members = True
-bot = commands.Bot(command_prefix='!', help_command=help_command, intents=intents)
+# bot = commands.Bot(command_prefix='!', help_command=help_command, intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 bot.add_cog(AutomationTools.AutomationTools(bot))
 bot.add_cog(LeaderUtils.LeaderUtils(bot))
@@ -52,13 +53,13 @@ bot.add_cog(Vacation.Vacation(bot))
 async def on_ready():
     for guild in bot.guilds:
         if guild.name == GUILD_NAME:
-            roles.SPECIAL_ROLES["Admin"] = discord.utils.get(guild.roles, name=ADMIN_ROLE_NAME)
-            roles.SPECIAL_ROLES["New"] = discord.utils.get(guild.roles, name=NEW_ROLE_NAME)
-            roles.SPECIAL_ROLES["Check Rules"] = discord.utils.get(guild.roles, name=CHECK_RULES_ROLE_NAME)
-            roles.NORMAL_ROLES["Visitor"] = discord.utils.get(guild.roles, name=VISITOR_ROLE_NAME)
-            roles.NORMAL_ROLES["Member"] = discord.utils.get(guild.roles, name=MEMBER_ROLE_NAME)
-            roles.NORMAL_ROLES["Elder"] = discord.utils.get(guild.roles, name=ELDER_ROLE_NAME)
-            roles.NORMAL_ROLES["Leader"] = discord.utils.get(guild.roles, name=LEADER_ROLE_NAME)
+            roles.SPECIAL_ROLES[ADMIN_ROLE_NAME] = discord.utils.get(guild.roles, name=ADMIN_ROLE_NAME)
+            roles.SPECIAL_ROLES[NEW_ROLE_NAME] = discord.utils.get(guild.roles, name=NEW_ROLE_NAME)
+            roles.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] = discord.utils.get(guild.roles, name=CHECK_RULES_ROLE_NAME)
+            roles.NORMAL_ROLES[VISITOR_ROLE_NAME] = discord.utils.get(guild.roles, name=VISITOR_ROLE_NAME)
+            roles.NORMAL_ROLES[MEMBER_ROLE_NAME] = discord.utils.get(guild.roles, name=MEMBER_ROLE_NAME)
+            roles.NORMAL_ROLES[ELDER_ROLE_NAME] = discord.utils.get(guild.roles, name=ELDER_ROLE_NAME)
+            roles.NORMAL_ROLES[LEADER_ROLE_NAME] = discord.utils.get(guild.roles, name=LEADER_ROLE_NAME)
 
     print("Bot Ready")
 
@@ -95,50 +96,50 @@ async def automated_reminder_us():
 async def assign_strikes_and_clear_vacation():
     """Assign strikes and clear vacation every Wednesday 10:00 UTC (Wednesday 3:00am PDT).""" 
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
-    vacationChannel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
-    strikesChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
-    savedMessage = ""
+    vacation_channel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
+    strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
+    saved_message = ""
 
     if db_utils.get_strike_status():
-        vacationList = db_utils.get_vacation_list()
-        deckUsageList = clash_utils.get_river_race_deck_usage()
+        vacation_list = db_utils.get_vacation_list()
+        deck_usage_list = clash_utils.get_river_race_deck_usage()
 
-        memberString = ""
-        nonMemberString = ""
+        member_string = ""
+        non_member_string = ""
 
-        for player_name, deck_usage in deckUsageList:
-            if player_name in vacationList:
+        for player_name, deck_usage in deck_usage_list:
+            if player_name in vacation_list:
                 continue
 
-            member = discord.utils.get(strikesChannel.members, display_name=player_name)
+            member = discord.utils.get(strikes_channel.members, display_name=player_name)
             strikes = db_utils.give_strike(player_name)
 
             if member == None:
-                prevStrikes = 0 if strikes == 0 else strikes - 1
-                nonMemberString += f"{player_name} - Decks used: {deck_usage},  Strikes: {prevStrikes} -> {strikes}" + "\n"
+                previous_strike_count = 0 if strikes == 0 else strikes - 1
+                non_member_string += f"{player_name} - Decks used: {deck_usage},  Strikes: {previous_strike_count} -> {strikes}" + "\n"
             else:
-                memberString += f"{member.mention} - Decks used: {deck_usage},  Strikes: {strikes - 1} -> {strikes}" + "\n"
+                member_string += f"{member.mention} - Decks used: {deck_usage},  Strikes: {strikes - 1} -> {strikes}" + "\n"
 
-        if (len(memberString) == 0) and (len(nonMemberString) == 0):
-            savedMessage = "Everyone completed their battles this week. Good job!"
+        if (len(member_string) == 0) and (len(non_member_string) == 0):
+            saved_message = "Everyone completed their battles this week. Good job!"
         else:
-            savedMessage = "The following members have received strikes for failing to complete 8 battles:\n" + memberString + nonMemberString
+            saved_message = "The following members have received strikes for failing to complete 8 battles:\n" + member_string + non_member_string
     else:
-        savedMessage = "Automated strikes are currently disabled so no strikes have been given out."
+        saved_message = "Automated strikes are currently disabled so no strikes have been given out."
 
-    db_utils.set_saved_message(savedMessage)
+    db_utils.set_saved_message(saved_message)
     db_utils.clear_all_vacation()
-    await vacationChannel.send("Vacation status for all users has been set to false. Make sure to use !vacation before the next war if you're going to miss it.")
+    await vacation_channel.send("Vacation status for all users has been set to false. Make sure to use !vacation before the next war if you're going to miss it.")
 
 
 @aiocron.crontab('0 18 * * 3')
 async def send_saved_message():
     """Send saved message of who received automated strikes every Wednesday 18:00 UTC (Wednesday 11:00am PDT)."""
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
-    strikesChannel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
+    strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
     message = db_utils.get_saved_message()
     db_utils.set_saved_message("")
-    await strikesChannel.send(message)
+    await strikes_channel.send(message)
 
 
 #####################################################

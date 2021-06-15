@@ -1,7 +1,8 @@
+from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
+from prettytable import PrettyTable
 import bot_utils
-import checks
 import clash_utils
 import db_utils
 import discord
@@ -54,15 +55,19 @@ class LeaderUtils(commands.Cog):
         # Get a list of members in guild without any special roles (New, Check Rules, or Admin) and that aren't bots.
         members = [member for member in ctx.guild.members if ((len(set(roles.SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
         roles_to_remove = list(roles.NORMAL_ROLES.values())
+        await ctx.send("Starting to update user roles. This might take a minute...")
 
         for member in members:
             # Get a list of normal roles (Visitor, Member, Elder, or Leader) that a member current has. These will be restored after reacting to rules message.
             roles_to_commit = [ role.name for role in list(set(roles.NORMAL_ROLES.values()).intersection(set(member.roles))) ]
             db_utils.commit_roles(member.display_name, roles_to_commit)
             await member.remove_roles(*roles_to_remove)
-            await member.add_roles(roles.SPECIAL_ROLES["Check Rules"])
+            await member.add_roles(roles.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
 
         await bot_utils.send_rules_message(ctx, self.bot.user)
+        admin_role = roles.SPECIAL_ROLES[ADMIN_ROLE_NAME]
+        leader_role = roles.NORMAL_ROLES[LEADER_ROLE_NAME]
+        await ctx.send(f"Force rules check complete. If you are a {admin_role.mention} or {leader_role.mention}, don't forget to acknowledge the rules too.")
 
     @force_rules_check.error
     async def force_rules_check_error(self, ctx, error):

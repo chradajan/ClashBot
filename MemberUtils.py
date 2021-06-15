@@ -1,6 +1,7 @@
+from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
-import checks
+from prettytable import PrettyTable
 import clash_utils
 import db_utils
 import discord
@@ -33,7 +34,7 @@ class MemberUtils(commands.Cog):
 
     @river_race_status.error
     async def river_race_status_error(self, ctx, error):
-        await ctx.send("Something went wrong. Command should be formatted as:  !current_river_race_status")
+        await ctx.send("Something went wrong. Command should be formatted as:  !river_race_status")
         raise error
 
 
