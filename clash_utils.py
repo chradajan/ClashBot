@@ -4,27 +4,36 @@ import json
 import re
 import requests
 
-def GetActiveMembersInClan(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
+# [player_name]
+def get_active_members_in_clan(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
             return []
 
-    jsonDump = json.dumps(req.json())
-    jsonObj = json.loads(jsonDump)
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
 
-    return [ member["name"] for member in jsonObj["items"] ]
+    return [ member["name"] for member in json_obj["items"] ]
 
 
-def ParsePlayerTag(message: str) -> str:
-    foundPattern = re.search(r"(#[A-Z0-9]+)", message)
-    if foundPattern != None:
-        return foundPattern.group(1)
+def parse_player_tag(message: str) -> str:
+    found_pattern = re.search(r"(#[A-Z0-9]+)", message)
+    if found_pattern != None:
+        return found_pattern.group(1)
     return None
 
 
-def GetClashUserData(message: str, discordName: str) -> dict:
-    player_tag = ParsePlayerTag(message)
+# clash_data = {
+#     player_tag: str,
+#     player_name: str,
+#     discord_name: str,
+#     clan_role: str,
+#     clan_name: str,
+#     clan_tag: str
+# }
+def get_clash_user_data(message: str, discord_name: str) -> dict:
+    player_tag = parse_player_tag(message)
 
     if player_tag == None:
         return None
@@ -34,128 +43,130 @@ def GetClashUserData(message: str, discordName: str) -> dict:
     if (req.status_code != 200):
         return None
 
-    jsonDump = json.dumps(req.json())
-    jsonObj = json.loads(jsonDump)
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
 
-    userDict = {
+    user_dict = {
         "player_tag": player_tag,
-        "player_name": jsonObj["name"],
-        "discord_name": discordName,
+        "player_name": json_obj["name"],
+        "discord_name": discord_name,
     }
 
-    if "clan" in jsonObj.keys():
-        userDict["clan_role"] = jsonObj["role"]
-        userDict["clan_name"] = jsonObj["clan"]["name"]
-        userDict["clan_tag"] = jsonObj["clan"]["tag"]
+    if "clan" in json_obj.keys():
+        user_dict["clan_role"] = json_obj["role"]
+        user_dict["clan_name"] = json_obj["clan"]["name"]
+        user_dict["clan_tag"] = json_obj["clan"]["tag"]
     else:
-        userDict["clan_role"] = "None"
-        userDict["clan_name"] = "None"
-        userDict["clan_tag"] = "None"
+        user_dict["clan_role"] = "None"
+        user_dict["clan_name"] = "None"
+        user_dict["clan_tag"] = "None"
 
-    return userDict
+    return user_dict
 
 
 # Get a list of users who have not used 4 decks today.
 # Returns [(player_name, decks_remaining)]
-def GetDeckUsageToday(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
+def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
         return []
 
-    jsonDump = json.dumps(req.json())
-    jsonObj = json.loads(jsonDump)
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
 
-    activeMembers = GetActiveMembersInClan(clan_tag)
+    active_members = get_active_members_in_clan(clan_tag)
 
-    participantList = [ (participant["name"], 4 - participant["decksUsedToday"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["name"] in activeMembers)) ]
-    participantList.sort(key = lambda x : (x[1], x[0].lower()))
+    participants = [ (participant["name"], 4 - participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["name"] in active_members)) ]
+    participants.sort(key = lambda x : (x[1], x[0].lower()))
 
-    return participantList
+    return participants
 
 
 # Get a list of members in specified clan with fewer than 8 decks used.
 # Returns [(player_name, decks_used)]
-def GetDeckUsage(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
+def get_river_race_deck_usage(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
         return []
 
-    jsonDump = json.dumps(req.json())
-    jsonObj = json.loads(jsonDump)
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
 
-    activeMembers = GetActiveMembersInClan(clan_tag)
+    active_members = get_active_members_in_clan(clan_tag)
 
-    participantList = [ (participant["name"], participant["decksUsed"]) for participant in jsonObj["clan"]["participants"] if ((participant["decksUsed"] < 8) and (participant["name"] in activeMembers)) ]
-    participantList.sort(key = lambda x : (x[1], x[0].lower()))
+    participants = [ (participant["name"], participant["decksUsed"]) for participant in json_obj["clan"]["participants"] if ((participant["decksUsed"] < 8) and (participant["name"] in active_members)) ]
+    participants.sort(key = lambda x : (x[1], x[0].lower()))
 
-    return participantList
-
-def GetTopFameUsers(topN : int=3, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
-    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
-
-    if (req.status_code != 200):
-        return []
-
-    jsonDump = json.dumps(req.json())
-    jsonObj = json.loads(jsonDump)
-
-    activeMembers = GetActiveMembersInClan(clan_tag)
-
-    fameList = [ (participant["name"], participant["fame"]) for participant in jsonObj["clan"]["participants"] if participant["name"] in activeMembers ]
-    fameList.sort(key = lambda x : x[1], reverse = True)
-
-    if len(fameList) <= topN:
-        return fameList
-
-    i = topN - 1
-    returnList = fameList[:topN]
-
-    while (i + 1 < len(fameList)) and (fameList[i][1] == fameList[i + 1][1]):
-        returnList.append(fameList[i + 1])
-        i += 1
-
-    return returnList
+    return participants
 
 # [(player_name, fame)]
-def GetHallOfShame(threshold: int, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
+def get_top_fame_users(top_n : int=3, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if (req.status_code != 200):
+        return []
+
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
+
+    active_members = get_active_members_in_clan(clan_tag)
+
+    fame_list = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if participant["name"] in active_members ]
+    fame_list.sort(key = lambda x : x[1], reverse = True)
+
+    if len(fame_list) <= top_n:
+        return fame_list
+
+    i = top_n - 1
+    return_list = fame_list[:top_n]
+
+    while (i + 1 < len(fame_list)) and (fame_list[i][1] == fame_list[i + 1][1]):
+        return_list.append(fame_list[i + 1])
+        i += 1
+
+    return return_list
+
+# [(player_name, fame)]
+def get_hall_of_shame(threshold: int, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
 
     if (req.status_code != 200):
         return []
 
-    jsonDump = json.dumps(req.json())
-    jsonObj = json.loads(jsonDump)
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
 
-    activeMembers = GetActiveMembersInClan(clan_tag)
+    active_members = get_active_members_in_clan(clan_tag)
 
-    participantList = [ (participant["name"], participant["fame"]) for participant in jsonObj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["name"] in activeMembers)) ]
-    participantList.sort(key = lambda x : (x[1], x[0].lower()))
+    participants = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["name"] in active_members)) ]
+    participants.sort(key = lambda x : (x[1], x[0].lower()))
 
-    return participantList
+    return participants
 
-def GetOtherClanDecksRemaining(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
+# [(clan_name, decks_remaining)]
+def get_clan_decks_remaining(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"}, params = {"limit":20})
 
     if (req.status_code != 200):
         return []
 
-    jsonDump = json.dumps(req.json())
-    jsonObj = json.loads(jsonDump)
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
 
-    returnList = []
+    return_list = []
 
-    for clan in jsonObj["clans"]:
-        activeMembers = GetActiveMembersInClan(clan["tag"])
-        decksRemaining = 0
+    for clan in json_obj["clans"]:
+        active_members = get_active_members_in_clan(clan["tag"])
+        decks_remaining = 0
 
         for participant in clan["participants"]:
-            if participant["name"] in activeMembers:
-                decksRemaining += (4 - participant["decksUsedToday"])
+            if participant["name"] in active_members:
+                decks_remaining += (4 - participant["decksUsedToday"])
 
-        returnList.append((clan["name"], decksRemaining))
+        return_list.append((clan["name"], decks_remaining))
 
-    returnList.sort(key = lambda x : (x[1], x[0]))
+    return_list.sort(key = lambda x : (x[1], x[0]))
 
-    return returnList
+    return return_list
