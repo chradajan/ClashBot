@@ -39,7 +39,17 @@ def add_new_user(clash_data: dict) -> bool:
         db.close()
         return False
 
-    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, 0, %(clan_id)s)"
+    # If player received strikes before joining, retrieve their current strike count.
+    cursor.execute("SELECT strikes FROM unregistered_users WHERE player_name = %(player_name)s", clash_data)
+    query_result = cursor.fetchone()
+
+    if query_result != None:
+        clash_data["strikes"] = query_result["strikes"]
+        cursor.execute("DELETE FROM unregistered_users WHERE player_name = %(player_name)s", clash_data)
+    else:
+        clash_data["strikes"] = 0
+
+    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, %(strikes)s, %(clan_id)s)"
     cursor.execute(insert_user_query, clash_data)
 
     # Get id of newly inserted user.
@@ -71,7 +81,7 @@ def update_user(clash_data: dict, original_player_name: str) -> str:
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
     query_result = cursor.fetchone()
 
-    if (query_result == None):
+    if query_result == None:
         insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
         cursor.execute(insert_clan_query, clash_data)
         cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
@@ -94,22 +104,36 @@ def update_user(clash_data: dict, original_player_name: str) -> str:
     return "Member" if (clash_data["clan_name"] == PRIMARY_CLAN_NAME) else "Visitor"
 
 
-# Add strike to user.
+# Add strike to user. Return new number of strikes.
 def give_strike(player_name: str) -> int:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    strike_count = 0
 
     cursor.execute("UPDATE users SET strikes = strikes + 1 WHERE player_name = %s", (player_name))
     cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
     query_result = cursor.fetchone()
 
+    # If player does not exist in database, check in unregistered users.
+    # Increment if there, add new row with 1 strike otherwise.
     if query_result == None:
-        return 0
+        cursor.execute("UPDATE unregistered_users SET strikes = strikes + 1 WHERE player_name = %s", (player_name))
+        cursor.execute("SELECT strikes FROM unregistered_users WHERE player_name = %s", (player_name))
+        query_result = cursor.fetchone()
+
+        if query_result == None:
+            cursor.execute("INSERT INTO unregistered_users VALUES (DEFAULT, %s, 1)", (player_name))
+            strike_count = 1
+        else:
+            strike_count = query_result["strikes"]
+    else:
+        strike_count = query_result["strikes"]
 
     db.commit()
     db.close()
 
-    return query_result["strikes"]
+    return strike_count
 
 def get_strikes(player_name: str) -> int:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
@@ -130,6 +154,7 @@ def reset_strikes():
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("UPDATE users SET strikes = 0")
+    cursor.execute("UPDATE unregistered_users SET strikes = 0")
     db.commit()
     db.close()
 
@@ -171,11 +196,20 @@ def get_strike_report() -> list:
     cursor.execute("SELECT player_name, strikes FROM users WHERE strikes > 0")
     query_result = cursor.fetchall()
 
-    if (query_result == None):
-        db.close()
-        return []
+    members_strike_list = []
 
-    strike_list = [ (user["player_name"], user["strikes"]) for user in query_result ]
+    if query_result != None:
+        members_strike_list = [ (user["player_name"], user["strikes"]) for user in query_result ]
+
+    cursor.execute("SELECT player_name, strikes FROM unregistered_users WHERE strikes > 0")
+    query_result = cursor.fetchall()
+
+    non_members_strike_list = []
+
+    if query_result != None:
+        non_members_strike_list = [ (user["player_name"], user["strikes"]) for user in query_result ]
+
+    strike_list = members_strike_list + non_members_strike_list
     strike_list.sort(key = lambda x : (x[1], x[0].lower()))
 
     db.close()
