@@ -1,10 +1,83 @@
-from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
+from discord.ext import commands
 import discord
-import checks
 import clash_utils
+import datetime
 import db_utils
-import roles
+
+######################################################
+#                                                    #
+#     _____                _              _          #
+#    / ____|              | |            | |         #
+#   | |     ___  _ __  ___| |_ __ _ _ __ | |_ ___    #
+#   | |    / _ \| '_ \/ __| __/ _` | '_ \| __/ __|   #
+#   | |___| (_) | | | \__ \ || (_| | | | | |_\__ \   #
+#    \_____\___/|_| |_|___/\__\__,_|_| |_|\__|___/   #
+#                                                    #
+######################################################
+
+RESET_TIME = datetime.time(9, 33)
+SIX_DAY_MASK = 0x3FFFF
+ONE_DAY_MASK = 0x7
+
+SPECIAL_ROLES = {
+    "Admin": None,
+    "New": None,
+    "Check Rules": None
+}
+
+NORMAL_ROLES = {
+    "Visitor": None,
+    "Member": None,
+    "Elder": None,
+    "Leader": None
+}
+
+
+#########################################
+#     _____ _               _           #
+#    / ____| |             | |          #
+#   | |    | |__   ___  ___| | _____    #
+#   | |    | '_ \ / _ \/ __| |/ / __|   #
+#   | |____| | | |  __/ (__|   <\__ \   #
+#    \_____|_| |_|\___|\___|_|\_\___/   #
+#                                       #
+#########################################
+
+
+async def is_admin(member: discord.Member) -> bool:
+    return (SPECIAL_ROLES[ADMIN_ROLE_NAME] in member.roles) or member.guild_permissions.administrator
+
+def is_leader_command_check():
+    async def predicate(ctx):
+        return (NORMAL_ROLES[LEADER_ROLE_NAME] in ctx.author.roles) or (SPECIAL_ROLES[ADMIN_ROLE_NAME] in ctx.author.roles)
+    return commands.check(predicate)
+
+def is_admin_command_check():
+    async def predicate(ctx):
+        return await is_admin(ctx.author)
+    return commands.check(predicate)
+
+def channel_check(CHANNEL_NAME):
+    async def predicate(ctx):
+        return ctx.message.channel.name == CHANNEL_NAME
+    return commands.check(predicate)
+
+
+###########################################
+#                                         #
+#    _    _      _                        #
+#   | |  | |    | |                       #
+#   | |__| | ___| |_ __   ___ _ __ ___    #
+#   |  __  |/ _ \ | '_ \ / _ \ '__/ __|   #
+#   | |  | |  __/ | |_) |  __/ |  \__ \   #
+#   |_|  |_|\___|_| .__/ \___|_|  |___/   #
+#                 | |                     #
+#                 |_|                     #
+#                                         #
+###########################################
+
+
 
 async def send_rules_message(ctx, user_to_purge: discord.ClientUser):
     rules_channel = discord.utils.get(ctx.guild.channels, name=RULES_CHANNEL)
@@ -14,7 +87,7 @@ async def send_rules_message(ctx, user_to_purge: discord.ClientUser):
 
 
 async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMINDER_MESSAGE, automated: bool=True):
-    reminder_list = clash_utils.get_deck_usage_today()
+    reminder_list = clash_utils.get_remaining_decks_today()
     vacation_list = db_utils.get_vacation_list()
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
@@ -91,11 +164,32 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
         if clash_data["player_name"] != member.display_name:
             await member.edit(nick = clash_data["player_name"])
 
-        roles_to_remove = [roles.NORMAL_ROLES[MEMBER_ROLE_NAME], roles.NORMAL_ROLES[VISITOR_ROLE_NAME], roles.NORMAL_ROLES[ELDER_ROLE_NAME]]
+        roles_to_remove = [NORMAL_ROLES[MEMBER_ROLE_NAME], NORMAL_ROLES[VISITOR_ROLE_NAME], NORMAL_ROLES[ELDER_ROLE_NAME]]
         await member.remove_roles(*roles_to_remove)
-        await member.add_roles(roles.NORMAL_ROLES[member_status])
+        await member.add_roles(NORMAL_ROLES[member_status])
 
         if clash_data["clan_role"] == "elder":
-            await member.add_roles(roles.NORMAL_ROLES[ELDER_ROLE_NAME])
+            await member.add_roles(NORMAL_ROLES[ELDER_ROLE_NAME])
 
     return True
+
+
+# [(most_recent_usage, datetime.date), (second_most_recent_usage, datetime.date), ...]
+def break_down_usage_history(deck_usage: int, command_time: datetime.datetime) -> list:
+    time_delta = None
+
+    if command_time.time() > RESET_TIME:
+        time_delta = datetime.timedelta(days=1)
+    else:
+        time_delta = datetime.timedelta(days=2)
+
+    usage_history = []
+
+    for i in range(7):
+        temp_usage = deck_usage & ONE_DAY_MASK
+        deck_usage >>= 3
+        temp_date = (command_time - time_delta).date()
+        usage_history.append((temp_usage, temp_date))
+        time_delta += datetime.timedelta(days=1)
+
+    return usage_history

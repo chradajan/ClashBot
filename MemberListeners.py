@@ -1,10 +1,9 @@
-from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
+import bot_utils
 import clash_utils
 import db_utils
 import discord
-import roles
 
 class MemberListeners(commands.Cog):
     def __init__(self, bot):
@@ -16,7 +15,7 @@ class MemberListeners(commands.Cog):
         if member.bot:
             return
 
-        await member.add_roles(roles.SPECIAL_ROLES[NEW_ROLE_NAME])
+        await member.add_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
 
 
     @commands.Cog.listener()
@@ -36,10 +35,10 @@ class MemberListeners(commands.Cog):
             clash_data = clash_utils.get_clash_user_data(message.content, discord_name)
             if clash_data != None:
                 if db_utils.add_new_user(clash_data):
-                    if not await is_admin(message.author):
+                    if not await bot_utils.is_admin(message.author):
                         await message.author.edit(nick=clash_data["player_name"])
-                    await message.author.add_roles(roles.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
-                    await message.author.remove_roles(roles.SPECIAL_ROLES[NEW_ROLE_NAME])
+                    await message.author.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
+                    await message.author.remove_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
             await message.delete()
 
         #await self.bot.process_commands(message)
@@ -53,19 +52,19 @@ class MemberListeners(commands.Cog):
         message = await channel.fetch_message(payload.message_id)
         member = guild.get_member(payload.user_id)
 
-        if (channel.name != RULES_CHANNEL) or (roles.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] not in member.roles) or (member.bot):
+        if (channel.name != RULES_CHANNEL) or (bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] not in member.roles) or (member.bot):
             return
 
-        await member.remove_roles(roles.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
+        await member.remove_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
 
-        if await is_admin(member):
-            roles_to_add = list(roles.NORMAL_ROLES.values())
+        if await bot_utils.is_admin(member):
+            roles_to_add = list(bot_utils.NORMAL_ROLES.values())
             await member.add_roles(*roles_to_add)
-            await member.remove_roles(roles.NORMAL_ROLES[VISITOR_ROLE_NAME])
+            await member.remove_roles(bot_utils.NORMAL_ROLES[VISITOR_ROLE_NAME])
             return
 
         db_roles = db_utils.get_roles(member.display_name)
         saved_roles = []
         for role in db_roles:
-            saved_roles.append(roles.NORMAL_ROLES[role])
+            saved_roles.append(bot_utils.NORMAL_ROLES[role])
         await member.add_roles(*saved_roles)

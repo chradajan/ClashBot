@@ -7,7 +7,6 @@ import bot_utils
 import clash_utils
 import db_utils
 import discord
-import roles
 
 #Cogs
 import AutomationTools
@@ -53,13 +52,13 @@ bot.add_cog(Vacation.Vacation(bot))
 async def on_ready():
     for guild in bot.guilds:
         if guild.name == GUILD_NAME:
-            roles.SPECIAL_ROLES[ADMIN_ROLE_NAME] = discord.utils.get(guild.roles, name=ADMIN_ROLE_NAME)
-            roles.SPECIAL_ROLES[NEW_ROLE_NAME] = discord.utils.get(guild.roles, name=NEW_ROLE_NAME)
-            roles.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] = discord.utils.get(guild.roles, name=CHECK_RULES_ROLE_NAME)
-            roles.NORMAL_ROLES[VISITOR_ROLE_NAME] = discord.utils.get(guild.roles, name=VISITOR_ROLE_NAME)
-            roles.NORMAL_ROLES[MEMBER_ROLE_NAME] = discord.utils.get(guild.roles, name=MEMBER_ROLE_NAME)
-            roles.NORMAL_ROLES[ELDER_ROLE_NAME] = discord.utils.get(guild.roles, name=ELDER_ROLE_NAME)
-            roles.NORMAL_ROLES[LEADER_ROLE_NAME] = discord.utils.get(guild.roles, name=LEADER_ROLE_NAME)
+            bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME] = discord.utils.get(guild.roles, name=ADMIN_ROLE_NAME)
+            bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME] = discord.utils.get(guild.roles, name=NEW_ROLE_NAME)
+            bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] = discord.utils.get(guild.roles, name=CHECK_RULES_ROLE_NAME)
+            bot_utils.NORMAL_ROLES[VISITOR_ROLE_NAME] = discord.utils.get(guild.roles, name=VISITOR_ROLE_NAME)
+            bot_utils.NORMAL_ROLES[MEMBER_ROLE_NAME] = discord.utils.get(guild.roles, name=MEMBER_ROLE_NAME)
+            bot_utils.NORMAL_ROLES[ELDER_ROLE_NAME] = discord.utils.get(guild.roles, name=ELDER_ROLE_NAME)
+            bot_utils.NORMAL_ROLES[LEADER_ROLE_NAME] = discord.utils.get(guild.roles, name=LEADER_ROLE_NAME)
 
     print("Bot Ready")
 
@@ -94,7 +93,7 @@ async def automated_reminder_us():
 
 @aiocron.crontab('32 9 * * 3')
 async def assign_strikes_and_clear_vacation():
-    """Assign strikes and clear vacation every Wednesday 10:00 UTC (Wednesday 3:00am PDT).""" 
+    """Assign strikes and clear vacation every Wednesday 10:00 UTC (Wednesday 3:00am PDT)."""
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     vacation_channel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
     strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
@@ -140,6 +139,15 @@ async def send_saved_message():
     message = db_utils.get_saved_message()
     db_utils.set_saved_message("")
     await strikes_channel.send(message)
+
+
+@aiocron.crontab('32 9 * * *')
+async def record_decks_used_today():
+    """Record number of decks used by each member one minute before daily reset every day."""
+    usage_list = clash_utils.get_deck_usage_today()
+
+    for player_name, decks_used in usage_list:
+        db_utils.add_deck_usage_today(player_name, decks_used)
 
 
 #####################################################

@@ -1,9 +1,23 @@
 from config import PRIMARY_CLAN_NAME
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
 import csv
-import datetime
 import os
 import pymysql
+
+######################################################
+#                                                    #
+#     _____                _              _          #
+#    / ____|              | |            | |         #
+#   | |     ___  _ __  ___| |_ __ _ _ __ | |_ ___    #
+#   | |    / _ \| '_ \/ __| __/ _` | '_ \| __/ __|   #
+#   | |___| (_) | | | \__ \ || (_| | | | | |_\__ \   #
+#    \_____\___/|_| |_|___/\__\__,_|_| |_|\__|___/   #
+#                                                    #
+######################################################
+
+SIX_DAY_MASK = 0x3FFFF
+ONE_DAY_MASK = 0x7
+
 
 
 # clash_data = {
@@ -40,16 +54,18 @@ def add_new_user(clash_data: dict) -> bool:
         return False
 
     # If player received strikes before joining, retrieve their current strike count.
-    cursor.execute("SELECT strikes FROM unregistered_users WHERE player_name = %(player_name)s", clash_data)
+    cursor.execute("SELECT strikes, usage_history FROM unregistered_users WHERE player_name = %(player_name)s", clash_data)
     query_result = cursor.fetchone()
 
     if query_result != None:
         clash_data["strikes"] = query_result["strikes"]
+        clash_data["usage_history"] = query_result["usage_history"]
         cursor.execute("DELETE FROM unregistered_users WHERE player_name = %(player_name)s", clash_data)
     else:
         clash_data["strikes"] = 0
+        clash_data["usage_history"] = 0
 
-    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, %(strikes)s, %(clan_id)s)"
+    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, %(strikes)s, %(usage_history)s, %(clan_id)s)"
     cursor.execute(insert_user_query, clash_data)
 
     # Get id of newly inserted user.
@@ -104,6 +120,54 @@ def update_user(clash_data: dict, original_player_name: str) -> str:
     return "Member" if (clash_data["clan_name"] == PRIMARY_CLAN_NAME) else "Visitor"
 
 
+# player_data = {
+#     player_tag: str,
+#     player_name: str,
+#     discord_name: str,
+#     clan_role: str,
+#     clan_name: str,
+#     clan_tag: str,
+#     vacation: bool,
+#     strikes: int,
+#     usage_history: int
+# }
+def get_user_data(player_name: str) -> dict:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    user_data = {}
+
+    cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
+    query_result = cursor.fetchone()
+
+    if query_result == None:
+        db.close()
+        return None
+
+    user_data["player_name"] = player_name
+    user_data["player_tag"] = query_result["player_tag"]
+    user_data["discord_name"] = query_result["discord_name"]
+    user_data["clan_role"] = query_result["clan_role"]
+    user_data["vacation"] = query_result["vacation"]
+    user_data["strikes"] = query_result["strikes"]
+    user_data["usage_history"] = query_result["usage_history"]
+
+    clan_id = query_result["clan_id"]
+
+    cursor.execute("SELECT * FROM clans WHERE id = %s", (clan_id))
+    query_result = cursor.fetchone()
+
+    if query_result == None:
+        db.close()
+        return None
+
+    user_data["clan_name"] = query_result["clan_name"]
+    user_data["clan_tag"] = query_result["clan_tag"]
+
+    db.close()
+    return user_data
+
+
 # Add strike to user. Return new number of strikes.
 def give_strike(player_name: str) -> int:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
@@ -123,7 +187,7 @@ def give_strike(player_name: str) -> int:
         query_result = cursor.fetchone()
 
         if query_result == None:
-            cursor.execute("INSERT INTO unregistered_users VALUES (DEFAULT, %s, 1)", (player_name))
+            cursor.execute("INSERT INTO unregistered_users VALUES (DEFAULT, %s, 1, 0)", (player_name))
             strike_count = 1
         else:
             strike_count = query_result["strikes"]
@@ -498,6 +562,77 @@ def get_members_in_time_zone(US_time: bool) -> list:
 
     db.close()
     return member_list
+
+
+def add_deck_usage_today(player_name: str, decks_used_today: int):
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT usage_history FROM users WHERE player_name = %s", (player_name))
+    query_result = cursor.fetchone()
+
+    if query_result == None:
+        cursor.execute("SELECT usage_history FROM unregistered_users WHERE player_name = %s", (player_name))
+        query_result = cursor.fetchone()
+
+        if query_result == None:
+            cursor.execute("INSERT INTO unregistered_users VALUES (DEFAULT, %s, 0, %s", (player_name, decks_used_today))
+        else:
+            updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (decks_used_today & ONE_DAY_MASK)
+            cursor.execute("UPDATE unregistered_users SET usage_history = %s WHERE player_name = %s", (updated_history, player_name))
+    else:
+        updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (decks_used_today & ONE_DAY_MASK)
+        cursor.execute("UPDATE users SET usage_history = %s WHERE player_name = %s", (updated_history, player_name))
+
+    db.commit()
+    db.close()
+
+
+def get_user_deck_usage_history(player_name: str) -> int:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT usage_history FROM users WHERE player_name = %s", (player_name))
+    query_result = cursor.fetchone()
+
+    if query_result == None:
+        cursor.execute("SELECT usage_history FROM unregistered_users WHERE player_name = %s", (player_name))
+        query_result = cursor.fetchone()
+
+        if query_result == None:
+            db.close()
+            return None
+
+    db.close()
+    return query_result["usage_history"]
+
+
+
+# [(player_name, deck_usage)]
+def get_all_deck_usage_history() -> list:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    cursor.execute("SELECT player_name, usage_history FROM users")
+    query_result = cursor.fetchall()
+
+    member_usage = []
+
+    if query_result != None:
+        member_usage = [ (user["player_name"], user["deck_usage"]) for user in query_result ]
+
+    cursor.execute("SELECT player_name, usage_history FROM unregistered_users")
+    query_result = cursor.fetchall()
+
+    non_member_usage = []
+
+    if query_result != None:
+        non_member_usage = [ (user["player_name"], user["deck_usage"]) for user in query_result ]
+
+    usage_list = member_usage + non_member_usage
+    usage_list.sort(key = lambda x : x[0].lower())
+
+    return usage_list
 
 
 def get_file_path() ->str:

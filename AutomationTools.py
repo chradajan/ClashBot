@@ -1,7 +1,7 @@
-from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
 from prettytable import PrettyTable
+import bot_utils
 import db_utils
 import discord
 
@@ -16,8 +16,8 @@ class AutomationTools(commands.Cog):
     Get current automated reminder/strike status.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def automation_status(self, ctx):
         """Get status for automated strikes and reminders."""
         reminder_status = "ENABLED" if db_utils.get_reminder_status() else "DISABLED"
@@ -48,8 +48,8 @@ class AutomationTools(commands.Cog):
     Enable/disable automated reminders.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def set_automated_reminders(self, ctx, status: bool):
         """Set whether automated reminders should be sent."""
         db_utils.set_reminder_status(status)
@@ -75,8 +75,8 @@ class AutomationTools(commands.Cog):
     Enable/disable automated strikes.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def set_automated_strikes(self, ctx, status: bool):
         """Set whether automated strikes should be given."""
         db_utils.set_strike_status(status)

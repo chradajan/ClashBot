@@ -1,7 +1,7 @@
-from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
 from prettytable import PrettyTable
+import bot_utils
 import db_utils
 import discord
 
@@ -16,7 +16,7 @@ class Vacation(commands.Cog):
     Toggle the vacation status of the user who issued the command.
     """
     @commands.command()
-    @channel_check(TIME_OFF_CHANNEL)
+    @bot_utils.channel_check(TIME_OFF_CHANNEL)
     async def vacation(self, ctx):
         """Toggles vacation status."""
         vacation_status = db_utils.update_vacation_for_user(ctx.author.display_name)
@@ -39,7 +39,7 @@ class Vacation(commands.Cog):
     Toggle the vacation status of the specified user.
     """
     @commands.command()
-    @is_leader_command_check()
+    @bot_utils.is_leader_command_check()
     async def set_vacation(self, ctx, member: discord.Member, status: bool):
         """Set vacation status for the specified member."""
         channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
@@ -68,7 +68,7 @@ class Vacation(commands.Cog):
     Print a list of all users currently on vacation.
     """
     @commands.command()
-    @is_leader_command_check()
+    @bot_utils.is_leader_command_check()
     async def vacation_list(self, ctx):
         """Get a list of all users currently on vacation."""
         users_on_vacation = db_utils.get_vacation_list()

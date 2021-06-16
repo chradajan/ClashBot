@@ -1,6 +1,6 @@
-from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
+import bot_utils
 import db_utils
 import discord
 
@@ -39,8 +39,8 @@ class Strikes(commands.Cog):
     Set a user's strike count to a specified value.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def set_strike_count(self, ctx, member: discord.Member, strikes: int):
         """Set specified user's strike count to specified value."""
         update_tuple = db_utils.set_strikes(member.display_name, strikes)
@@ -76,8 +76,8 @@ class Strikes(commands.Cog):
     Give a list of members 1 strike.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def give_strike(self, ctx, members: commands.Greedy[discord.Member]):
         """Specify a list of members and increment each user's strike count by 1."""
         channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
@@ -114,8 +114,8 @@ class Strikes(commands.Cog):
     Set all members to 0 strikes.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def reset_all_strikes(self, ctx):
         """Reset each member's strikes to 0."""
         db_utils.reset_strikes()

@@ -1,4 +1,3 @@
-from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
 from prettytable import PrettyTable
@@ -6,7 +5,6 @@ import bot_utils
 import clash_utils
 import db_utils
 import discord
-import roles
 
 class LeaderUtils(commands.Cog):
     def __init__(self, bot):
@@ -18,8 +16,8 @@ class LeaderUtils(commands.Cog):
     Export database information to csv.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def export(self, ctx, update_before_export: bool=True, false_logic_only: bool=True):
         """Export database to csv file. Optionally specify whether to update users in database before exporting and whether to only export False Logic users."""
         if (update_before_export):
@@ -48,25 +46,25 @@ class LeaderUtils(commands.Cog):
     Force all players back to rules channel until they acknowledge new rules.
     """
     @commands.command()
-    @is_admin_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_admin_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def force_rules_check(self, ctx):
         """Strip roles from all non-leaders until they acknowledge new rules. Clash bot will send message to react to in rules channel."""
         # Get a list of members in guild without any special roles (New, Check Rules, or Admin) and that aren't bots.
-        members = [member for member in ctx.guild.members if ((len(set(roles.SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
-        roles_to_remove = list(roles.NORMAL_ROLES.values())
+        members = [member for member in ctx.guild.members if ((len(set(bot_utils.SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
+        roles_to_remove = list(bot_utils.NORMAL_ROLES.values())
         await ctx.send("Starting to update user roles. This might take a minute...")
 
         for member in members:
             # Get a list of normal roles (Visitor, Member, Elder, or Leader) that a member current has. These will be restored after reacting to rules message.
-            roles_to_commit = [ role.name for role in list(set(roles.NORMAL_ROLES.values()).intersection(set(member.roles))) ]
+            roles_to_commit = [ role.name for role in list(set(bot_utils.NORMAL_ROLES.values()).intersection(set(member.roles))) ]
             db_utils.commit_roles(member.display_name, roles_to_commit)
             await member.remove_roles(*roles_to_remove)
-            await member.add_roles(roles.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
+            await member.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
 
         await bot_utils.send_rules_message(ctx, self.bot.user)
-        admin_role = roles.SPECIAL_ROLES[ADMIN_ROLE_NAME]
-        leader_role = roles.NORMAL_ROLES[LEADER_ROLE_NAME]
+        admin_role = bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME]
+        leader_role = bot_utils.NORMAL_ROLES[LEADER_ROLE_NAME]
         await ctx.send(f"Force rules check complete. If you are a {admin_role.mention} or {leader_role.mention}, don't forget to acknowledge the rules too.")
 
     @force_rules_check.error
@@ -85,8 +83,8 @@ class LeaderUtils(commands.Cog):
     Have a bot tag specific users and send a message in a specified channel.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def mention_users(self, ctx, members: commands.Greedy[discord.Member], channel: discord.TextChannel, message: str):
         """Send message to channel mentioning specified users. Message must be enclosed in quotes."""
         message_string = ""
@@ -116,8 +114,8 @@ class LeaderUtils(commands.Cog):
     Manually send automated reminder message. Optionally modify message.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def send_reminder(self, ctx, *message):
         """Send message to reminders channel tagging users who still have battles to complete. Excludes members currently on vacation. Optionally specify the message you want sent with the reminder."""
         reminder_message = ' '.join(message)
@@ -141,8 +139,8 @@ class LeaderUtils(commands.Cog):
     Send a list of the members with the top fame to the fame channel.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def top_fame(self, ctx):
         """Send a list of top users by fame in the fame channel."""
         top_members = clash_utils.get_top_fame_users()
@@ -177,8 +175,8 @@ class LeaderUtils(commands.Cog):
     Mention users below the threshold in the fame channel.
     """
     @commands.command()
-    @is_leader_command_check()
-    @channel_check(COMMANDS_CHANNEL)
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def fame_check(self, ctx, threshold: int):
         """Mention users below the specified fame threshold. Ignores users on vacation."""
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)

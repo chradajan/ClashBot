@@ -1,7 +1,7 @@
-from checks import is_admin, is_leader_command_check, is_admin_command_check, channel_check
 from config import *
 from discord.ext import commands
 from prettytable import PrettyTable
+import bot_utils
 import clash_utils
 import db_utils
 import discord
