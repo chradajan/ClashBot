@@ -6,6 +6,8 @@ import db_utils
 import discord
 
 class AutomationTools(commands.Cog):
+    """Commands to view/set automation status"""
+
     def __init__(self, bot):
         self.bot = bot
 

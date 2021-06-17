@@ -7,6 +7,8 @@ import db_utils
 import discord
 
 class MemberUtils(commands.Cog):
+    """Miscellaneous utilities for everyone."""
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -65,3 +67,73 @@ class MemberUtils(commands.Cog):
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !set_reminder_time <reminder_time>")
             raise error
+
+    
+    """
+    Command: !vacation
+
+    Toggle the vacation status of the user who issued the command.
+    """
+    @commands.command()
+    @bot_utils.channel_check(TIME_OFF_CHANNEL)
+    async def vacation(self, ctx):
+        """Toggles vacation status."""
+        vacation_status = db_utils.update_vacation_for_user(ctx.author.display_name)
+        vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
+        await ctx.send(f"New vacation status for {ctx.author.mention}: {vacation_status_string}.")
+
+    @vacation.error
+    async def vacation_error(self, ctx, error):
+        if isinstance(error, commands.errors.CheckFailure):
+            channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
+            await ctx.send(f"!vacation command can only be sent in {channel.mention}.")
+        else:
+            await ctx.send("Something went wrong. Command should be formatted as:  !vacation")
+            raise error
+
+
+    """
+    Command: !update
+
+    Update a user in the database.
+    """
+    @commands.command()
+    async def update(self, ctx):
+        """Update your player name, clan role/affiliation, Discord server role, and Discord nickname."""
+        if not await bot_utils.update_member(ctx.author):
+            await ctx.send("Something went wrong. Your information has not been updated.")
+            return
+
+        if await bot_utils.is_admin(ctx.author):
+            await ctx.send("Your information has been updated. As an Admin, you must manually update your Discord nickname if it no longer matches your in-game player name.")
+        else:
+            await ctx.send("Your information has been updated.")
+
+    @update.error
+    async def update_error(self, ctx, error):
+        await ctx.send("Something went wrong. You should have gone through the new user and check rules channels before using this command. Command should be formatted as:  !update")
+        raise error
+
+    
+    """
+    Command: !strikes
+
+    Show a user how many strikes they currently have.
+    """
+    @commands.command()
+    async def strikes(self, ctx):
+        """Get your current strike count."""
+        strikes = db_utils.get_strikes(ctx.author.display_name)
+        message = ""
+
+        if strikes == None:
+            message = "Error, you were not found in the database."
+        else:
+            message = f"You currently have {strikes} strikes."
+
+        await ctx.send(message)
+
+    @strikes.error
+    async def strikes_error(self, ctx, error):
+        await ctx.send("Something went wrong. Command should be formatted as:  !strikes")
+        raise error

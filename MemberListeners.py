@@ -57,7 +57,11 @@ class MemberListeners(commands.Cog):
         """Monitor rules channel for people reacting to rules message."""
         guild = self.bot.get_guild(payload.guild_id)
         channel = await self.bot.fetch_channel(payload.channel_id)
-        message = await channel.fetch_message(payload.message_id)
+        message = None
+        try:
+            message = await channel.fetch_message(payload.message_id)
+        except discord.errors.NotFound:
+            return
         member = guild.get_member(payload.user_id)
 
         if (channel.name != RULES_CHANNEL) or (bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] not in member.roles) or (member.bot):

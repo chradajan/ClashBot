@@ -7,6 +7,8 @@ import db_utils
 import discord
 
 class LeaderUtils(commands.Cog):
+    """Miscellaneous utilities for leaders/admins."""
+
     def __init__(self, bot):
         self.bot = bot
 

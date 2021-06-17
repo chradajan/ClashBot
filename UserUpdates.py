@@ -6,6 +6,8 @@ import db_utils
 import discord
 
 class UserUpdates(commands.Cog):
+    """Commands for updating/resetting users."""
+
     def __init__(self, bot):
         self.bot = bot
 
@@ -20,30 +22,6 @@ class UserUpdates(commands.Cog):
         await member.add_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
 
         db_utils.remove_user(member.display_name)
-
-
-    """
-    Command: !update
-
-    Update a user in the database.
-    """
-    @commands.command()
-    async def update(self, ctx):
-        """Update your player name, clan role/affiliation, Discord server role, and Discord nickname."""
-        if not await bot_utils.update_member(ctx.author):
-            await ctx.send("Something went wrong. Your information has not been updated.")
-            return
-
-        if await bot_utils.is_admin(ctx.author):
-            await ctx.send("Your information has been updated. As an Admin, you must manually update your Discord nickname if it no longer matches your in-game player name.")
-        else:
-            await ctx.send("Your information has been updated.")
-
-    @update.error
-    async def update_error(self, ctx, error):
-        await ctx.send("Something went wrong. You should have gone through the new user and check rules channels before using this command. Command should be formatted as:  !update")
-        raise error
-
 
     """
     Command: !update_user {member} {player_tag}

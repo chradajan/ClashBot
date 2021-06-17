@@ -5,32 +5,10 @@ import db_utils
 import discord
 
 class Strikes(commands.Cog):
+    """Commands for updating strike counts."""
+
     def __init__(self, bot):
         self.bot = bot
-
-
-    """
-    Command: !strikes
-
-    Show a user how many strikes they currently have.
-    """
-    @commands.command()
-    async def strikes(self, ctx):
-        """Get your current strike count."""
-        strikes = db_utils.get_strikes(ctx.author.display_name)
-        message = ""
-
-        if strikes == None:
-            message = "Error, you were not found in the database."
-        else:
-            message = f"You currently have {strikes} strikes."
-
-        await ctx.send(message)
-
-    @strikes.error
-    async def strikes_error(self, ctx, error):
-        await ctx.send("Something went wrong. Command should be formatted as:  !strikes")
-        raise error
 
 
     """

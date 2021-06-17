@@ -1,6 +1,7 @@
 from config import *
 from credentials import BOT_TOKEN
 from discord.ext import commands
+from pretty_help import DefaultMenu, PrettyHelp
 import aiocron
 import asyncio
 import bot_utils
@@ -32,11 +33,10 @@ import Vacation
 #                                                      #
 ########################################################
 
-# help_command = commands.DefaultHelpCommand(no_category="Clash Bot Commands")
+menu = DefaultMenu('◀️', '▶️', '❌')
 intents = discord.Intents.default()
 intents.members = True
-# bot = commands.Bot(command_prefix='!', help_command=help_command, intents=intents)
-bot = commands.Bot(command_prefix='!', intents=intents)
+bot = commands.Bot(command_prefix='!', help_command=PrettyHelp(navigation=menu, color=discord.Colour.green()), intents=intents)
 
 bot.add_cog(AutomationTools.AutomationTools(bot))
 bot.add_cog(LeaderUtils.LeaderUtils(bot))

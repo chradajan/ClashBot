@@ -8,6 +8,8 @@ import db_utils
 import discord
 
 class StatusReports(commands.Cog):
+    """Commands to get different status reports."""
+
     def __init__(self, bot):
         self.bot = bot
 

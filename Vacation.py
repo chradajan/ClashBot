@@ -6,32 +6,10 @@ import db_utils
 import discord
 
 class Vacation(commands.Cog):
+    """Commands for setting setting/viewing vacation status of users."""
+
     def __init__(self, bot):
         self.bot = bot
-
-
-    """
-    Command: !vacation
-
-    Toggle the vacation status of the user who issued the command.
-    """
-    @commands.command()
-    @bot_utils.channel_check(TIME_OFF_CHANNEL)
-    async def vacation(self, ctx):
-        """Toggles vacation status."""
-        vacation_status = db_utils.update_vacation_for_user(ctx.author.display_name)
-        vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
-        await ctx.send(f"New vacation status for {ctx.author.mention}: {vacation_status_string}.")
-
-    @vacation.error
-    async def vacation_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
-            await ctx.send(f"!vacation command can only be sent in {channel.mention}.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !vacation")
-            raise error
-
 
     """
     Command: !set_vacation {member} {status}
