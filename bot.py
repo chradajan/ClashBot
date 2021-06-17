@@ -76,6 +76,11 @@ async def on_ready():
 #                                                                                       #
 #########################################################################################
 
+@aiocron.crontab('0 0 * * *')
+async def clean_unregistered_users():
+    """Remove unregistered users that are no longer active members in False Logic every day at midnight"""
+    db_utils.clean_unregistered_users()
+
 
 @aiocron.crontab('0 19 * * 1,2')
 async def automated_reminder_eu():

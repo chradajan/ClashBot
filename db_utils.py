@@ -1,6 +1,7 @@
 from config import PRIMARY_CLAN_NAME
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
 import bot_utils
+import clash_utils
 import csv
 import datetime
 import os
@@ -632,6 +633,23 @@ def get_all_user_deck_usage_history() -> list:
     usage_list.sort(key = lambda x : x[0].lower())
 
     return usage_list
+
+
+def clean_unregistered_users():
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    active_members = clash_utils.get_active_members_in_clan()
+
+    cursor.execute("SELECT player_name FROM unregistered_users")
+    query_result = cursor.fetchall()
+
+    for unregistered_user in query_result:
+        if unregistered_user["player_name"] not in active_members:
+            cursor.execute("DELETE FROM unregistered_users WHERE player_name = %s", (unregistered_user["player_name"]))
+
+    db.commit()
+    db.close()
 
 
 def get_file_path() ->str:
