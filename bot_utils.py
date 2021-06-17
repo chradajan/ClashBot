@@ -175,7 +175,7 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
 
 
 # [(most_recent_usage, datetime.date), (second_most_recent_usage, datetime.date), ...]
-def break_down_usage_history(deck_usage: int, command_time: datetime.datetime) -> list:
+def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)) -> list:
     time_delta = None
 
     if command_time.time() > RESET_TIME:
@@ -193,3 +193,18 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime) -
         time_delta += datetime.timedelta(days=1)
 
     return usage_history
+
+
+# (should_receive_strike, decks_used)
+def should_receive_strike(deck_usage: int, completed_saturday: bool) -> tuple:
+    usage_history_list = break_down_usage_history(deck_usage)
+    decks_required = 10 if completed_saturday else 14
+    decks_used_in_race = 0
+
+    for i in range(1, 4):
+        decks_used_in_race += usage_history_list[i][0]
+
+    if not completed_saturday:
+        decks_used_in_race += usage_history_list[0][0]
+
+    return (decks_used_in_race < decks_required, decks_used_in_race)

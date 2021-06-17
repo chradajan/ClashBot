@@ -280,30 +280,28 @@ def get_strike_report() -> list:
     return strike_list
 
 
-def set_saved_message(message: str):
+def save_race_completion_status(status: bool):
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    cursor.execute("UPDATE saved_message SET message = %s", (message))
+    cursor.execute("UPDATE race_status SET completed_saturday = %s", (status))
 
     db.commit()
     db.close()
 
 
-def get_saved_message() -> str:
+def race_completed_saturday() -> bool:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
-    cursor.execute("SELECT * FROM saved_message")
+    cursor.execute("SELECT completed_saturday FROM race_status")
     query_result = cursor.fetchone()
 
     if query_result == None:
-        db.close()
-        return ""
+        return None
 
-    message = query_result["message"]
     db.close()
-    return message
+    return query_result["completed_saturday"]
 
 
 def get_player_tag(player_name: str) -> str:
@@ -609,7 +607,7 @@ def get_user_deck_usage_history(player_name: str) -> int:
 
 
 # [(player_name, deck_usage)]
-def get_all_deck_usage_history() -> list:
+def get_all_user_deck_usage_history() -> list:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -619,7 +617,7 @@ def get_all_deck_usage_history() -> list:
     member_usage = []
 
     if query_result != None:
-        member_usage = [ (user["player_name"], user["deck_usage"]) for user in query_result ]
+        member_usage = [ (user["player_name"], user["usage_history"]) for user in query_result ]
 
     cursor.execute("SELECT player_name, usage_history FROM unregistered_users")
     query_result = cursor.fetchall()
@@ -627,7 +625,7 @@ def get_all_deck_usage_history() -> list:
     non_member_usage = []
 
     if query_result != None:
-        non_member_usage = [ (user["player_name"], user["deck_usage"]) for user in query_result ]
+        non_member_usage = [ (user["player_name"], user["usage_history"]) for user in query_result ]
 
     usage_list = member_usage + non_member_usage
     usage_list.sort(key = lambda x : x[0].lower())

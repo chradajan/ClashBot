@@ -165,7 +165,7 @@ class StatusReports(commands.Cog):
 
         if deck_usage_info:
             decks_used_today = clash_utils.get_user_decks_used_today(user_data["player_tag"])
-            usage_history_list = bot_utils.break_down_usage_history(user_data["usage_history"], datetime.datetime.utcnow())
+            usage_history_list = bot_utils.break_down_usage_history(user_data["usage_history"], datetime.datetime.now(datetime.timezone.utc))
 
             deck_usage_history_table = PrettyTable()
             deck_usage_history_table.field_names = ["Day", "Decks Used"]

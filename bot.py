@@ -91,53 +91,56 @@ async def automated_reminder_us():
         await bot_utils.deck_usage_reminder(bot, US_time=True)
 
 
-@aiocron.crontab('32 9 * * 3')
+@aiocron.crontab('32 9 * * 6')
+async def record_race_completion_status():
+    """Check if the race was completed on Saturday and save result to db"""
+    db_utils.save_race_completion_status(clash_utils.river_race_completed())
+
+
+# @aiocron.crontab('0 18 * * 1')
+@aiocron.crontab('21 0 * * 4')
 async def assign_strikes_and_clear_vacation():
-    """Assign strikes and clear vacation every Wednesday 10:00 UTC (Wednesday 3:00am PDT)."""
+    """Assign strikes and clear vacation every Monday 18:00 UTC (Monday 11:00am PDT)."""
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     vacation_channel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
     strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
-    saved_message = ""
+    completed_saturday = db_utils.race_completed_saturday()
+    message = ""
+
+    if completed_saturday:
+        message = "River Race completed Saturday, so the following strikes have been given based on deck usage between Thursday and Saturday:\n"
+    else:
+        message = "River Race completed Sunday, so the following strikes have been given based on deck usage between Thursday and Sunday:\n"
 
     if db_utils.get_strike_status():
         vacation_list = db_utils.get_vacation_list()
-        deck_usage_list = clash_utils.get_river_race_deck_usage()
+        deck_usage_list = db_utils.get_all_user_deck_usage_history()
+        active_members = clash_utils.get_active_members_in_clan()
+        strikes_string = ""
 
-        member_string = ""
-        non_member_string = ""
+        for player_name, deck_usage_history in deck_usage_list:
+            should_receive_strike, decks_used_in_race = bot_utils.should_receive_strike(deck_usage_history, completed_saturday)
 
-        for player_name, deck_usage in deck_usage_list:
-            if player_name in vacation_list:
+            if (not should_receive_strike) or (player_name in vacation_list) or (player_name not in active_members):
                 continue
 
             member = discord.utils.get(strikes_channel.members, display_name=player_name)
             strikes = db_utils.give_strike(player_name)
 
-            if member == None:
-                previous_strike_count = 0 if strikes == 0 else strikes - 1
-                non_member_string += f"{player_name} - Decks used: {deck_usage},  Strikes: {previous_strike_count} -> {strikes}" + "\n"
+            if member != None:
+                strikes_string += f"{member.mention} - Decks used: {decks_used_in_race},  Strikes: {strikes - 1} -> {strikes}" + "\n"
             else:
-                member_string += f"{member.mention} - Decks used: {deck_usage},  Strikes: {strikes - 1} -> {strikes}" + "\n"
+                strikes_string += f"{player_name} - Decks used: {decks_used_in_race},  Strikes: {strikes - 1} -> {strikes}" + "\n"
 
-        if (len(member_string) == 0) and (len(non_member_string) == 0):
-            saved_message = "Everyone completed their battles this week. Good job!"
+        if len(strikes_string) == 0:
+            message = "Everyone completed their battles this week. Good job!"
         else:
-            saved_message = "The following members have received strikes for failing to complete 8 battles:\n" + member_string + non_member_string
+            message += strikes_string
     else:
-        saved_message = "Automated strikes are currently disabled so no strikes have been given out."
+        message = "Automated strikes are currently disabled so no strikes have been given out for the previous River Race."
 
-    db_utils.set_saved_message(saved_message)
     db_utils.clear_all_vacation()
     await vacation_channel.send("Vacation status for all users has been set to false. Make sure to use !vacation before the next war if you're going to miss it.")
-
-
-@aiocron.crontab('0 18 * * 3')
-async def send_saved_message():
-    """Send saved message of who received automated strikes every Wednesday 18:00 UTC (Wednesday 11:00am PDT)."""
-    guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
-    strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
-    message = db_utils.get_saved_message()
-    db_utils.set_saved_message("")
     await strikes_channel.send(message)
 
 
