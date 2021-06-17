@@ -174,7 +174,7 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
     return True
 
 
-# [(most_recent_usage, datetime.date), (second_most_recent_usage, datetime.date), ...]
+# [(most_recent_usage, day_string), (second_most_recent_usage, day_string), ...]
 def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)) -> list:
     time_delta = None
 
@@ -189,7 +189,8 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = 
         temp_usage = deck_usage & ONE_DAY_MASK
         deck_usage >>= 3
         temp_date = (command_time - time_delta).date()
-        usage_history.append((temp_usage, temp_date))
+        date_string = temp_date.strftime("%a") + ", " +  temp_date.strftime("%b") + " " + str(temp_date.day).zfill(2)
+        usage_history.append((temp_usage, date_string))
         time_delta += datetime.timedelta(days=1)
 
     return usage_history

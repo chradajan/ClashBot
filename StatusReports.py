@@ -171,8 +171,7 @@ class StatusReports(commands.Cog):
             deck_usage_history_table.field_names = ["Day", "Decks Used"]
 
             for decks_used, date in usage_history_list:
-                day_string = date.strftime("%a") + ", " +  date.strftime("%b") + " " + str(date.day).zfill(2)
-                deck_usage_history_table.add_row([day_string, decks_used])
+                deck_usage_history_table.add_row([date, decks_used])
 
             embed = discord.Embed(title="Status Report")
             embed.set_footer(text=f"{member.display_name} has used {decks_used_today} decks today.")

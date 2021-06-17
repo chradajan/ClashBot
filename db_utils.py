@@ -1,6 +1,8 @@
 from config import PRIMARY_CLAN_NAME
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
+import bot_utils
 import csv
+import datetime
 import os
 import pymysql
 
@@ -17,7 +19,6 @@ import pymysql
 
 SIX_DAY_MASK = 0x3FFFF
 ONE_DAY_MASK = 0x7
-
 
 
 # clash_data = {
@@ -647,7 +648,7 @@ def get_file_path() ->str:
     return new_path
 
 
-def output_to_csv(primary_clan_only: bool) -> str:
+def output_to_csv(primary_clan_only: bool, include_unregistered_users: bool, include_deck_usage_history: bool) -> str:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
@@ -672,16 +673,24 @@ def output_to_csv(primary_clan_only: bool) -> str:
     if users == None:
         return None
 
+    unregistered_users = {}
+
+    if include_unregistered_users:
+        cursor.execute("SELECT * FROM unregistered_users")
+        unregistered_users = cursor.fetchall()
+
     clans_dict = {}
+
     for clan in clans:
         clans_dict[clan["id"]] = {"Clan Tag": clan["clan_tag"], "Clan Name": clan["clan_name"]}
 
     file_path = get_file_path()
 
-    with open(file_path, 'w', newline='') as csvfile:
+    with open(file_path, 'w', newline='') as csv_file:
         fields_list = list(users[0].keys())
         fields_list.remove("id")
         fields_list.remove("clan_id")
+        fields_list[0], fields_list[1] = fields_list[1], fields_list[0]
         field_names = []
 
         for field in fields_list:
@@ -691,22 +700,49 @@ def output_to_csv(primary_clan_only: bool) -> str:
         field_names.append("Clan Name")
         field_names.append("RoyaleAPI")
 
-        writer = csv.DictWriter(csvfile, fieldnames=field_names)
+        time_to_use = datetime.datetime.now(datetime.timezone.utc)
+
+        if include_deck_usage_history:
+            day_fields = bot_utils.break_down_usage_history(users[0]["usage_history"], time_to_use)
+            for day in day_fields[::-1]:
+                field_names.append(day[1])
+
+        writer = csv.DictWriter(csv_file, fieldnames=field_names)
         headers = dict( (n,n) for n in field_names)
         writer.writerow(headers)
 
         for user in users:
             user.pop("id")
             clan_id = user.pop("clan_id")
+            usage_history = user.pop("usage_history")
 
-            keysList = list(user.keys())
-            for key in keysList:
+            keys_list = list(user.keys())
+            for key in keys_list:
                 user[' '.join(key.split('_')).title()] = user.pop(key)
-            
+
             user["Clan Tag"] = clans_dict[clan_id]["Clan Tag"]
             user["Clan Name"] = clans_dict[clan_id]["Clan Name"]
             user["RoyaleAPI"] = ("https://royaleapi.com/player/" + user["Player Tag"][1:])
 
+            if include_deck_usage_history:
+                usage_history_list = bot_utils.break_down_usage_history(usage_history, time_to_use)
+                for usage, day in usage_history_list:
+                    user[day] = usage
+
             writer.writerow(user)
+
+        if include_unregistered_users:
+            for user in unregistered_users:
+                user.pop("id")
+                user["Player Name"] = user.pop("player_name")
+                user["Strikes"] = user.pop("strikes")
+                usage_history = user.pop("usage_history")
+
+                if include_deck_usage_history:
+                    usage_history_list = bot_utils.break_down_usage_history(usage_history, time_to_use)
+                    for usage, day in usage_history_list:
+                        user[day] = usage
+
+                writer.writerow(user)
 
     return file_path
