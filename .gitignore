@@ -3,3 +3,4 @@ credentials.py
 config.py
 __pycache__/
 export_files/
+blacklist.py
