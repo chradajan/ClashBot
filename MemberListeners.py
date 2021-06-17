@@ -31,14 +31,22 @@ class MemberListeners(commands.Cog):
             return
 
         if message.channel.name == NEW_CHANNEL:
-            discord_name = message.author.name + "#" + message.author.discriminator
-            clash_data = clash_utils.get_clash_user_data(message.content, discord_name)
-            if clash_data != None:
-                if db_utils.add_new_user(clash_data):
-                    if not await bot_utils.is_admin(message.author):
-                        await message.author.edit(nick=clash_data["player_name"])
-                    await message.author.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
-                    await message.author.remove_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
+            if not message.content.startswith("#"):
+                await message.channel.send(content="You forgot to include the # symbol at the start of your player tag. Try again with that included.", delete_after=5)
+            elif message.content == PRIMARY_CLAN_TAG:
+                await message.channel.send(content="You sent False Logic's clan tag. Please send your player tag instead.", delete_after=5)
+            else:
+                discord_name = message.author.name + "#" + message.author.discriminator
+                clash_data = clash_utils.get_clash_user_data(message.content, discord_name)
+                if clash_data != None:
+                    if db_utils.add_new_user(clash_data):
+                        if not await bot_utils.is_admin(message.author):
+                            await message.author.edit(nick=clash_data["player_name"])
+                        await message.author.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
+                        await message.author.remove_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
+                else:
+                    await message.channel.send(content="Something went wrong getting your Clash Royale information. Please try again with your player tag. If this issue persists, message a leader for help.", delete_after=5)
+
             await message.delete()
 
         #await self.bot.process_commands(message)

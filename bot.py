@@ -97,8 +97,7 @@ async def record_race_completion_status():
     db_utils.save_race_completion_status(clash_utils.river_race_completed())
 
 
-# @aiocron.crontab('0 18 * * 1')
-@aiocron.crontab('21 0 * * 4')
+@aiocron.crontab('0 18 * * 1')
 async def assign_strikes_and_clear_vacation():
     """Assign strikes and clear vacation every Monday 18:00 UTC (Monday 11:00am PDT)."""
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
