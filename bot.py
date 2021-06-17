@@ -82,17 +82,29 @@ async def clean_unregistered_users():
     db_utils.clean_unregistered_users()
 
 
-@aiocron.crontab('0 19 * * 1,2')
+@aiocron.crontab('0 19 * * 4,5,6')
 async def automated_reminder_eu():
-    """Send reminder every Monday and Tuesday at 19:00 UTC (Monday and Tuesday at 7pm GMT)."""
-    if (db_utils.get_reminder_status()):
+    """Send reminder every Thursday, Friday, and Saturday at 19:00 UTC (Monday and Tuesday at 7pm GMT)."""
+    if db_utils.get_reminder_status():
+        await bot_utils.deck_usage_reminder(bot, US_time=False)
+
+@aiocron.crontab('0 19 * * 0')
+async def automated_reminder_eu_sunday():
+    """Send reminder every Sunday at 19:00 UTC if race not completed (Monday and Tuesday at 7pm GMT)."""
+    if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
         await bot_utils.deck_usage_reminder(bot, US_time=False)
 
 
-@aiocron.crontab('0 1 * * 2,3')
+@aiocron.crontab('0 1 * * 5,6,0')
 async def automated_reminder_us():
-    """Send reminder every Tuesday and Wednesday at 01:00 UTC (Monday and Tuesday at 6pm PDT)."""
-    if (db_utils.get_reminder_status()):
+    """Send reminder every Friday, Saturday, and Sunday at 01:00 UTC (Thursday, Friday, and Saturday at 6pm PDT)."""
+    if db_utils.get_reminder_status():
+        await bot_utils.deck_usage_reminder(bot, US_time=True)
+
+@aiocron.crontab('0 1 * * 1')
+async def automated_reminder_us_sunday():
+    """Send reminder every Monday at 01:00 UTC if race not completed (Sunday at 6pm PDT)."""
+    if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
         await bot_utils.deck_usage_reminder(bot, US_time=True)
 
 
