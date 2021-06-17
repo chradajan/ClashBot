@@ -18,6 +18,7 @@ class Vacation(commands.Cog):
     """
     @commands.command()
     @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def set_vacation(self, ctx, member: discord.Member, status: bool):
         """Set vacation status for the specified member."""
         channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
@@ -47,6 +48,7 @@ class Vacation(commands.Cog):
     """
     @commands.command()
     @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def vacation_list(self, ctx):
         """Get a list of all users currently on vacation."""
         users_on_vacation = db_utils.get_vacation_list()
