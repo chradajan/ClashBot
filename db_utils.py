@@ -576,7 +576,7 @@ def add_deck_usage_today(player_name: str, decks_used_today: int):
         query_result = cursor.fetchone()
 
         if query_result == None:
-            cursor.execute("INSERT INTO unregistered_users VALUES (DEFAULT, %s, 0, %s", (player_name, decks_used_today))
+            cursor.execute("INSERT INTO unregistered_users VALUES (DEFAULT, %s, 0, %s)", (player_name, decks_used_today))
         else:
             updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (decks_used_today & ONE_DAY_MASK)
             cursor.execute("UPDATE unregistered_users SET usage_history = %s WHERE player_name = %s", (updated_history, player_name))

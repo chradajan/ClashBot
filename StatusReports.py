@@ -96,7 +96,7 @@ class StatusReports(commands.Cog):
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def fame_report(self, ctx, threshold: int):
-        """Get a report of players below specifiec fame threshold. Ignores users on vacation."""
+        """Get a report of players below specific fame threshold. Ignores users on vacation."""
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)
         vacation_list = db_utils.get_vacation_list()
         table = PrettyTable()
