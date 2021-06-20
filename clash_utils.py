@@ -212,4 +212,4 @@ def river_race_completed(clan_tag : str=PRIMARY_CLAN_TAG) -> bool:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    return "finishTime" in json_obj["clan"].keys()
+    return json_obj["clan"]["fame"] >= 10000

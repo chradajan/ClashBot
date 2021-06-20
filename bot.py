@@ -108,7 +108,7 @@ async def automated_reminder_us_sunday():
         await bot_utils.deck_usage_reminder(bot, US_time=True)
 
 
-@aiocron.crontab('32 9 * * 6')
+@aiocron.crontab('34 9 * * 6')
 async def record_race_completion_status():
     """Check if the race was completed on Saturday and save result to db"""
     db_utils.save_race_completion_status(clash_utils.river_race_completed())
