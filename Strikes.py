@@ -35,7 +35,7 @@ class Strikes(commands.Cog):
     @set_strike_count.error
     async def set_strike_count_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            await ctx.send("Member not found.")
+            await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         elif isinstance(error, commands.errors.CheckFailure):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
             await ctx.send(f"!set_stike_count command can only be sent in {channel.mention} by Leaders/Admins.")

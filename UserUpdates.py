@@ -45,7 +45,7 @@ class UserUpdates(commands.Cog):
     @update_user.error
     async def update_user_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            await ctx.send("Member not found.")
+            await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         elif isinstance(error, commands.errors.CheckFailure):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
             await ctx.send(f"!update_user command can only be sent in {channel.mention} by Leaders/Admins.")
@@ -74,7 +74,7 @@ class UserUpdates(commands.Cog):
     @reset_user.error
     async def reset_user_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            await ctx.send("Member not found.")
+            await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         elif isinstance(error, commands.errors.CheckFailure):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
             await ctx.send(f"!reset_user command can only be sent in {channel.mention} by Admins.")

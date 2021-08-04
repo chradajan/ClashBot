@@ -144,6 +144,10 @@ class StatusReports(commands.Cog):
 
         user_data = db_utils.get_user_data(member.display_name)
 
+        if user_data == None:
+            await ctx.send(f"{member.display_name} is a member of this Discord server but they were not found in the database. Make sure their nickname matches their in-game player name.")
+            return
+
         if general_info:
             general_info_table = PrettyTable()
 
@@ -190,6 +194,8 @@ class StatusReports(commands.Cog):
         if isinstance(error, commands.errors.CheckFailure):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
             await ctx.send(f"!player_report command can only be sent in {channel.mention} by Leaders/Admins.")
+        elif isinstance(error, commands.errors.MemberNotFound):
+            await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !player_report <general_info (optional)> <deck_usage_info (optional)>")
             raise error

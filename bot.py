@@ -164,9 +164,18 @@ async def assign_strikes_and_clear_vacation():
 async def record_decks_used_today():
     """Record number of decks used by each member one minute before daily reset every day."""
     usage_list = clash_utils.get_deck_usage_today()
+    active_members = clash_utils.get_active_members_in_clan()
 
     for player_name, decks_used in usage_list:
         db_utils.add_deck_usage_today(player_name, decks_used)
+
+        try:
+            active_members.remove(player_name)
+        except ValueError:
+            pass
+
+    for player_name in active_members:
+        db_utils.add_deck_usage_today(player_name, 0)
 
 
 #####################################################

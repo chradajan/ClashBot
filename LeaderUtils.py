@@ -20,7 +20,7 @@ class LeaderUtils(commands.Cog):
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
-    async def export(self, ctx, update_before_export: bool=True, false_logic_only: bool=True, include_unregistered_users: bool=True, include_deck_usage_history: bool=False):
+    async def export(self, ctx, update_before_export: bool=True, false_logic_only: bool=True, include_unregistered_users: bool=True, include_deck_usage_history: bool=True):
         """Export database to csv file."""
         if (update_before_export):
             await ctx.send("Starting export and updating all player information. This might take a minute.")

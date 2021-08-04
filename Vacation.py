@@ -29,7 +29,7 @@ class Vacation(commands.Cog):
     @set_vacation.error
     async def set_vacation_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            await ctx.send("Member not found.")
+            await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         elif isinstance(error, commands.errors.CheckFailure):
             await ctx.send(f"!set_vacation command can only be sent by Leaders/Admins.")
         elif isinstance(error, commands.errors.BadBoolArgument):

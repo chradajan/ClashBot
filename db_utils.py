@@ -1,5 +1,6 @@
-from config import PRIMARY_CLAN_NAME
+from config import PRIMARY_CLAN_TAG
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
+import blacklist
 import bot_utils
 import clash_utils
 import csv
@@ -31,7 +32,7 @@ ONE_DAY_MASK = 0x7
 #     clan_tag: str
 # }
 def add_new_user(clash_data: dict) -> bool:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
@@ -76,7 +77,7 @@ def add_new_user(clash_data: dict) -> bool:
     user_id = query_result["id"]
 
     # Check if new user is member or visitor. Get id of relevant discord_role.
-    role_string = "Member" if (clash_data["clan_name"] == PRIMARY_CLAN_NAME) else "Visitor"
+    role_string = "Member" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "Visitor"
     cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role_string))
     query_result = cursor.fetchone()
     discord_role_id = query_result["id"]
@@ -85,6 +86,13 @@ def add_new_user(clash_data: dict) -> bool:
     insert_assigned_roles_query = "INSERT INTO assigned_roles VALUES (%s, %s)"
     cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
 
+    if (clash_data["clan_role"] == "elder") and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_name"] not in blacklist.blacklist):
+        role_string = "Elder"
+        cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role_string))
+        query_result = cursor.fetchone()
+        discord_role_id = query_result["id"]
+        cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
+
     db.commit()
     db.close()
     return True
@@ -92,7 +100,7 @@ def add_new_user(clash_data: dict) -> bool:
 
 # Update existing user.
 def update_user(clash_data: dict, original_player_name: str) -> str:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
@@ -119,7 +127,7 @@ def update_user(clash_data: dict, original_player_name: str) -> str:
     db.commit()
     db.close()
 
-    return "Member" if (clash_data["clan_name"] == PRIMARY_CLAN_NAME) else "Visitor"
+    return "Member" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "Visitor"
 
 
 # player_data = {
@@ -134,7 +142,7 @@ def update_user(clash_data: dict, original_player_name: str) -> str:
 #     usage_history: int
 # }
 def get_user_data(player_name: str) -> dict:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     user_data = {}
@@ -172,7 +180,7 @@ def get_user_data(player_name: str) -> dict:
 
 # Add strike to user. Return new number of strikes.
 def give_strike(player_name: str) -> int:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     strike_count = 0
@@ -202,7 +210,7 @@ def give_strike(player_name: str) -> int:
     return strike_count
 
 def get_strikes(player_name: str) -> int:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT strikes FROM users WHERE player_name = %s", (player_name))
@@ -216,7 +224,7 @@ def get_strikes(player_name: str) -> int:
     return strikes
 
 def reset_strikes():
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("UPDATE users SET strikes = 0")
@@ -226,7 +234,7 @@ def reset_strikes():
 
 # (previous_strike_count, new_strike_count)
 def set_strikes(player_name: str, strike_count: int) -> tuple:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT strikes FROM users WHERE player_name = %s", (player_name))
@@ -256,7 +264,7 @@ def set_strikes(player_name: str, strike_count: int) -> tuple:
 
 # [(player_name, strikes),]
 def get_strike_report() -> list:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT player_name, strikes FROM users WHERE strikes > 0")
@@ -283,7 +291,7 @@ def get_strike_report() -> list:
 
 
 def save_race_completion_status(status: bool):
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("UPDATE race_status SET completed_saturday = %s", (status))
@@ -293,7 +301,7 @@ def save_race_completion_status(status: bool):
 
 
 def race_completed_saturday() -> bool:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT completed_saturday FROM race_status")
@@ -307,7 +315,7 @@ def race_completed_saturday() -> bool:
 
 
 def get_player_tag(player_name: str) -> str:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT player_tag FROM users WHERE player_name = %s", (player_name))
@@ -325,7 +333,7 @@ def get_player_tag(player_name: str) -> str:
 
 # Remove user from DB along with any roles assigned to them.
 def remove_user(player_name: str):
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     # Get user_id from player_name.
@@ -346,7 +354,7 @@ def remove_user(player_name: str):
 
 # Drop all users and assigned roles.
 def remove_all_users():
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("DELETE FROM assigned_roles")
@@ -358,7 +366,7 @@ def remove_all_users():
 
 # Set user to opposite of their current vacation status. Return new status.
 def update_vacation_for_user(player_name: str, status=None) -> bool:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     if (type(status) == bool):
@@ -382,7 +390,7 @@ def update_vacation_for_user(player_name: str, status=None) -> bool:
 
 # Return a list of player_names currently on vacation.
 def get_vacation_list() -> list:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT player_name FROM users WHERE vacation = TRUE")
@@ -401,7 +409,7 @@ def get_vacation_list() -> list:
 
 # Set vacation to false for all users.
 def clear_all_vacation():
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("UPDATE users SET vacation = FALSE")
@@ -412,7 +420,7 @@ def clear_all_vacation():
 
 # Set whether to send deck usage reminders.
 def set_reminder_status(status: bool):
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("UPDATE automation_status SET send_reminders = %s", (status))
@@ -423,7 +431,7 @@ def set_reminder_status(status: bool):
 
 # Return current reminder status.
 def get_reminder_status() -> bool:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT * FROM automation_status")
@@ -440,7 +448,7 @@ def get_reminder_status() -> bool:
 
 # Set whether to send strikes automatically.
 def set_strike_status(status: bool):
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("UPDATE automation_status SET send_strikes = %s", (status))
@@ -451,7 +459,7 @@ def set_strike_status(status: bool):
 
 # Return current strike status.
 def get_strike_status() -> bool:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT * FROM automation_status")
@@ -463,7 +471,7 @@ def get_strike_status() -> bool:
 
 # Return a list of discord role_names corresponding to a user.
 def get_roles(player_name: str) -> list:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     # Get user_id.
@@ -506,7 +514,7 @@ def get_roles(player_name: str) -> list:
 
 # Get current normal roles possesed by user.
 def commit_roles(player_name: str, roles: list):
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     # Get user_id from player_name.
@@ -516,7 +524,7 @@ def commit_roles(player_name: str, roles: list):
     if (query_result == None):
         db.close()
         return
-    
+
     user_id = query_result["id"]
 
     cursor.execute("DELETE FROM assigned_roles WHERE user_id = %s", (user_id))
@@ -538,7 +546,7 @@ def commit_roles(player_name: str, roles: list):
 
 # True = US, False = EU
 def update_time_zone(player_name: str, US_time: bool):
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("UPDATE users SET US_time = %s WHERE player_name = %s", (US_time, player_name))
@@ -548,7 +556,7 @@ def update_time_zone(player_name: str, US_time: bool):
 
 
 def get_members_in_time_zone(US_time: bool) -> list:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT player_name FROM users WHERE US_time = %s", (US_time))
@@ -565,7 +573,7 @@ def get_members_in_time_zone(US_time: bool) -> list:
 
 
 def add_deck_usage_today(player_name: str, decks_used_today: int):
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT usage_history FROM users WHERE player_name = %s", (player_name))
@@ -589,7 +597,7 @@ def add_deck_usage_today(player_name: str, decks_used_today: int):
 
 
 def get_user_deck_usage_history(player_name: str) -> int:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT usage_history FROM users WHERE player_name = %s", (player_name))
@@ -610,7 +618,7 @@ def get_user_deck_usage_history(player_name: str) -> int:
 
 # [(player_name, deck_usage)]
 def get_all_user_deck_usage_history() -> list:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     cursor.execute("SELECT player_name, usage_history FROM users")
@@ -636,7 +644,7 @@ def get_all_user_deck_usage_history() -> list:
 
 
 def clean_unregistered_users():
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     active_members = clash_utils.get_active_members_in_clan()
@@ -667,14 +675,14 @@ def get_file_path() ->str:
 
 
 def output_to_csv(primary_clan_only: bool, include_unregistered_users: bool, include_deck_usage_history: bool) -> str:
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME)
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
     cursor = db.cursor(pymysql.cursors.DictCursor)
 
     clans = None
     false_logic_id = None
 
     if primary_clan_only:
-        cursor.execute("SELECT * FROM clans WHERE clan_name = %s", (PRIMARY_CLAN_NAME))
+        cursor.execute("SELECT * FROM clans WHERE clan_tag = %s", (PRIMARY_CLAN_TAG))
         clans = cursor.fetchall()
         false_logic_id = clans[0]["id"]
     else:
@@ -708,6 +716,7 @@ def output_to_csv(primary_clan_only: bool, include_unregistered_users: bool, inc
         fields_list = list(users[0].keys())
         fields_list.remove("id")
         fields_list.remove("clan_id")
+        fields_list.remove("usage_history")
         fields_list[0], fields_list[1] = fields_list[1], fields_list[0]
         field_names = []
 
@@ -719,11 +728,17 @@ def output_to_csv(primary_clan_only: bool, include_unregistered_users: bool, inc
         field_names.append("RoyaleAPI")
 
         time_to_use = datetime.datetime.now(datetime.timezone.utc)
+        deck_usage_today = {}
+        today_date = datetime.datetime.now(datetime.timezone.utc).date()
+        today_date_header = today_date.strftime("%a") + ", " +  today_date.strftime("%b") + " " + str(today_date.day).zfill(2)
 
         if include_deck_usage_history:
             day_fields = bot_utils.break_down_usage_history(users[0]["usage_history"], time_to_use)
             for day in day_fields[::-1]:
                 field_names.append(day[1])
+
+            field_names.append(today_date_header)
+            deck_usage_today = clash_utils.get_deck_usage_today_dict()
 
         writer = csv.DictWriter(csv_file, fieldnames=field_names)
         headers = dict( (n,n) for n in field_names)
@@ -747,6 +762,14 @@ def output_to_csv(primary_clan_only: bool, include_unregistered_users: bool, inc
                 for usage, day in usage_history_list:
                     user[day] = usage
 
+                usage_today = deck_usage_today.get(user["Player Name"])
+
+                if usage_today == None:
+                    usage_today = clash_utils.get_user_decks_used_today(user["Player Tag"])
+
+                if usage_today != None:
+                    user[today_date_header] = usage_today
+
             writer.writerow(user)
 
         if include_unregistered_users:
@@ -760,6 +783,11 @@ def output_to_csv(primary_clan_only: bool, include_unregistered_users: bool, inc
                     usage_history_list = bot_utils.break_down_usage_history(usage_history, time_to_use)
                     for usage, day in usage_history_list:
                         user[day] = usage
+
+                    usage_today = deck_usage_today.get(user["Player Name"])
+
+                    if usage_today != None:
+                        user[today_date_header] = usage_today
 
                 writer.writerow(user)
 
