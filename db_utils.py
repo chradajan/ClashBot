@@ -178,6 +178,27 @@ def get_user_data(player_name: str) -> dict:
     return user_data
 
 
+def get_unregistered_user_data(player_name: str) -> dict:
+    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+
+    user_data = {}
+
+    cursor.execute("SELECT * FROM unregistered_users WHERE player_name = %s", (player_name))
+    query_result = cursor.fetchone()
+
+    if query_result == None:
+        db.close()
+        return None
+
+    user_data["player_name"] = player_name
+    user_data["strikes"] = query_result["strikes"]
+    user_data["usage_history"] = query_result["usage_history"]
+
+    db.close()
+    return user_data
+
+
 # Add strike to user. Return new number of strikes.
 def give_strike(player_name: str) -> int:
     db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')

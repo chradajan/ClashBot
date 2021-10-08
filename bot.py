@@ -108,7 +108,7 @@ async def automated_reminder_us_sunday():
         await bot_utils.deck_usage_reminder(bot, US_time=True)
 
 
-@aiocron.crontab('34 9 * * 6')
+@aiocron.crontab('46 9 * * 6')
 async def record_race_completion_status():
     """Check if the race was completed on Saturday and save result to db"""
     db_utils.save_race_completion_status(clash_utils.river_race_completed())
@@ -160,7 +160,7 @@ async def assign_strikes_and_clear_vacation():
     await strikes_channel.send(message)
 
 
-@aiocron.crontab('32 9 * * *')
+@aiocron.crontab('44 9 * * *')
 async def record_decks_used_today():
     """Record number of decks used by each member one minute before daily reset every day."""
     usage_list = clash_utils.get_deck_usage_today()
