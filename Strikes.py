@@ -63,7 +63,7 @@ class Strikes(commands.Cog):
         members_message = ""
 
         for member in members:
-            new_strike_count = db_utils.give_strike(member.display_name)
+            new_strike_count = db_utils.give_strike(db_utils.get_player_tag(member.display_name))
             if new_strike_count == 0:
                 continue
 

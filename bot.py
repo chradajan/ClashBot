@@ -134,14 +134,14 @@ async def assign_strikes_and_clear_vacation():
         active_members = list(clash_utils.get_active_members_in_clan().values())
         strikes_string = ""
 
-        for player_name, deck_usage_history in deck_usage_list:
+        for player_name, player_tag, deck_usage_history in deck_usage_list:
             should_receive_strike, decks_used_in_race = bot_utils.should_receive_strike(deck_usage_history, completed_saturday)
 
             if (not should_receive_strike) or (player_name in vacation_list) or (player_name not in active_members):
                 continue
 
             member = discord.utils.get(strikes_channel.members, display_name=player_name)
-            strikes = db_utils.give_strike(player_name)
+            strikes = db_utils.give_strike(player_tag)
 
             if member != None:
                 strikes_string += f"{member.mention} - Decks used: {decks_used_in_race},  Strikes: {strikes - 1} -> {strikes}" + "\n"
@@ -164,18 +164,18 @@ async def assign_strikes_and_clear_vacation():
 async def record_decks_used_today():
     """Record number of decks used by each member one minute before daily reset every day."""
     usage_list = clash_utils.get_deck_usage_today()
-    active_members = list(clash_utils.get_active_members_in_clan().values())
+    active_members = list(clash_utils.get_active_members_in_clan().keys())
 
-    for player_name, decks_used in usage_list:
-        db_utils.add_deck_usage_today(player_name, decks_used)
+    for player_tag, decks_used in usage_list:
+        db_utils.add_deck_usage_today(player_tag, decks_used)
 
         try:
-            active_members.remove(player_name)
+            active_members.remove(player_tag)
         except ValueError:
             pass
 
-    for player_name in active_members:
-        db_utils.add_deck_usage_today(player_name, 0)
+    for player_tag in active_members:
+        db_utils.add_deck_usage_today(player_tag, 0)
 
 
 #####################################################

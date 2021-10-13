@@ -26,7 +26,7 @@ def move_unregistered_users():
             unregistered_users_dict.pop(member["player_tag"])
 
     for unregistered_user_tag in unregistered_users_dict:
-        clash_data = clash_utils.get_clash_user_data(unregistered_user_tag, "UNKNOWN" + unregistered_user_tag)
+        clash_data = clash_utils.get_clash_user_data(unregistered_user_tag, "UNREGISTERED" + unregistered_user_tag)
         db_utils.add_new_user(clash_data)
         cursor.execute("UPDATE users SET status = 'UNREGISTERED' WHERE player_tag = %s", (unregistered_user_tag))
 

@@ -104,6 +104,36 @@ def add_new_user(clash_data: dict) -> bool:
     return True
 
 
+def add_new_unregistered_user(player_tag: str):
+    db, cursor = connect_to_db()
+
+    # Get their data
+    clash_data = clash_utils.get_clash_user_data(player_tag, "UNREGISTERED" + player_tag)
+
+    # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
+    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
+    query_result = cursor.fetchone()
+
+    if query_result == None:
+        insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
+        cursor.execute(insert_clan_query, clash_data)
+        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
+        query_result = cursor.fetchone()
+
+    # Add clan_id to clash_data for use in user insertion.
+    clash_data["clan_id"] = query_result["id"]
+
+    # Set their proper status
+    clash_data["status"] = "UNREGISTERED"
+
+    #Insert them
+    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, 0, 0, %(status)s, %(clan_id)s)"
+    cursor.execute(insert_user_query, clash_data)
+
+    db.commit()
+    db.close()
+
+
 # Update existing user.
 # clash_data = {
 #     player_tag: str,
@@ -193,50 +223,23 @@ def get_user_data(player_name: str) -> dict:
     return user_data
 
 
-def get_unregistered_user_data(player_name: str) -> dict:
-    db, cursor = connect_to_db()
-
-    user_data = {}
-
-    cursor.execute("SELECT * FROM unregistered_users WHERE player_name = %s", (player_name))
-    query_result = cursor.fetchone()
-
-    if query_result == None:
-        db.close()
-        return None
-
-    user_data["player_name"] = player_name
-    user_data["strikes"] = query_result["strikes"]
-    user_data["usage_history"] = query_result["usage_history"]
-
-    db.close()
-    return user_data
-
-
 # Add strike to user. Return new number of strikes.
-def give_strike(player_name: str) -> int:
+def give_strike(player_tag: str) -> int:
     db, cursor = connect_to_db()
 
     strike_count = 0
-
-    cursor.execute("UPDATE users SET strikes = strikes + 1 WHERE player_name = %s", (player_name))
-    cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT * FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
 
-    # If player does not exist in database, check in unregistered users.
-    # Increment if there, add new row with 1 strike otherwise.
+    # Add unregistered user if they aren't in the users table.
     if query_result == None:
-        cursor.execute("UPDATE unregistered_users SET strikes = strikes + 1 WHERE player_name = %s", (player_name))
-        cursor.execute("SELECT strikes FROM unregistered_users WHERE player_name = %s", (player_name))
-        query_result = cursor.fetchone()
+        add_new_unregistered_user(player_tag)
+        strike_count = 1
 
-        if query_result == None:
-            cursor.execute("INSERT INTO unregistered_users VALUES (DEFAULT, %s, 1, 0)", (player_name))
-            strike_count = 1
-        else:
-            strike_count = query_result["strikes"]
-    else:
-        strike_count = query_result["strikes"]
+    cursor.execute("UPDATE users SET strikes = strikes + 1 WHERE player_tag = %s", (player_tag))
+
+    if query_result != None:
+        strike_count = query_result["strikes"] + 1
 
     db.commit()
     db.close()
@@ -260,7 +263,6 @@ def reset_strikes():
     db, cursor = connect_to_db()
 
     cursor.execute("UPDATE users SET strikes = 0")
-    cursor.execute("UPDATE unregistered_users SET strikes = 0")
     db.commit()
     db.close()
 
@@ -300,20 +302,11 @@ def get_strike_report() -> list:
     cursor.execute("SELECT player_name, strikes FROM users WHERE strikes > 0")
     query_result = cursor.fetchall()
 
-    members_strike_list = []
+    strike_list = []
 
     if query_result != None:
-        members_strike_list = [ (user["player_name"], user["strikes"]) for user in query_result ]
+        strike_list = [ (user["player_name"], user["strikes"]) for user in query_result ]
 
-    cursor.execute("SELECT player_name, strikes FROM unregistered_users WHERE strikes > 0")
-    query_result = cursor.fetchall()
-
-    non_members_strike_list = []
-
-    if query_result != None:
-        non_members_strike_list = [ (user["player_name"], user["strikes"]) for user in query_result ]
-
-    strike_list = members_strike_list + non_members_strike_list
     strike_list.sort(key = lambda x : (x[1], x[0].lower()))
 
     db.close()
@@ -586,85 +579,49 @@ def get_members_in_time_zone(US_time: bool) -> list:
     return member_list
 
 
-def add_deck_usage_today(player_name: str, decks_used_today: int):
+def add_deck_usage_today(player_tag: str, decks_used_today: int):
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT usage_history FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT usage_history FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
 
     if query_result == None:
-        cursor.execute("SELECT usage_history FROM unregistered_users WHERE player_name = %s", (player_name))
-        query_result = cursor.fetchone()
+        add_new_unregistered_user(player_tag)
 
-        if query_result == None:
-            cursor.execute("INSERT INTO unregistered_users VALUES (DEFAULT, %s, 0, %s)", (player_name, decks_used_today))
-        else:
-            updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (decks_used_today & ONE_DAY_MASK)
-            cursor.execute("UPDATE unregistered_users SET usage_history = %s WHERE player_name = %s", (updated_history, player_name))
-    else:
-        updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (decks_used_today & ONE_DAY_MASK)
-        cursor.execute("UPDATE users SET usage_history = %s WHERE player_name = %s", (updated_history, player_name))
+    updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (decks_used_today & ONE_DAY_MASK)
+    cursor.execute("UPDATE users SET usage_history = %s WHERE player_tag = %s", (updated_history, player_tag))
 
     db.commit()
     db.close()
 
 
-def get_user_deck_usage_history(player_name: str) -> int:
-    db, cursor = connect_to_db()
-
-    cursor.execute("SELECT usage_history FROM users WHERE player_name = %s", (player_name))
-    query_result = cursor.fetchone()
-
-    if query_result == None:
-        cursor.execute("SELECT usage_history FROM unregistered_users WHERE player_name = %s", (player_name))
-        query_result = cursor.fetchone()
-
-        if query_result == None:
-            db.close()
-            return None
-
-    db.close()
-    return query_result["usage_history"]
-
-
-
-# [(player_name, deck_usage)]
+# [(player_name, player_tag, deck_usage)]
 def get_all_user_deck_usage_history() -> list:
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_name, usage_history FROM users")
+    cursor.execute("SELECT player_name, player_tag, usage_history FROM users")
     query_result = cursor.fetchall()
 
-    member_usage = []
+    usage_list = []
 
     if query_result != None:
-        member_usage = [ (user["player_name"], user["usage_history"]) for user in query_result ]
+        usage_list = [ (user["player_name"], user["player_tag"], user["usage_history"]) for user in query_result ]
 
-    cursor.execute("SELECT player_name, usage_history FROM unregistered_users")
-    query_result = cursor.fetchall()
-
-    non_member_usage = []
-
-    if query_result != None:
-        non_member_usage = [ (user["player_name"], user["usage_history"]) for user in query_result ]
-
-    usage_list = member_usage + non_member_usage
     usage_list.sort(key = lambda x : x[0].lower())
-
     return usage_list
 
 
 def clean_unregistered_users():
     db, cursor = connect_to_db()
 
-    active_members = list(clash_utils.get_active_members_in_clan().values())
+    active_members = list(clash_utils.get_active_members_in_clan().keys())
 
-    cursor.execute("SELECT player_name FROM unregistered_users")
+    cursor.execute("SELECT player_tag FROM users WHERE status = 'UNREGISTERED'")
     query_result = cursor.fetchall()
 
-    for unregistered_user in query_result:
-        if unregistered_user["player_name"] not in active_members:
-            cursor.execute("DELETE FROM unregistered_users WHERE player_name = %s", (unregistered_user["player_name"]))
+    for user in query_result:
+        if user["player_tag"] not in active_members:
+            cursor.execute("UPDATE users SET status = 'DEPARTED', usage_history = 0 WHERE player_tag = %s", (user["player_tag"]))
 
     db.commit()
     db.close()

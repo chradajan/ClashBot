@@ -128,19 +128,18 @@ class StatusReports(commands.Cog):
             raise error
 
 
-    async def player_report_helper(self, ctx, user_data: dict, is_registered_user: bool):
+    async def player_report_helper(self, ctx, user_data: dict):
         general_info_table = PrettyTable()
 
         general_info_table.add_row(["Player Name", user_data["player_name"]])
         general_info_table.add_row(["Strikes", user_data["strikes"]])
-
-        if is_registered_user:
-            general_info_table.add_row(["Player Tag", user_data["player_tag"]])
-            general_info_table.add_row(["Discord Name", user_data["discord_name"]])
-            general_info_table.add_row(["Clan Name", user_data["clan_name"]])
-            general_info_table.add_row(["Clan Tag", user_data["clan_tag"]])
-            general_info_table.add_row(["Clan Role", user_data["clan_role"].capitalize()])
-            general_info_table.add_row(["On Vacation", "Yes" if user_data["vacation"] else "No"])
+        general_info_table.add_row(["Player Tag", user_data["player_tag"]])
+        general_info_table.add_row(["Discord Name", user_data["discord_name"]])
+        general_info_table.add_row(["Clan Name", user_data["clan_name"]])
+        general_info_table.add_row(["Clan Tag", user_data["clan_tag"]])
+        general_info_table.add_row(["Clan Role", user_data["clan_role"].capitalize()])
+        general_info_table.add_row(["On Vacation", "Yes" if user_data["vacation"] else "No"])
+        general_info_table.add_row(["Status", user_data["status"]])
 
         embed = discord.Embed(title="Status Report")
         embed.add_field(name=f"{user_data['player_name']}'s general info", value = "```\n" + general_info_table.get_string(header=False) + "```")
@@ -150,9 +149,9 @@ class StatusReports(commands.Cog):
         except:
             await ctx.send(f"{user_data['player_name']}'s general info" + "\n" + "```\n" + table.get_string(header=False) + "```")
 
-        decks_used_today = "UNKNOWN"
-        if is_registered_user:
-            decks_used_today = clash_utils.get_user_decks_used_today(user_data["player_tag"])
+        decks_used_today = clash_utils.get_user_decks_used_today(user_data["player_tag"])
+        if decks_used_today == None:
+            decks_used_today = 0
 
         usage_history_list = bot_utils.break_down_usage_history(user_data["usage_history"], datetime.datetime.now(datetime.timezone.utc))
 
@@ -169,7 +168,7 @@ class StatusReports(commands.Cog):
         try:
             await ctx.send(embed=embed)
         except:
-            await ctx.send(f"{user_data['player_name']} has used {decks_used_today} decks." + "\n\n" +\
+            await ctx.send(f"{user_data['player_name']} has used {decks_used_today} decks today." + "\n\n" +\
                             f"{user_data['player_name']}'s deck usage history" + "\n" + "```\n" + table.get_string() + "```")
 
     """
@@ -188,7 +187,7 @@ class StatusReports(commands.Cog):
             await ctx.send(f"{member.display_name} is a member of this Discord server but they were not found in the database. Make sure their nickname matches their in-game player name.")
             return
         
-        await self.player_report_helper(ctx, user_data, True)
+        await self.player_report_helper(ctx, user_data)
 
     @player_report.error
     async def player_report_error(self, ctx, error):
@@ -196,9 +195,9 @@ class StatusReports(commands.Cog):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
             await ctx.send(f"!player_report command can only be sent in {channel.mention} by Leaders/Admins.")
         elif isinstance(error, commands.errors.MemberNotFound):
-            user_data = db_utils.get_unregistered_user_data(error.argument)
+            user_data = db_utils.get_user_data(error.argument)
             if user_data != None:
-                await self.player_report_helper(ctx, user_data, False)
+                await self.player_report_helper(ctx, user_data)
             else:
                 await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         else:

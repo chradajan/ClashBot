@@ -84,7 +84,7 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
 
 
 # Get a list of players in clan and decks used today
-# [(player_name, decks_used)]
+# [(player_tag, decks_used)]
 def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
@@ -94,9 +94,9 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = list(get_active_members_in_clan(clan_tag).values())
+    active_members = list(get_active_members_in_clan(clan_tag).keys())
 
-    participants = [ (participant["name"], participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if participant["name"] in active_members ]
+    participants = [ (participant["tag"], participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if participant["tag"] in active_members ]
 
     return participants
 
