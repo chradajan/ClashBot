@@ -21,18 +21,8 @@ RESET_TIME = datetime.time(9, 33)
 SIX_DAY_MASK = 0x3FFFF
 ONE_DAY_MASK = 0x7
 
-SPECIAL_ROLES = {
-    "Admin": None,
-    "New": None,
-    "Check Rules": None
-}
-
-NORMAL_ROLES = {
-    "Visitor": None,
-    "Member": None,
-    "Elder": None,
-    "Leader": None
-}
+SPECIAL_ROLES = {}
+NORMAL_ROLES = {}
 
 
 #########################################

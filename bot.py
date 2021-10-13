@@ -131,7 +131,7 @@ async def assign_strikes_and_clear_vacation():
     if db_utils.get_strike_status():
         vacation_list = db_utils.get_vacation_list()
         deck_usage_list = db_utils.get_all_user_deck_usage_history()
-        active_members = clash_utils.get_active_members_in_clan()
+        active_members = list(clash_utils.get_active_members_in_clan().values())
         strikes_string = ""
 
         for player_name, deck_usage_history in deck_usage_list:
@@ -160,11 +160,11 @@ async def assign_strikes_and_clear_vacation():
     await strikes_channel.send(message)
 
 
-@aiocron.crontab('44 9 * * *')
+@aiocron.crontab('33 9 * * *')
 async def record_decks_used_today():
     """Record number of decks used by each member one minute before daily reset every day."""
     usage_list = clash_utils.get_deck_usage_today()
-    active_members = clash_utils.get_active_members_in_clan()
+    active_members = list(clash_utils.get_active_members_in_clan().values())
 
     for player_name, decks_used in usage_list:
         db_utils.add_deck_usage_today(player_name, decks_used)

@@ -4,17 +4,17 @@ import json
 import re
 import requests
 
-# [player_name]
-def get_active_members_in_clan(clan_tag : str=PRIMARY_CLAN_TAG) -> list:
+# { player_tag: player_name }
+def get_active_members_in_clan(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
-            return []
+            return {}
 
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    return [ member["name"] for member in json_obj["items"] ]
+    return { member["tag"]: member["name"] for member in json_obj["items"] }
 
 
 def parse_player_tag(message: str) -> str:
@@ -75,7 +75,7 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = get_active_members_in_clan(clan_tag)
+    active_members = list(get_active_members_in_clan(clan_tag).values())
 
     participants = [ (participant["name"], 4 - participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["name"] in active_members)) ]
     participants.sort(key = lambda x : (x[1], x[0].lower()))
@@ -94,7 +94,7 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = get_active_members_in_clan(clan_tag)
+    active_members = list(get_active_members_in_clan(clan_tag).values())
 
     participants = [ (participant["name"], participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if participant["name"] in active_members ]
 
@@ -112,7 +112,7 @@ def get_deck_usage_today_dict(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = get_active_members_in_clan(clan_tag)
+    active_members = list(get_active_members_in_clan(clan_tag).values())
 
     participants = {}
 
@@ -166,7 +166,7 @@ def get_top_fame_users(top_n : int=3, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = get_active_members_in_clan(clan_tag)
+    active_members = list(get_active_members_in_clan(clan_tag).values())
 
     fame_list = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if participant["name"] in active_members ]
     fame_list.sort(key = lambda x : x[1], reverse = True)
@@ -193,7 +193,7 @@ def get_hall_of_shame(threshold: int, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = get_active_members_in_clan(clan_tag)
+    active_members = list(get_active_members_in_clan(clan_tag).values())
 
     participants = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["name"] in active_members)) ]
     participants.sort(key = lambda x : (x[1], x[0].lower()))
@@ -213,7 +213,7 @@ def get_clan_decks_remaining(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
     return_list = []
 
     for clan in json_obj["clans"]:
-        active_members = get_active_members_in_clan(clan["tag"])
+        active_members = list(get_active_members_in_clan(clan["tag"]).values())
         decks_remaining = 0
 
         for participant in clan["participants"]:
