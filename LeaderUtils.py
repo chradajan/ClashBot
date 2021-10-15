@@ -20,14 +20,14 @@ class LeaderUtils(commands.Cog):
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
-    async def export(self, ctx, update_before_export: bool=True, false_logic_only: bool=True, include_unregistered_users: bool=True, include_deck_usage_history: bool=True):
+    async def export(self, ctx, update_before_export: bool=True, false_logic_only: bool=True, include_deck_usage_history: bool=True, include_match_performance_history: bool=True):
         """Export database to csv file."""
-        if (update_before_export):
+        if update_before_export:
             await ctx.send("Starting export and updating all player information. This might take a minute.")
             for member in ctx.guild.members:
                 await bot_utils.update_member(member)
 
-        path = db_utils.output_to_csv(false_logic_only, include_unregistered_users, include_deck_usage_history)
+        path = db_utils.output_to_csv(false_logic_only, include_deck_usage_history, include_match_performance_history)
         await ctx.send(file=discord.File(path))
 
     @export.error
@@ -38,10 +38,7 @@ class LeaderUtils(commands.Cog):
         elif isinstance(error, commands.errors.BadBoolArgument):
             await ctx.send(f"Invalid argument. Valid arguments: yes or no")
         else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !export <update_before_export (optional)>\
-                                                                                           <false_logic_only (optional)>\
-                                                                                           <include_unregistered_users (optional)>\
-                                                                                           <include_deck_usage_history (optional)>")
+            await ctx.send("Something went wrong. Command should be formatted as:  !export <update_before_export (optional)> <false_logic_only (optional)> <include_deck_usage_history (optional)> <include_match_performance_history (optional)>")
             raise error
 
 

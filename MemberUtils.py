@@ -137,3 +137,20 @@ class MemberUtils(commands.Cog):
     async def strikes_error(self, ctx, error):
         await ctx.send("Something went wrong. Command should be formatted as:  !strikes")
         raise error
+
+    
+    """
+    Command: !stats
+
+    Show a user their river race stats.
+    """
+    @commands.command()
+    async def stats(self, ctx):
+        """Get your river race performance stats."""
+        embed = bot_utils.create_match_performance_embed(ctx.author.display_name)
+        await ctx.send(embed=embed)
+
+    @stats.error
+    async def stats_error(self, ctx, error):
+        await ctx.send("Something went wrong. Command should be formatted as:  !stats")
+        raise error

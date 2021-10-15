@@ -147,7 +147,7 @@ class StatusReports(commands.Cog):
         try:
             await ctx.send(embed=embed)
         except:
-            await ctx.send(f"{user_data['player_name']}'s general info" + "\n" + "```\n" + table.get_string(header=False) + "```")
+            await ctx.send(f"{user_data['player_name']}'s general info" + "\n" + "```\n" + general_info_table.get_string(header=False) + "```")
 
         decks_used_today = clash_utils.get_user_decks_used_today(user_data["player_tag"])
         if decks_used_today == None:
@@ -169,7 +169,10 @@ class StatusReports(commands.Cog):
             await ctx.send(embed=embed)
         except:
             await ctx.send(f"{user_data['player_name']} has used {decks_used_today} decks today." + "\n\n" +\
-                            f"{user_data['player_name']}'s deck usage history" + "\n" + "```\n" + table.get_string() + "```")
+                            f"{user_data['player_name']}'s deck usage history" + "\n" + "```\n" + deck_usage_history_table.get_string() + "```")
+
+        match_performance_embed = bot_utils.create_match_performance_embed(user_data["player_name"])
+        await ctx.send(embed=match_performance_embed)
 
     """
     Command: !player_report {general_info} {deck_usage_history}

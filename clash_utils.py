@@ -1,11 +1,22 @@
 from config import PRIMARY_CLAN_TAG
 from credentials import CLASH_API_KEY
+import bot_utils
+import datetime
+import db_utils
 import json
 import re
 import requests
 
-# { player_tag: player_name }
-def get_active_members_in_clan(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
+
+def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
+    """Get a dictionary of members currently in a clan.
+    
+    Args:
+        clan_tag(str, optional): Clan to check.
+    
+    Returns:
+        dict {player_tag(str): player_name(str)}: Dictionary of active members.
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -18,21 +29,40 @@ def get_active_members_in_clan(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
 
 
 def parse_player_tag(message: str) -> str:
+    """
+    Parses a string for a valid player tag.
+
+    Args:
+        message(str): String to parse.
+
+    Returns:
+        str: A valid player tag, or None if one can't be found.
+    """
     found_pattern = re.search(r"(#[A-Z0-9]+)", message)
     if found_pattern != None:
         return found_pattern.group(1)
     return None
 
 
-# clash_data = {
-#     player_tag: str,
-#     player_name: str,
-#     discord_name: str,
-#     clan_role: str,
-#     clan_name: str,
-#     clan_tag: str
-# }
 def get_clash_user_data(message: str, discord_name: str) -> dict:
+    """
+    Get a user's relevant Clash Royale information.
+
+    Args:
+        message(str): Message that should contain a valid player tag.
+        discord_name(str): The user's discord name in the format name#discriminator.
+
+    Returns:
+        dict{str:str}: A dictionary of relevant Clash Royale information, or None if an error occurs.
+            {
+                "player_tag": str,
+                "player_name": str,
+                "discord_name": str,
+                "clan_role": str,
+                "clan_name": str,
+                "clan_tag": str
+            }
+    """
     player_tag = parse_player_tag(message)
 
     if player_tag == None:
@@ -64,9 +94,17 @@ def get_clash_user_data(message: str, discord_name: str) -> dict:
     return user_dict
 
 
-# Get a list of users who have not used 4 decks today.
-# [(player_name, decks_remaining)]
 def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
+    """
+    Retrieve a list of players in a clan who have not used 4 war decks today.
+
+    Args:
+        clan_tag(str, optional): Clan to check.
+
+    Returns:
+        list[tuple(str, int)]: List of players in the specified clan that haven't used 4 war decks today.
+            [(player_name(str), decks_remaining(int))]
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -83,9 +121,17 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     return participants
 
 
-# Get a list of players in clan and decks used today
-# [(player_tag, decks_used)]
 def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
+    """
+    Get a list of players in a clan and how many decks each player used today.
+
+    Args:
+        clan_tag(str, optional): Clan to check.
+
+    Returns:
+        list[tuple(str, int)]: List of players and their deck usage.
+            [(player_tag(str), decks_used(int))]
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -94,30 +140,45 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = list(get_active_members_in_clan(clan_tag).keys())
+    active_members = get_active_members_in_clan(clan_tag)
 
-    participants = [ (participant["tag"], participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if participant["tag"] in active_members ]
+    usage_list = []
 
-    return participants
+    for participant in json_obj["clan"]["participants"]:
+        if participant["tag"] in active_members:
+            usage_list.append((participant["tag"], participant["decksUsedToday"]))
+            active_members.pop(participant["tag"], None)
+
+    for member in active_members:
+        usage_list.append((member, 0))
+
+    return usage_list
 
 
-# Get a list of players in clan and decks used today
-# {player_name: decks_used}
 def get_deck_usage_today_dict(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
+    """
+    Get a list of players in a clan and how many decks each player used today.
+
+    Args:
+        clan_tag(str, optional): Clan to check.
+
+    Returns:
+        dict{player_name(str): decksUsedToday(int)}: dict of players and their deck usage.
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
-        return []
+        return {}
 
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = list(get_active_members_in_clan(clan_tag).values())
+    active_members = get_active_members_in_clan(clan_tag)
 
     participants = {}
 
     for participant in json_obj["clan"]["participants"]:
-        if participant["name"] not in active_members:
+        if participant["tag"] not in active_members:
             continue
 
         participants[participant["name"]] = participant["decksUsedToday"]
@@ -126,10 +187,19 @@ def get_deck_usage_today_dict(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
 
 
 def get_user_decks_used_today(player_tag: str) -> int:
+    """
+    Return the number of decks used today by a specific player.
+
+    Args:
+        player_tag(str): Player tag of player to look up.
+
+    Returns:
+        int: Number of decks used today, or 0 if can't find relevant information.
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
-        return None
+        return 0
 
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
@@ -138,14 +208,14 @@ def get_user_decks_used_today(player_tag: str) -> int:
     if "clan" in json_obj.keys():
         clan_tag = json_obj["clan"]["tag"]
     else:
-        return None
+        return 0
 
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
     if (req.status_code != 200):
-        return None
+        return 0
 
     for participant in json_obj["clan"]["participants"]:
         if participant["tag"] != player_tag:
@@ -153,11 +223,44 @@ def get_user_decks_used_today(player_tag: str) -> int:
         else:
             return participant["decksUsedToday"]
 
-    return None
+    return 0
 
 
-# [(player_name, fame)]
-def get_top_fame_users(top_n : int=3, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
+def get_deck_usage_this_week(clan_tag: str=PRIMARY_CLAN_TAG):
+    """
+    Get a dictionary of users in a specified clan and how many total war decks they've used this week.
+
+    Args:
+        clan_tag(str, optional): Clan to look for players in.
+
+    Returns:
+        dict{player_tag(str): decks_used(int)}: dict containing a player tags and their total deck usage.
+    """
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if (req.status_code != 200):
+        return {}
+
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
+
+    active_members = get_active_members_in_clan(clan_tag)
+    deck_usage = {participant["tag"]: participant["decksUsed"] for participant in json_obj["clan"]["participants"] if participant["tag"] in active_members}
+
+    return deck_usage
+
+
+def get_top_fame_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> list:
+    """
+    Get the top n users in a clan by fame. Can possible return more than n if players are tied for the same amount of fame.
+
+    Args:
+        top_n(int): Number of players to return. More than this may be returned though.
+        clan_tag(str, optional): Clan to look for top players in.
+
+    Returns:
+        list[tuple(player_name(str), fame(int))]: List of top players and their fame.
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -183,8 +286,18 @@ def get_top_fame_users(top_n : int=3, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
 
     return return_list
 
-# [(player_name, fame)]
-def get_hall_of_shame(threshold: int, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
+
+def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> list:
+    """
+    Get a list of players below a specified fame threshold.
+
+    Args:
+        threshold(int): Look for players with fame below this threshold.
+        clan_tag(str, optional): Clan to look for players below threshold in.
+
+    Returns:
+        list[tuple(player_name(str), fame(int))]: List of players below specified fame threshold.
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -200,8 +313,17 @@ def get_hall_of_shame(threshold: int, clan_tag : str=PRIMARY_CLAN_TAG) -> list:
 
     return participants
 
-# [(clan_name, decks_remaining)]
-def get_clan_decks_remaining(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
+
+def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
+    """
+    Get the number of available war decks remaining for all clans in a race with specified clan.
+
+    Args:
+        clan_tag(str, optional): Clan to check the race status of.
+
+    Returns:
+        list[tuple(clan_name(str), decks_remaining(int))]: List of clans in the specified clan's race and their remaining deck count today.
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -227,7 +349,16 @@ def get_clan_decks_remaining(clan_tag : str=PRIMARY_CLAN_TAG) -> dict:
     return return_list
 
 
-def river_race_completed(clan_tag : str=PRIMARY_CLAN_TAG) -> bool:
+def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
+    """
+    Check if a clan has crossed the finish line.
+
+    Args:
+        clan_tag(str, optional): Clan to check completion status of.
+
+    Returns:
+        bool: Whether the specified clan has accumulated 10,000 fame and crossed the finish line.
+    """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -237,3 +368,151 @@ def river_race_completed(clan_tag : str=PRIMARY_CLAN_TAG) -> bool:
     json_obj = json.loads(json_dump)
 
     return json_obj["clan"]["fame"] >= 10000
+
+
+def calculate_player_win_rate(player_tag: str, decks_used: int, fame: int, boat_attacks: int) -> dict:
+    """
+    Look at a player's battelog and break down their performance in recent river race battles.
+
+    Args:
+        player_tag(str): Player to check match history of.
+        decks_used(int): Number of decks they've used so far in the current river race.
+        fame(int): Total fame they've accumulated in the current river race.
+        boat_attacks(int): Total number of boat attacks they've made in the current river race.
+
+    Returns:
+        dict{str: int}: Number of wins and losses in each river race battle type for the specified player.
+            {
+                "battle_wins": int,
+                "battle_losses": int,
+                "special_battle_wins": int,
+                "special_battle_losses": int,
+                "boat_attack_wins": int,
+                "boat_attack_losses": int,
+                "duel_match_wins": int,
+                "duel_match_losses": int,
+                "duel_series_wins": int,
+                "duel_series_losses": int
+            }
+    """
+    req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}/battlelog", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if (req.status_code != 200):
+        return {}
+
+    json_dump = json.dumps(req.json())
+    river_race_battle_list = json.loads(json_dump)
+
+    prev_info = db_utils.get_previous_fame_and_boat_attacks(player_tag, decks_used, fame, boat_attacks)
+    decks_used -= prev_info["prev_decks_used"]
+    fame -= prev_info["prev_fame"]
+    boat_attacks -= prev_info["prev_boat_attacks"]
+
+    # If decks_used since last check is 0, no point in continuing
+    if decks_used == 0:
+        return {}
+
+    # This list comprehension will result in a list of river race battles since the last check
+    river_race_battle_list = [ battle for battle in river_race_battle_list if (((battle["type"].startswith("riverRace")) or (battle["type"] == "boatBattle")) and (bot_utils.battletime_to_datetime(battle["battleTime"]) > prev_info["prev_battle_time"])) ]
+
+    player_dict = {"player_tag": player_tag}
+
+    # Calculate PVP and boat battle performance
+    player_dict["battle_wins"] = 0
+    player_dict["battle_losses"] = 0
+    player_dict["special_battle_wins"] = 0
+    player_dict["special_battle_losses"] = 0
+    player_dict["boat_attack_wins"] = 0
+    player_dict["boat_attack_losses"] = 0
+
+    for battle in river_race_battle_list:
+        if battle["type"] == "riverRaceDuel":
+            continue
+
+        if battle["type"] == "riverRacePvP":
+            if battle["gameMode"]["name"] == "CW_Battle_1v1":
+                if battle["team"][0]["crowns"] > battle["opponent"][0]["crowns"]:
+                    fame -= 200
+                    player_dict["battle_wins"] += 1
+                else:
+                    fame -= 100
+                    player_dict["battle_losses"] += 1
+            else:
+                if battle["team"][0]["crowns"] > battle["opponent"][0]["crowns"]:
+                    fame -= 200
+                    player_dict["special_battle_wins"] += 1
+                else:
+                    fame -= 100
+                    player_dict["special_battle_losses"] += 1
+        else:
+            if battle["boatBattleWon"]:
+                fame -= 125
+                player_dict["boat_attack_wins"] += 1
+            else:
+                fame -= 75
+                player_dict["boat_attack_losses"] += 1
+
+        decks_used -= 1
+
+    # Calculate duel performance
+    player_dict["duel_match_wins"] = 0
+    player_dict["duel_match_losses"] = 0
+    player_dict["duel_series_wins"] = 0
+    player_dict["duel_series_losses"] = 0
+
+    if decks_used > 0:
+        for battle in river_race_battle_list:
+            if battle["type"] != "riverRaceDuel":
+                continue
+
+            if battle["team"][0]["crowns"] > battle["opponent"][0]["crowns"]:
+                player_dict["duel_series_wins"] += 1
+            else:
+                player_dict["duel_series_losses"] += 1
+
+            if fame == 600:
+                player_dict["duel_match_wins"] += 2
+                player_dict["duel_match_losses"] += 1
+                decks_used -= 3
+                fame -= 600
+            elif fame == 500:
+                player_dict["duel_match_wins"] += 2
+                decks_used -= 2
+                fame -= 500
+            elif fame == 450:
+                player_dict["duel_match_wins"] += 1
+                player_dict["duel_match_losses"] += 2
+                decks_used -= 3
+                fame -= 450
+            elif fame == 200:
+                player_dict["duel_match_losses"] += 2
+                decks_used -= 2
+                fame -= 200
+
+    return player_dict
+
+
+def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG):
+    """
+    Get the match performance of each player in the specified clan. Saves results in match_history table.
+
+    Args:
+        clan_tag(str, optional): Check player match performance of players in this clan.
+    """
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if (req.status_code != 200):
+        return
+
+    json_dump = json.dumps(req.json())
+    json_obj = json.loads(json_dump)
+
+    active_members = get_active_members_in_clan(clan_tag)
+    player_list = [ player for player in json_obj["clan"]["participants"] if (player["tag"] in active_members) and (player["decksUsedToday"] > 0) ]
+
+    performance_list = []
+
+    for player in player_list:
+        performance_list.append(calculate_player_win_rate(player["tag"], player["decksUsed"], player["fame"], player["boatAttacks"]))
+
+    db_utils.update_match_history(performance_list)

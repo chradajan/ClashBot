@@ -200,3 +200,67 @@ def should_receive_strike(deck_usage: int, completed_saturday: bool) -> tuple:
         decks_used_in_race += usage_history_list[0][0]
 
     return (decks_used_in_race < decks_required, decks_used_in_race)
+
+
+def battletime_to_datetime(battle_time: str) -> datetime.datetime:
+    """
+    Convert a Clash Royale API battleTime string to a datetime object.
+
+    Args:
+        battle_time(str): API battleTime string in the format "yyyymmddThhmmss.000Z".
+    
+    Returns:
+        datetime: Converted datetime object.
+    """
+    year = int(battle_time[:4])
+    month = int(battle_time[4:6])
+    day = int(battle_time[6:8])
+    hour = int(battle_time[9:11])
+    minute = int(battle_time[11:13])
+    second = int(battle_time[13:15])
+
+    return datetime.datetime(year, month, day, hour, minute, second, tzinfo=datetime.timezone.utc)
+
+
+def datetime_to_battletime(time: datetime.datetime) -> str:
+    """
+    Convert a datetime object to a Clash Royale API battleTime string.
+
+    Args:
+        time(datetime.datetime): datetime object to convert.
+
+    Returns:
+        str: Converted API battleTime string in the format "yyyymmddThhmmss.000Z".
+    """
+    return f"{time.year}{time.month:02}{time.day:02}T{time.hour:02}{time.minute:02}{time.second:02}.000Z"
+
+
+def create_match_performance_embed(player_name: str) -> discord.Embed:
+    """
+    Create a Discord Embed object displaying a user's River Race stats.
+
+    Args:
+        player_name(str): Player to display stats of.
+
+    Returns:
+        discord.Embed: Sendable embed containing the specified user's stats.
+    """
+    history = db_utils.get_match_performance_dict(player_name)
+    embed = discord.Embed(title=f"{player_name}'s River Race Stats")
+
+    embed.add_field(name="Regular PvP", value = f"``` Wins: {history['regular']['wins']} \n Total played: {history['regular']['total']} \n Win rate: {history['regular']['win_rate']} ```")
+    embed.add_field(name="Special PvP", value = f"``` Wins: {history['special']['wins']} \n Total played: {history['special']['total']} \n Win rate: {history['special']['win_rate']} ```")
+    embed.add_field(name="\u200b", value="\u200b", inline=False)
+
+    embed.add_field(name="Duel (individual matches)",
+                    value = f"``` Wins: {history['duel_matches']['wins']} \n Total played: {history['duel_matches']['total']} \n Win rate: {history['duel_matches']['win_rate']} ```",
+                    inline=True)
+    embed.add_field(name="Duel (series)",
+                    value = f"``` Wins: {history['duel_series']['wins']} \n Total played: {history['duel_series']['total']} \n Win rate: {history['duel_series']['win_rate']} ```",
+                    inline=True)
+    embed.add_field(name="\u200b", value="\u200b", inline=False)
+
+    embed.add_field(name="Combined PvP matches", value = f"``` Wins: {history['combined_pvp']['wins']} \n Total played: {history['combined_pvp']['total']} \n Win rate: {history['combined_pvp']['win_rate']} ```", inline=False)
+    embed.add_field(name="Boat attacks", value = f"``` Wins: {history['boat_attacks']['wins']} \n Total played: {history['boat_attacks']['total']} \n Win rate: {history['boat_attacks']['win_rate']} ```")
+
+    return embed

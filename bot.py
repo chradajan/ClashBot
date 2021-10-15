@@ -6,6 +6,7 @@ import aiocron
 import asyncio
 import bot_utils
 import clash_utils
+import datetime
 import db_utils
 import discord
 
@@ -77,46 +78,60 @@ async def on_ready():
 #########################################################################################
 
 @aiocron.crontab('0 0 * * *')
-async def clean_unregistered_users():
-    """Remove unregistered users that are no longer active members in False Logic every day at midnight"""
-    db_utils.clean_unregistered_users()
+async def clean_up_non_active_users():
+    """
+    Remove unregistered users that are no longer active members in False Logic every day at midnight.
+    """
+    db_utils.clean_up_non_active_users()
 
 
 @aiocron.crontab('0 19 * * 4,5,6')
 async def automated_reminder_eu():
-    """Send reminder every Thursday, Friday, and Saturday at 19:00 UTC (Monday and Tuesday at 7pm GMT)."""
+    """
+    Send reminder every Thursday, Friday, and Saturday at 19:00 UTC (Monday and Tuesday at 7pm GMT).
+    """
     if db_utils.get_reminder_status():
         await bot_utils.deck_usage_reminder(bot, US_time=False)
 
 @aiocron.crontab('0 19 * * 0')
 async def automated_reminder_eu_sunday():
-    """Send reminder every Sunday at 19:00 UTC if race not completed (Monday and Tuesday at 7pm GMT)."""
+    """
+    Send reminder every Sunday at 19:00 UTC if race not completed (Monday and Tuesday at 7pm GMT).
+    """
     if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
         await bot_utils.deck_usage_reminder(bot, US_time=False)
 
 
 @aiocron.crontab('0 1 * * 5,6,0')
 async def automated_reminder_us():
-    """Send reminder every Friday, Saturday, and Sunday at 01:00 UTC (Thursday, Friday, and Saturday at 6pm PDT)."""
+    """
+    Send reminder every Friday, Saturday, and Sunday at 01:00 UTC (Thursday, Friday, and Saturday at 6pm PDT).
+    """
     if db_utils.get_reminder_status():
         await bot_utils.deck_usage_reminder(bot, US_time=True)
 
 @aiocron.crontab('0 1 * * 1')
 async def automated_reminder_us_sunday():
-    """Send reminder every Monday at 01:00 UTC if race not completed (Sunday at 6pm PDT)."""
+    """
+    Send reminder every Monday at 01:00 UTC if race not completed (Sunday at 6pm PDT).
+    """
     if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
         await bot_utils.deck_usage_reminder(bot, US_time=True)
 
 
-@aiocron.crontab('46 9 * * 6')
+@aiocron.crontab('0 10 * * 0')
 async def record_race_completion_status():
-    """Check if the race was completed on Saturday and save result to db"""
+    """
+    Check if the race was completed on Saturday and save result to db.
+    """
     db_utils.save_race_completion_status(clash_utils.river_race_completed())
 
 
 @aiocron.crontab('0 18 * * 1')
 async def assign_strikes_and_clear_vacation():
-    """Assign strikes and clear vacation every Monday 18:00 UTC (Monday 11:00am PDT)."""
+    """
+    Assign strikes and clear vacation every Monday 18:00 UTC (Monday 11:00am PDT).
+    """
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     vacation_channel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
     strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
@@ -159,23 +174,74 @@ async def assign_strikes_and_clear_vacation():
     await vacation_channel.send("Vacation status for all users has been set to false. Make sure to use !vacation before the next war if you're going to miss it.")
     await strikes_channel.send(message)
 
+prev_deck_usage_sum = -1
+prev_deck_usage = None
+reset_occurred = False
 
-@aiocron.crontab('33 9 * * *')
-async def record_decks_used_today():
-    """Record number of decks used by each member one minute before daily reset every day."""
+@aiocron.crontab('25-50 9 * * *')
+async def determine_reset_time():
+    """
+    Check every minute for a drop in total deck usage today which indicates that the daily reset has occurred. When reset occurs,
+    record the number of decks used by each member. If it's Thursday, prepare to start tracking match performance for upcoming
+    race. If it's Monday, calculate match performance for the ~30 minutes between the final automated match performance calculation
+    and reset time.
+    """
+    global prev_deck_usage_sum
+    global prev_deck_usage
+    global reset_occurred
+
+    if reset_occurred:
+        return
+
+    weekday = datetime.datetime.utcnow().date().weekday()
     usage_list = clash_utils.get_deck_usage_today()
-    active_members = list(clash_utils.get_active_members_in_clan().keys())
+    current_sum = 0
 
-    for player_tag, decks_used in usage_list:
-        db_utils.add_deck_usage_today(player_tag, decks_used)
+    for _, decks_used in usage_list:
+        current_sum += decks_used
 
-        try:
-            active_members.remove(player_tag)
-        except ValueError:
-            pass
+    if current_sum < prev_deck_usage_sum:
+        reset_occurred = True
+        reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
+        bot_utils.RESET_TIME = reset_time.time()
+        db_utils.record_deck_usage_today(prev_deck_usage)
 
-    for player_tag in active_members:
-        db_utils.add_deck_usage_today(player_tag, 0)
+        if weekday == 0:
+            clash_utils.calculate_match_performance()
+        elif weekday == 3:
+            db_utils.prepare_match_history(reset_time)
+    else:
+        prev_deck_usage_sum = current_sum
+        prev_deck_usage = usage_list
+
+
+@aiocron.crontab('51 9 * * *')
+async def reset_globals():
+    """
+    Reset global variables needed for daily reset tracking.
+    """
+    global prev_deck_usage_sum
+    global prev_deck_usage
+    global reset_occurred
+
+    prev_deck_usage_sum = -1
+    prev_deck_usage = None
+    reset_occurred = False
+
+
+@aiocron.crontab('0 10-23 * * 4,5,6,0')
+async def night_match_performance_tracker():
+    """
+    Calculate match performance every hour between 10:00-23:00 Thursday-Sunday.
+    """
+    clash_utils.calculate_match_performance()
+
+@aiocron.crontab('0 0-9 * * 5,6,0,1')
+async def morning_match_performance_tracker():
+    """
+    Calculate match performance every hour between 00:00-09:00 Friday-Monday.
+    """
+    clash_utils.calculate_match_performance()
 
 
 #####################################################
