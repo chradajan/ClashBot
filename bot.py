@@ -78,11 +78,11 @@ async def on_ready():
 #########################################################################################
 
 @aiocron.crontab('0 0 * * *')
-async def clean_up_non_active_users():
+async def clean_up_db():
     """
-    Remove unregistered users that are no longer active members in False Logic every day at midnight.
+    Clean up the db every day at midnight.
     """
-    db_utils.clean_up_non_active_users()
+    db_utils.clean_up_db()
 
 
 @aiocron.crontab('0 19 * * 4,5,6')
@@ -224,6 +224,17 @@ async def reset_globals():
     global prev_deck_usage
     global reset_occurred
 
+    if not reset_occurred:
+        weekday = datetime.datetime.utcnow().date().weekday()
+        reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
+        bot_utils.RESET_TIME = reset_time.time()
+        db_utils.record_deck_usage_today(prev_deck_usage)
+
+        if weekday == 0:
+            clash_utils.calculate_match_performance()
+        elif weekday == 3:
+            db_utils.prepare_match_history(reset_time)
+
     prev_deck_usage_sum = -1
     prev_deck_usage = None
     reset_occurred = False
@@ -235,6 +246,7 @@ async def night_match_performance_tracker():
     Calculate match performance every hour between 10:00-23:00 Thursday-Sunday.
     """
     clash_utils.calculate_match_performance()
+
 
 @aiocron.crontab('0 0-9 * * 5,6,0,1')
 async def morning_match_performance_tracker():

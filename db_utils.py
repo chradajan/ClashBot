@@ -1,3 +1,4 @@
+from discord import player
 from config import PRIMARY_CLAN_TAG
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
 import blacklist
@@ -76,7 +77,7 @@ def add_new_user(clash_data: dict) -> bool:
                             discord_name = %(discord_name)s,\
                             clan_role = %(clan_role)s,\
                             clan_id = %(clan_id)s,\
-                            status = %(status)s,\
+                            status = %(status)s\
                             WHERE player_tag = %(player_tag)s"
             cursor.execute(update_query, clash_data)
     else:
@@ -391,12 +392,13 @@ def remove_user(player_name: str):
     user_id = query_result["id"]
 
     cursor.execute("DELETE FROM assigned_roles WHERE user_id = %s", (user_id))
-    active_members = list(clash_utils.get_active_members_in_clan().values())
+    active_members = clash_utils.get_active_members_in_clan()
+    player_tag = get_player_tag(player_name)
 
-    if player_name in active_members:
-        cursor.execute("UPDATE users SET status = 'UNREGISTERED' WHERE id = %s", (user_id))
+    if player_tag in active_members:
+        cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED' WHERE id = %s", (f"UNREGISTERED{player_tag}", user_id))
     else:
-        cursor.execute("UPDATE users SET status = 'DEPARTED', usage_history = 0 WHERE id = %s", (user_id))
+        cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED', usage_history = 0 WHERE id = %s", (f"DEPARTED{player_tag}", user_id))
 
     db.commit()
     db.close()
@@ -616,12 +618,15 @@ def record_deck_usage_today(deck_usage_list: list):
     db, cursor = connect_to_db()
 
     for player_tag, decks_used_today in deck_usage_list:
-        cursor.execute("SELECT usage_history FROM users WHERE player_tag = %s", (player_tag))
+        cursor.execute("SELECT player_name, usage_history, status, discord_name FROM users WHERE player_tag = %s", (player_tag))
         query_result = cursor.fetchone()
 
         if query_result == None:
             add_new_unregistered_user(player_tag)
             query_result = {"usage_history": 0}
+        elif query_result["status"] == 'INACTIVE':
+            clash_data = clash_utils.get_clash_user_data(player_tag, query_result["discord_name"])
+            update_user(clash_data, query_result["player_name"])
 
         updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (decks_used_today & ONE_DAY_MASK)
         cursor.execute("UPDATE users SET usage_history = %s WHERE player_tag = %s", (updated_history, player_tag))
@@ -643,26 +648,37 @@ def get_all_user_deck_usage_history() -> list:
         usage_list = [ (user["player_name"], user["player_tag"], user["usage_history"]) for user in query_result ]
 
     usage_list.sort(key = lambda x : x[0].lower())
+    db.close()
     return usage_list
 
 
-def clean_up_non_active_users():
+def clean_up_db():
     """
     Change UNREGISTERED users that are no longer active members to DEPARTED. Change ACTIVE users that are no longer active members
-    to INACTIVE.
+    to INACTIVE. Set any INACTIVE users to ACTIVE if they have joined the primary clan.
     """
     db, cursor = connect_to_db()
 
     active_members = clash_utils.get_active_members_in_clan()
-    cursor.execute("SELECT player_tag, status FROM users WHERE status = 'UNREGISTERED' or status = 'ACTIVE'")
+    cursor.execute("SELECT player_name, player_tag, discord_name, status FROM users WHERE status != 'DEPARTED'")
     query_result = cursor.fetchall()
 
     for user in query_result:
-        if user["player_tag"] not in active_members:
-            if user["status"] == 'UNREGISTERED':
-                cursor.execute("UPDATE users SET status = 'DEPARTED', usage_history = 0 WHERE player_tag = %s", (user["player_tag"]))
-            else:
-                cursor.execute("UPDATE users SET status = 'INACTIVE', usage_history = 0 WHERE player_tag = %s", (user["player_tag"]))
+        player_name = user["player_name"]
+        player_tag = user["player_tag"]
+        discord_name = user["discord_name"]
+        status = user["status"]
+
+        if player_tag not in active_members:
+            if status == 'UNREGISTERED':
+                cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED', usage_history = 0 WHERE player_tag = %s",
+                               (f"DEPARTED{player_tag}", player_tag))
+            elif status == 'ACTIVE':
+                cursor.execute("UPDATE users SET status = 'INACTIVE', usage_history = 0 WHERE player_tag = %s",
+                               (player_tag))
+        elif (player_tag in active_members) and (status == 'INACTIVE'):
+            clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
+            update_user(clash_data, player_name)
 
     db.commit()
     db.close()
@@ -855,6 +871,7 @@ def get_match_performance_dict(player_name: str) -> dict:
     overall_win_rate = "0.00%" if total_pvp_matches == 0 else "{:.2%}".format(total_pvp_wins / total_pvp_matches)
     match_performance_dict["combined_pvp"] = {"wins": total_pvp_wins, "total": total_pvp_matches, "win_rate": overall_win_rate}
 
+    db.close()
     return match_performance_dict
 
 
@@ -907,8 +924,8 @@ def get_file_path() -> str:
 def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, include_match_performance_history: bool) -> str:
     """
     """
-    # Before doing anything, update any ACTIVE/UNREGISTERED that should be INACTIVE/DEPARTED.
-    clean_up_non_active_users()
+    # Before doing anything, update the database.
+    clean_up_db()
 
     db, cursor = connect_to_db()
 
