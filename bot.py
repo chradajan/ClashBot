@@ -77,13 +77,6 @@ async def on_ready():
 #                                                                                       #
 #########################################################################################
 
-@aiocron.crontab('0 0 * * *')
-async def clean_up_db():
-    """
-    Clean up the db every day at midnight.
-    """
-    db_utils.clean_up_db()
-
 
 @aiocron.crontab('0 19 * * 4,5,6')
 async def automated_reminder_eu():
@@ -204,6 +197,7 @@ async def determine_reset_time():
         reset_occurred = True
         reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
         bot_utils.RESET_TIME = reset_time.time()
+        db_utils.clean_up_db()
         db_utils.record_deck_usage_today(prev_deck_usage)
 
         if weekday == 0:
@@ -228,6 +222,7 @@ async def reset_globals():
         weekday = datetime.datetime.utcnow().date().weekday()
         reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
         bot_utils.RESET_TIME = reset_time.time()
+        db_utils.clean_up_db()
         db_utils.record_deck_usage_today(prev_deck_usage)
 
         if weekday == 0:
@@ -245,6 +240,7 @@ async def night_match_performance_tracker():
     """
     Calculate match performance every hour between 10:00-23:00 Thursday-Sunday.
     """
+    db_utils.clean_up_db()
     clash_utils.calculate_match_performance()
 
 
@@ -253,6 +249,7 @@ async def morning_match_performance_tracker():
     """
     Calculate match performance every hour between 00:00-09:00 Friday-Monday.
     """
+    db_utils.clean_up_db()
     clash_utils.calculate_match_performance()
 
 
