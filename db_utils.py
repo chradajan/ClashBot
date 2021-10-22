@@ -809,36 +809,42 @@ def get_match_performance_dict(player_name: str) -> dict:
                 "regular":
                     {
                         "wins": int,
+                        "losses": int,
                         "total": int,
                         "win_rate": str
                     },
                 "special":
                     {
                         "wins": int,
+                        "losses": int,
                         "total": int,
                         "win_rate": str
                     },
                 "duel_matches":
                     {
                         "wins": int,
+                        "losses": int,
                         "total": int,
                         "win_rate": str
                     },
                 "duel_series":
                     {
                         "wins": int,
+                        "losses": int,
                         "total": int,
                         "win_rate": str
                     },
                 "combined_pvp":
                     {
                         "wins": int,
+                        "losses": int,
                         "total": int,
                         "win_rate": str
                     },
                 "boat_attacks":
                     {
                         "wins": int,
+                        "losses": int,
                         "total": int,
                         "win_rate": str
                     }
@@ -854,39 +860,63 @@ def get_match_performance_dict(player_name: str) -> dict:
 
     # Regular battles
     regular_wins = match_performance["battle_wins"]
-    total_regular_battles = regular_wins + match_performance["battle_losses"]
+    regular_losses = match_performance["battle_losses"]
+    total_regular_battles = regular_wins + regular_losses
     regular_battle_win_rate = "0.00%" if total_regular_battles == 0 else "{:.2%}".format(regular_wins / total_regular_battles)
-    match_performance_dict["regular"] = {"wins": regular_wins, "total": total_regular_battles, "win_rate": regular_battle_win_rate}
+    match_performance_dict["regular"] = {"wins": regular_wins,
+                                         "losses": regular_losses,
+                                         "total": total_regular_battles,
+                                         "win_rate": regular_battle_win_rate}
 
     # Special battles
     special_wins = match_performance["special_battle_wins"]
-    total_special_battles = special_wins + match_performance["special_battle_losses"]
+    special_losses = match_performance["special_battle_losses"]
+    total_special_battles = special_wins + special_losses
     special_battle_win_rate = "0.00%" if total_special_battles == 0 else "{:.2%}".format(special_wins / total_special_battles)
-    match_performance_dict["special"] = {"wins": special_wins, "total": total_special_battles, "win_rate": special_battle_win_rate}
+    match_performance_dict["special"] = {"wins": special_wins,
+                                         "losses": special_losses,
+                                         "total": total_special_battles,
+                                         "win_rate": special_battle_win_rate}
 
     # Duel matches
     duel_match_wins = match_performance["duel_match_wins"]
-    total_duel_matches = duel_match_wins + match_performance["duel_match_losses"]
+    duel_match_losses = match_performance["duel_match_losses"]
+    total_duel_matches = duel_match_wins + duel_match_losses
     duel_match_win_rate = "0.00%" if total_duel_matches == 0 else "{:.2%}".format(duel_match_wins / total_duel_matches)
-    match_performance_dict["duel_matches"] = {"wins": duel_match_wins, "total": total_duel_matches, "win_rate": duel_match_win_rate}
+    match_performance_dict["duel_matches"] = {"wins": duel_match_wins,
+                                              "losses": duel_match_losses,
+                                              "total": total_duel_matches,
+                                              "win_rate": duel_match_win_rate}
 
     # Duel series
     duel_series_wins = match_performance["duel_series_wins"]
-    total_duel_series = duel_series_wins + match_performance["duel_series_losses"]
+    duel_series_losses = match_performance["duel_series_losses"]
+    total_duel_series = duel_series_wins + duel_series_losses
     duel_series_win_rate = "0.00%" if total_duel_series == 0 else "{:.2%}".format(duel_series_wins / total_duel_series)
-    match_performance_dict["duel_series"] = {"wins": duel_series_wins, "total": total_duel_series, "win_rate": duel_series_win_rate}
+    match_performance_dict["duel_series"] = {"wins": duel_series_wins,
+                                             "losses": duel_series_losses,
+                                             "total": total_duel_series,
+                                             "win_rate": duel_series_win_rate}
 
     # Boat attacks
     boat_attack_wins = match_performance["boat_attack_wins"]
-    total_boat_attacks = boat_attack_wins + match_performance["boat_attack_losses"]
+    boat_attack_losses = match_performance["boat_attack_losses"]
+    total_boat_attacks = boat_attack_wins + boat_attack_losses
     boat_attack_win_rate = "0.00%" if total_boat_attacks == 0 else "{:.2%}".format(boat_attack_wins / total_boat_attacks)
-    match_performance_dict["boat_attacks"] = {"wins": boat_attack_wins, "total": total_boat_attacks, "win_rate": boat_attack_win_rate}
+    match_performance_dict["boat_attacks"] = {"wins": boat_attack_wins,
+                                              "losses": boat_attack_losses,
+                                              "total": total_boat_attacks,
+                                              "win_rate": boat_attack_win_rate}
 
     # Combined
     total_pvp_wins = regular_wins + special_wins + duel_match_wins
-    total_pvp_matches = total_regular_battles + total_special_battles + total_duel_matches
+    total_pvp_losses = regular_losses + special_losses + duel_match_losses
+    total_pvp_matches = total_pvp_wins + total_pvp_losses
     overall_win_rate = "0.00%" if total_pvp_matches == 0 else "{:.2%}".format(total_pvp_wins / total_pvp_matches)
-    match_performance_dict["combined_pvp"] = {"wins": total_pvp_wins, "total": total_pvp_matches, "win_rate": overall_win_rate}
+    match_performance_dict["combined_pvp"] = {"wins": total_pvp_wins,
+                                              "losses": total_pvp_losses,
+                                              "total": total_pvp_matches,
+                                              "win_rate": overall_win_rate}
 
     db.close()
     return match_performance_dict
@@ -1019,12 +1049,12 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
         if include_match_performance_history:
             match_performance_dict = {user["player_name"]: get_match_performance_dict(user["player_name"]) for user in users}
 
-            fields_list.extend(["Regular PvP Wins", "Total Regular PvP Matches", "Regular PvP Win Rate",
-                                "Special PvP Wins", "Total Special PvP Matches", "Special PvP Win Rate",
-                                "Duel Match Wins", "Total Duel Matches", "Duel Match Win Rate",
-                                "Duel Series Wins", "Total Duel Series", "Duel Series Win Rate",
-                                "Combined PvP Wins", "Total Combined PvP Matches", "Combined PvP Win Rate",
-                                "Boat Attack Wins", "Total Boat Attacks", "Boat Attack Win Rate"])
+            fields_list.extend(["Regular PvP Wins", "Regular PvP Losses", "Regular PvP Win Rate",
+                                "Special PvP Wins", "Special PvP Losses", "Special PvP Win Rate",
+                                "Duel Match Wins", "Duel Match Losses", "Duel Match Win Rate",
+                                "Duel Series Wins", "Duel Series Losses", "Duel Series Win Rate",
+                                "Combined PvP Wins", "Combined PvP Losses", "Combined PvP Win Rate",
+                                "Boat Attack Wins", "Boat Attack Losses", "Boat Attack Win Rate"])
 
         # Prepare CSV file.
         writer = csv.DictWriter(csv_file, fieldnames=fields_list)
@@ -1059,22 +1089,22 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
 
             if include_match_performance_history:
                 user["Regular PvP Wins"] = match_performance_dict[user["Player Name"]]["regular"]["wins"]
-                user["Total Regular PvP Matches"] = match_performance_dict[user["Player Name"]]["regular"]["total"]
+                user["Regular PvP Losses"] = match_performance_dict[user["Player Name"]]["regular"]["losses"]
                 user["Regular PvP Win Rate"] = float(match_performance_dict[user["Player Name"]]["regular"]["win_rate"][:-1]) / 100
                 user["Special PvP Wins"] = match_performance_dict[user["Player Name"]]["special"]["wins"]
-                user["Total Special PvP Matches"] = match_performance_dict[user["Player Name"]]["special"]["total"]
+                user["Special PvP Losses"] = match_performance_dict[user["Player Name"]]["special"]["losses"]
                 user["Special PvP Win Rate"] = float(match_performance_dict[user["Player Name"]]["special"]["win_rate"][:-1]) / 100
                 user["Duel Match Wins"] = match_performance_dict[user["Player Name"]]["duel_matches"]["wins"]
-                user["Total Duel Matches"] = match_performance_dict[user["Player Name"]]["duel_matches"]["total"]
+                user["Duel Match Losses"] = match_performance_dict[user["Player Name"]]["duel_matches"]["losses"]
                 user["Duel Match Win Rate"] = float(match_performance_dict[user["Player Name"]]["duel_matches"]["win_rate"][:-1]) / 100
                 user["Duel Series Wins"] = match_performance_dict[user["Player Name"]]["duel_series"]["wins"]
-                user["Total Duel Series"] = match_performance_dict[user["Player Name"]]["duel_series"]["total"]
+                user["Duel Series Losses"] = match_performance_dict[user["Player Name"]]["duel_series"]["losses"]
                 user["Duel Series Win Rate"] = float(match_performance_dict[user["Player Name"]]["duel_series"]["win_rate"][:-1]) / 100
                 user["Combined PvP Wins"] = match_performance_dict[user["Player Name"]]["combined_pvp"]["wins"]
-                user["Total Combined PvP Matches"] = match_performance_dict[user["Player Name"]]["combined_pvp"]["total"]
+                user["Combined PvP Losses"] = match_performance_dict[user["Player Name"]]["combined_pvp"]["losses"]
                 user["Combined PvP Win Rate"] = float(match_performance_dict[user["Player Name"]]["combined_pvp"]["win_rate"][:-1]) / 100
                 user["Boat Attack Wins"] = match_performance_dict[user["Player Name"]]["boat_attacks"]["wins"]
-                user["Total Boat Attacks"] = match_performance_dict[user["Player Name"]]["boat_attacks"]["total"]
+                user["Boat Attack Losses"] = match_performance_dict[user["Player Name"]]["boat_attacks"]["losses"]
                 user["Boat Attack Win Rate"] = float(match_performance_dict[user["Player Name"]]["boat_attacks"]["win_rate"][:-1]) / 100
 
             writer.writerow(user)
