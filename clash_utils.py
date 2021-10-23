@@ -226,30 +226,6 @@ def get_user_decks_used_today(player_tag: str) -> int:
     return 0
 
 
-def get_deck_usage_this_week(clan_tag: str=PRIMARY_CLAN_TAG):
-    """
-    Get a dictionary of users in a specified clan and how many total war decks they've used this week.
-
-    Args:
-        clan_tag(str, optional): Clan to look for players in.
-
-    Returns:
-        dict{player_tag(str): decks_used(int)}: dict containing a player tags and their total deck usage.
-    """
-    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
-
-    if (req.status_code != 200):
-        return {}
-
-    json_dump = json.dumps(req.json())
-    json_obj = json.loads(json_dump)
-
-    active_members = get_active_members_in_clan(clan_tag)
-    deck_usage = {participant["tag"]: participant["decksUsed"] for participant in json_obj["clan"]["participants"] if participant["tag"] in active_members}
-
-    return deck_usage
-
-
 def get_top_fame_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     """
     Get the top n users in a clan by fame. Can possible return more than n if players are tied for the same amount of fame.
@@ -370,15 +346,13 @@ def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
     return json_obj["clan"]["fame"] >= 10000
 
 
-def calculate_player_win_rate(player_tag: str, decks_used: int, fame: int, boat_attacks: int) -> dict:
+def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
     """
     Look at a player's battelog and break down their performance in recent river race battles.
 
     Args:
         player_tag(str): Player to check match history of.
-        decks_used(int): Number of decks they've used so far in the current river race.
         fame(int): Total fame they've accumulated in the current river race.
-        boat_attacks(int): Total number of boat attacks they've made in the current river race.
 
     Returns:
         dict{str: int}: Number of wins and losses in each river race battle type for the specified player.
@@ -395,6 +369,13 @@ def calculate_player_win_rate(player_tag: str, decks_used: int, fame: int, boat_
                 "duel_series_losses": int
             }
     """
+    prev_fame, last_check_time = db_utils.get_and_update_match_history_fame_and_battle_time(player_tag, fame)
+    fame -= prev_fame
+
+    # If no fame has been acquired since last check, no point in grabbing battlelog.
+    if fame == 0:
+        return {}
+
     req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}/battlelog", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -403,91 +384,76 @@ def calculate_player_win_rate(player_tag: str, decks_used: int, fame: int, boat_
     json_dump = json.dumps(req.json())
     river_race_battle_list = json.loads(json_dump)
 
-    prev_info = db_utils.get_previous_fame_and_boat_attacks(player_tag, decks_used, fame, boat_attacks)
-    decks_used -= prev_info["prev_decks_used"]
-    fame -= prev_info["prev_fame"]
-    boat_attacks -= prev_info["prev_boat_attacks"]
-
-    # If decks_used since last check is 0, no point in continuing
-    if decks_used == 0:
-        return {}
-
     # This list comprehension will result in a list of river race battles since the last check
-    river_race_battle_list = [ battle for battle in river_race_battle_list if (((battle["type"].startswith("riverRace")) or (battle["type"] == "boatBattle")) and (bot_utils.battletime_to_datetime(battle["battleTime"]) > prev_info["prev_battle_time"])) ]
+    river_race_battle_list = [ battle for battle in river_race_battle_list if (((battle["type"].startswith("riverRace")) or (battle["type"] == "boatBattle")) and (bot_utils.battletime_to_datetime(battle["battleTime"]) > last_check_time)) ]
 
     player_dict = {"player_tag": player_tag}
-
-    # Calculate PVP and boat battle performance
     player_dict["battle_wins"] = 0
     player_dict["battle_losses"] = 0
     player_dict["special_battle_wins"] = 0
     player_dict["special_battle_losses"] = 0
     player_dict["boat_attack_wins"] = 0
     player_dict["boat_attack_losses"] = 0
-
-    for battle in river_race_battle_list:
-        if battle["type"] == "riverRaceDuel":
-            continue
-
-        if battle["type"] == "riverRacePvP":
-            if battle["gameMode"]["name"] == "CW_Battle_1v1":
-                if battle["team"][0]["crowns"] > battle["opponent"][0]["crowns"]:
-                    fame -= 200
-                    player_dict["battle_wins"] += 1
-                else:
-                    fame -= 100
-                    player_dict["battle_losses"] += 1
-            else:
-                if battle["team"][0]["crowns"] > battle["opponent"][0]["crowns"]:
-                    fame -= 200
-                    player_dict["special_battle_wins"] += 1
-                else:
-                    fame -= 100
-                    player_dict["special_battle_losses"] += 1
-        else:
-            if battle["boatBattleWon"]:
-                fame -= 125
-                player_dict["boat_attack_wins"] += 1
-            else:
-                fame -= 75
-                player_dict["boat_attack_losses"] += 1
-
-        decks_used -= 1
-
-    # Calculate duel performance
     player_dict["duel_match_wins"] = 0
     player_dict["duel_match_losses"] = 0
     player_dict["duel_series_wins"] = 0
     player_dict["duel_series_losses"] = 0
 
-    if decks_used > 0:
-        for battle in river_race_battle_list:
-            if battle["type"] != "riverRaceDuel":
-                continue
+    for battle in river_race_battle_list:
+        if battle["type"] == "riverRacePvP":
+            if battle["gameMode"]["name"] == "CW_Battle_1v1":
+                if battle["team"][0]["crowns"] > battle["opponent"][0]["crowns"]:
+                    player_dict["battle_wins"] += 1
+                else:
+                    player_dict["battle_losses"] += 1
+            else:
+                if battle["team"][0]["crowns"] > battle["opponent"][0]["crowns"]:
+                    player_dict["special_battle_wins"] += 1
+                else:
+                    player_dict["special_battle_losses"] += 1
 
-            if battle["team"][0]["crowns"] > battle["opponent"][0]["crowns"]:
+        elif battle["type"] == "boatBattle":
+            if battle["boatBattleWon"]:
+                player_dict["boat_attack_wins"] += 1
+            else:
+                player_dict["boat_attack_losses"] += 1
+
+        elif battle["type"] == "riverRaceDuel":
+            # Determine duel series outcome by result of final game
+            team_king_hit_points = battle["team"][0].get("kingTowerHitPoints")
+            team_princess_list = battle["team"][0].get("princessTowersHitPoints")
+            opponent_king_hit_points = battle["opponent"][0].get("kingTowerHitPoints")
+            opponent_princess_list = battle["opponent"][0].get("princessTowersHitPoints")
+            team_won = None
+
+            if team_king_hit_points == None:
+                team_won = False
+            elif opponent_king_hit_points == None:
+                team_won = True
+            elif (team_princess_list == None) and (opponent_princess_list != None):
+                team_won = False
+            elif (team_princess_list != None) and (opponent_princess_list == None):
+                team_won = True
+            elif len(team_princess_list) < len(opponent_princess_list):
+                team_won = False
+            elif len(team_princess_list) > len(opponent_princess_list):
+                team_won = True
+
+            # Determine how many individual matches were won/lost by number of cards used
+            if team_won == None:
+                print("Can't determine duel outcome. Player tag: ", player_tag)
+            elif team_won:
                 player_dict["duel_series_wins"] += 1
+                player_dict["duel_match_wins"] += 2
+
+                if len(battle["team"][0]["cards"]) == 24:
+                    player_dict["duel_match_losses"] += 1
             else:
                 player_dict["duel_series_losses"] += 1
+                player_dict["duel_match_losses"] += 2
 
-            if fame == 600:
-                player_dict["duel_match_wins"] += 2
-                player_dict["duel_match_losses"] += 1
-                decks_used -= 3
-                fame -= 600
-            elif fame == 500:
-                player_dict["duel_match_wins"] += 2
-                decks_used -= 2
-                fame -= 500
-            elif fame == 450:
-                player_dict["duel_match_wins"] += 1
-                player_dict["duel_match_losses"] += 2
-                decks_used -= 3
-                fame -= 450
-            elif fame == 200:
-                player_dict["duel_match_losses"] += 2
-                decks_used -= 2
-                fame -= 200
+                if len(battle["team"][0]["cards"]) == 24:
+                    player_dict["duel_match_wins"] += 1
 
     return player_dict
 
@@ -513,6 +479,6 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG):
     performance_list = []
 
     for player in player_list:
-        performance_list.append(calculate_player_win_rate(player["tag"], player["decksUsed"], player["fame"], player["boatAttacks"]))
+        performance_list.append(calculate_player_win_rate(player["tag"], player["fame"]))
 
     db_utils.update_match_history(performance_list)

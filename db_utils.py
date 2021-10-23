@@ -95,7 +95,7 @@ def add_new_user(clash_data: dict) -> bool:
 
     if query_result == None:
         battle_time = bot_utils.datetime_to_battletime(datetime.datetime.now(datetime.timezone.utc))
-        cursor.execute("INSERT INTO match_history VALUES (%s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (user_id, battle_time))
+        cursor.execute("INSERT INTO match_history VALUES (%s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (user_id, battle_time))
 
     # Check if new user is member or visitor. Get id of relevant discord_role.
     role_string = "Member" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "Visitor"
@@ -155,7 +155,7 @@ def add_new_unregistered_user(player_tag: str):
     cursor.execute("SELECT id FROM users WHERE player_tag = %(player_tag)s", clash_data)
     query_result = cursor.fetchone()
     battle_time = bot_utils.datetime_to_battletime(datetime.datetime.now(datetime.timezone.utc))
-    cursor.execute("INSERT INTO match_history VALUES (%s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (query_result["id"], battle_time))
+    cursor.execute("INSERT INTO match_history VALUES (%s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (query_result["id"], battle_time))
 
     db.commit()
     db.close()
@@ -701,49 +701,35 @@ def clean_up_db():
     db.close()
 
 
-def get_previous_fame_and_boat_attacks(player_tag: str, decks_used: int, fame: int, boat_attacks: int) -> dict:
+def get_and_update_match_history_fame_and_battle_time(player_tag: str, fame: int):
     """
-    Get a user's decks used, fame, and boat attacks when their battlelog was last inspected. Then store their new values back into
-    the database.
+    Get a user's fame and time when their battlelog was last checked. Then store their updated fame and current time.
 
     Args:
-        player_tag(str): Player to get/set info for.
-        decks_used(int): Most recent count of decks used today.
-        fame(int): Most recent fame amount.
-        boat_attacks(int): Most recent number of boat attacks performed.
+        player_tag(str): Player to get/set fame for.
+        fame(int): Current fame value.
 
     Returns:
-        dict: Dict containing information needed to determine match performance.
-            {
-                "prev_battle_time": datetime.datetime,
-                "prev_decks_used": int,
-                "prev_fame": int,
-                "prev_boat_attacks": int
-            }
+        tuple(fame(int), last_battle_time(datetime.datetime)): Previous fame value and battle time.
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT last_battle_time, decks_used, fame, boat_attacks FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
+    cursor.execute("SELECT last_battle_time, fame FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
     query_result = cursor.fetchone()
 
     if query_result == None:
         add_new_unregistered_user(player_tag)
-        cursor.execute("SELECT last_battle_time, decks_used, fame, boat_attacks FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
+        cursor.execute("SELECT last_battle_time, fame FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
         query_result = cursor.fetchone()
 
-    prev_info = {
-        "prev_battle_time": bot_utils.battletime_to_datetime(query_result["last_battle_time"]),
-        "prev_decks_used": query_result["decks_used"],
-        "prev_fame": query_result["fame"],
-        "prev_boat_attacks": query_result["boat_attacks"]
-    }
+    fame_and_time = (query_result["fame"], bot_utils.battletime_to_datetime(query_result["last_battle_time"]))
 
-    cursor.execute("UPDATE match_history SET last_battle_time = %s, decks_used = %s, fame = %s, boat_attacks = %s WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
-                   (bot_utils.datetime_to_battletime(datetime.datetime.now(datetime.timezone.utc)), decks_used, fame, boat_attacks, player_tag))
+    cursor.execute("UPDATE match_history SET last_battle_time = %s, fame = %s WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
+                   (bot_utils.datetime_to_battletime(datetime.datetime.now(datetime.timezone.utc)), fame, player_tag))
 
     db.commit()
     db.close()
-    return prev_info
+    return fame_and_time
 
 
 def update_match_history(user_performance_list: list):
@@ -786,12 +772,8 @@ def prepare_match_history(last_battle_time: datetime.datetime):
     """
     db, cursor = connect_to_db()
 
-    deck_usage = clash_utils.get_deck_usage_this_week()
     last_battle_time = bot_utils.datetime_to_battletime(last_battle_time)
-
-    for player_tag in deck_usage:
-        cursor.execute("UPDATE match_history SET last_battle_time = %s, decks_used = %s, fame = 0, boat_attacks = 0 WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
-                        (last_battle_time, deck_usage[player_tag], player_tag))
+    cursor.execute("UPDATE match_history SET last_battle_time = %s, fame = 0", (last_battle_time))
 
     db.commit()
     db.close()
@@ -920,38 +902,6 @@ def get_match_performance_dict(player_name: str) -> dict:
 
     db.close()
     return match_performance_dict
-
-
-def get_match_performance(player_name: str):
-    """
-    Retrieve a specified player's match performance stats.
-
-    Args:
-        player_name(str): Player to retrieve stats for.
-
-    Returns:
-        dict{str: int}: dict of specified player's match performance.
-            {
-                "battle_wins": int,
-                "battle_losses": int,
-                "special_battle_wins": int,
-                "special_battle_losses": int,
-                "boat_attack_wins": int,
-                "boat_attack_losses": int,
-                "duel_match_wins": int,
-                "duel_match_losses": int,
-                "duel_series_wins": int,
-                "duel_series_losses": int
-            }
-    """
-    db, cursor = connect_to_db()
-
-    cursor.execute("SELECT battle_wins, battle_losses, special_battle_wins, special_battle_losses, boat_attack_wins, boat_attack_losses, duel_match_wins, duel_match_losses, duel_series_wins, duel_series_losses\
-                    FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_name = %s)", (player_name))
-
-    query_result = cursor.fetchone()
-    db.close()
-    return query_result
 
 
 def get_file_path() -> str:
