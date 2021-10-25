@@ -145,7 +145,7 @@ def add_new_unregistered_user(player_tag: str):
     clash_data["clan_id"] = query_result["id"]
 
     # Set their proper status
-    clash_data["status"] = "UNREGISTERED"
+    clash_data["status"] = "UNREGISTERED" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "DEPARTED"
 
     # Insert them
     insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, 0, 0, %(status)s, %(clan_id)s)"
@@ -396,10 +396,10 @@ def remove_user(player_name: str):
     player_tag = get_player_tag(player_name)
 
     if player_tag in active_members:
-        cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED', usage_history = 0 WHERE id = %s",
+        cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED' WHERE id = %s",
                        (f"UNREGISTERED{player_tag}", user_id))
     else:
-        cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED', usage_history = 0 WHERE id = %s",
+        cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED' WHERE id = %s",
                        (f"DEPARTED{player_tag}", user_id))
 
     db.commit()
@@ -615,22 +615,41 @@ def get_members_in_time_zone(US_time: bool) -> list:
     return member_list
 
 
-# (player_tag, decks_used_today)
-def record_deck_usage_today(deck_usage_list: list):
+def record_deck_usage_today(deck_usage: dict):
+    """
+    Log how many decks were used today by each member of the primary clan. Any users in the database but not in the primary clan
+    will be considered to have used 0 decks today.
+
+    Args:
+        deck_usage(dict): dict of users and number of decks used today.
+            {player_tag(str): decks_used_today(int)}
+    """
     db, cursor = connect_to_db()
 
-    for player_tag, decks_used_today in deck_usage_list:
-        cursor.execute("SELECT player_name, usage_history, status, discord_name FROM users WHERE player_tag = %s", (player_tag))
+    cursor.execute("SELECT player_tag FROM users")
+    query_result = cursor.fetchall()
+    db_users = set()
+
+    if query_result != None:
+        db_users = {user["player_tag"] for user in query_result}
+
+    for player_tag in deck_usage:
+        db_users.discard(player_tag)
+        cursor.execute("SELECT player_tag, usage_history FROM users WHERE player_tag = %s", (player_tag))
         query_result = cursor.fetchone()
 
         if query_result == None:
             add_new_unregistered_user(player_tag)
             query_result = {"usage_history": 0}
-        elif query_result["status"] == 'INACTIVE':
-            clash_data = clash_utils.get_clash_user_data(player_tag, query_result["discord_name"])
-            update_user(clash_data, query_result["player_name"])
 
-        updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (decks_used_today & ONE_DAY_MASK)
+        updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (deck_usage[player_tag] & ONE_DAY_MASK)
+        cursor.execute("UPDATE users SET usage_history = %s WHERE player_tag = %s", (updated_history, player_tag))
+
+    for player_tag in db_users:
+        cursor.execute("SELECT usage_history FROM users WHERE player_tag = %s", (player_tag))
+        query_result = cursor.fetchone()
+
+        updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (0 & ONE_DAY_MASK)
         cursor.execute("UPDATE users SET usage_history = %s WHERE player_tag = %s", (updated_history, player_tag))
 
     db.commit()
@@ -674,28 +693,24 @@ def clean_up_db():
         discord_name = user["discord_name"]
         status = user["status"]
 
-        if player_tag not in active_members:
+        if player_tag in active_members:
+            if status == 'INACTIVE':
+                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
+                update_user(clash_data, player_name)
+            elif status == 'DEPARTED':
+                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
+                update_user(clash_data, player_name)
+                cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED' WHERE player_tag = %s",
+                               (f"UNREGISTERED{player_tag}", player_tag))
+        else:
             if status == 'UNREGISTERED':
                 clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
                 update_user(clash_data, player_name)
-                cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED', usage_history = 0 WHERE player_tag = %s",
+                cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED' WHERE player_tag = %s",
                                (f"DEPARTED{player_tag}", player_tag))
             elif status == 'ACTIVE':
                 clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
                 update_user(clash_data, player_name)
-                cursor.execute("UPDATE users SET usage_history = 0 WHERE player_tag = %s",
-                               (player_tag))
-        else:
-            if status == 'INACTIVE':
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
-                update_user(clash_data, player_name)
-                cursor.execute("UPDATE users SET usage_history = 0 WHERE player_tag = %s",
-                               (player_tag))
-            elif status == 'DEPARTED':
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
-                update_user(clash_data, player_name)
-                cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED', usage_history = 0 WHERE player_tag = %s",
-                               (f"UNREGISTERED{player_tag}", player_tag))
 
     db.commit()
     db.close()
@@ -920,6 +935,12 @@ def get_file_path() -> str:
 
 def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, include_match_performance_history: bool) -> str:
     """
+    Create CSV file containing relevant information from the database.
+
+    Args:
+        primary_clan_only(bool)
+        include_deck_usage_history(bool)
+        include_match_performance_history(bool)
     """
     # Before doing anything, update the database.
     clean_up_db()
