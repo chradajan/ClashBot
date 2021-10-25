@@ -418,7 +418,7 @@ def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
             else:
                 player_dict["boat_attack_losses"] += 1
 
-        elif battle["type"] == "riverRaceDuel":
+        elif battle["type"].startswith("riverRaceDuel"):
             # Determine duel series outcome by result of final game
             team_king_hit_points = battle["team"][0].get("kingTowerHitPoints")
             team_princess_list = battle["team"][0].get("princessTowersHitPoints")
