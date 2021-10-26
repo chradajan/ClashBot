@@ -36,15 +36,22 @@ def connect_to_db():
     return (db, cursor)
 
 
-# clash_data = {
-#     player_tag: str,
-#     player_name: str,
-#     discord_name: str,
-#     clan_role: str,
-#     clan_name: str,
-#     clan_tag: str
-# }
 def add_new_user(clash_data: dict) -> bool:
+    """
+    Add a new user to the database. Only used for users that just joined the Discord server.
+
+    Args:
+        clash_data(dict): A dictionary of relevant Clash Royale information.
+            {
+                "player_tag": str,
+                "player_name": str,
+                "discord_name": str,
+                "discord_id": int,
+                "clan_role": str,
+                "clan_name": str,
+                "clan_tag": str
+            }
+    """
     db, cursor = connect_to_db()
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
@@ -75,13 +82,14 @@ def add_new_user(clash_data: dict) -> bool:
         else:
             update_query = "UPDATE users SET player_name = %(player_name)s,\
                             discord_name = %(discord_name)s,\
+                            discord_id = %(discord_id)s,\
                             clan_role = %(clan_role)s,\
                             clan_id = %(clan_id)s,\
                             status = %(status)s\
                             WHERE player_tag = %(player_tag)s"
             cursor.execute(update_query, clash_data)
     else:
-        insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, 0, 0, %(status)s, %(clan_id)s)"
+        insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(discord_id)s, %(clan_role)s, TRUE, FALSE, 0, 0, %(status)s, %(clan_id)s)"
         cursor.execute(insert_user_query, clash_data)
 
     # Get id of newly inserted user.
@@ -129,7 +137,7 @@ def add_new_unregistered_user(player_tag: str):
     db, cursor = connect_to_db()
 
     # Get their data
-    clash_data = clash_utils.get_clash_user_data(player_tag, "UNREGISTERED" + player_tag)
+    clash_data = clash_utils.get_clash_user_data(player_tag, player_tag, None)
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
@@ -146,9 +154,10 @@ def add_new_unregistered_user(player_tag: str):
 
     # Set their proper status
     clash_data["status"] = "UNREGISTERED" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "DEPARTED"
+    clash_data["discord_name"] = f"{clash_data['status']}{player_tag}"
 
     # Insert them
-    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(clan_role)s, TRUE, FALSE, 0, 0, %(status)s, %(clan_id)s)"
+    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, NULL, %(clan_role)s, TRUE, FALSE, 0, 0, %(status)s, %(clan_id)s)"
     cursor.execute(insert_user_query, clash_data)
 
     # Create match_history entry.
@@ -160,16 +169,23 @@ def add_new_unregistered_user(player_tag: str):
     db.commit()
     db.close()
 
-# Update existing user.
-# clash_data = {
-#     player_tag: str,
-#     player_name: str,
-#     discord_name: str,
-#     clan_role: str,
-#     clan_name: str,
-#     clan_tag: str
-# }
-def update_user(clash_data: dict, original_player_name: str) -> str:
+
+def update_user(clash_data: dict) -> str:
+    """
+    Update a user in the database to reflect any changes to their Clash Royale or Discord statuses.
+
+    Args:
+        clash_data(dict): A dictionary of relevant Clash Royale information.
+            {
+                "player_tag": str,
+                "player_name": str,
+                "discord_name": str,
+                "discord_id": int,
+                "clan_role": str,
+                "clan_name": str,
+                "clan_tag": str
+            }
+    """
     db, cursor = connect_to_db()
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
@@ -183,7 +199,6 @@ def update_user(clash_data: dict, original_player_name: str) -> str:
         query_result = cursor.fetchone()
 
     clash_data["clan_id"] = query_result["id"]
-    clash_data["original_player_name"] = original_player_name
     clash_data["status"] = "ACTIVE" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "INACTIVE"
 
     update_query = "UPDATE users SET player_tag = %(player_tag)s,\
@@ -192,7 +207,7 @@ def update_user(clash_data: dict, original_player_name: str) -> str:
                     clan_role = %(clan_role)s,\
                     clan_id = %(clan_id)s,\
                     status = %(status)s\
-                    WHERE player_name = %(original_player_name)s"
+                    WHERE discord_id = %(discord_id)s"
     cursor.execute(update_query, clash_data)
 
     db.commit()
@@ -201,30 +216,45 @@ def update_user(clash_data: dict, original_player_name: str) -> str:
     return "Member" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "Visitor"
 
 
-# player_data = {
-#     player_tag: str,
-#     player_name: str,
-#     discord_name: str,
-#     clan_role: str,
-#     clan_name: str,
-#     clan_tag: str,
-#     vacation: bool,
-#     strikes: int,
-#     usage_history: int,
-#     status: str
-# }
-def get_user_data(player_name: str) -> dict:
+def get_user_data(search_key: str) -> dict:
+    """
+    Get a user's information from the users table.
+
+    Args:
+        search_key(str): Key to search for in database. First try using as a player tag. If no results, then try as a player name.
+
+    Returns:
+        dict: Dict of user's info.
+            {
+                player_tag: str,
+                player_name: str,
+                discord_name: str,
+                clan_role: str,
+                clan_name: str,
+                clan_tag: str,
+                vacation: bool,
+                strikes: int,
+                usage_history: int,
+                status: str
+            }
+    """
     db, cursor = connect_to_db()
 
     user_data = {}
-    cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT * FROM users WHERE player_tag = %s", (search_key))
     query_result = cursor.fetchone()
 
     if query_result == None:
-        db.close()
-        return None
+        cursor.execute("SELECT * FROM users WHERE player_name = %s", (search_key))
+        query_result = cursor.fetchall()
 
-    user_data["player_name"] = player_name
+        if len(query_result) > 1:
+            db.close()
+            return None
+        else:
+            query_result = query_result[0]
+
+    user_data["player_name"] = query_result["player_name"]
     user_data["player_tag"] = query_result["player_tag"]
     user_data["discord_name"] = query_result["discord_name"]
     user_data["clan_role"] = query_result["clan_role"]
@@ -272,18 +302,28 @@ def give_strike(player_tag: str) -> int:
 
     return strike_count
 
-def get_strikes(player_name: str) -> int:
+
+def get_strikes(discord_id: int) -> int:
+    """
+    Get the current number of strikes a user has.
+
+    Args:
+        discord_id(int): Unique Discord id of a member.
+
+    Returns:
+        int: Number of strikes the specified user currently has.
+    """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT strikes FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT strikes FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
+
+    db.close()
 
     if query_result == None:
         return None
 
-    strikes = query_result["strikes"]
-    db.close()
-    return strikes
+    return query_result["strikes"]
 
 def reset_strikes():
     db, cursor = connect_to_db()
@@ -292,33 +332,39 @@ def reset_strikes():
     db.commit()
     db.close()
 
-# (previous_strike_count, new_strike_count)
-def set_strikes(player_name: str, strike_count: int) -> tuple:
+
+def set_strikes(search_key: str, strike_count: int) -> tuple:
+    """
+    Set a user's strike count to a specified number.
+
+    Args:
+        search_key(str): Key to search for in database. First try using as a player tag. If no results, then try as a player name.
+        strike_count(int): Number of strikes to set.
+
+    Returns:
+        int: Previous strike count of specified user.
+    """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT strikes FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT player_tag, strikes FROM users WHERE player_tag = %s", (search_key))
     query_result = cursor.fetchone()
 
     if query_result == None:
-        db.close()
-        return None
+        cursor.execute("SELECT player_tag, strikes FROM users WHERE player_name = %s", (search_key))
+        query_result = cursor.fetchall()
+        
+        if len(query_result) > 1:
+            db.close()
+            return None
+        else:
+            query_result = query_result[0]
 
-    previous_strike_count = query_result["strikes"]
-
-    cursor.execute("UPDATE users SET strikes = %s WHERE player_name = %s", (strike_count, player_name))
-    cursor.execute("SELECT strikes FROM users WHERE player_name = %s", (player_name))
-    query_result = cursor.fetchone()
-
-    if (query_result == None):
-        db.close()
-        return None
-
-    new_strike_count = query_result["strikes"]
+    cursor.execute("UPDATE users SET strikes = %s WHERE player_tag = %s", (strike_count, query_result["player_tag"]))
 
     db.commit()
     db.close()
 
-    return (previous_strike_count, new_strike_count)
+    return query_result["strikes"]
 
 
 # [(player_name, strikes),]
@@ -354,17 +400,23 @@ def race_completed_saturday() -> bool:
     cursor.execute("SELECT completed_saturday FROM race_status")
     query_result = cursor.fetchone()
 
-    if query_result == None:
-        return None
-
     db.close()
     return query_result["completed_saturday"]
 
 
-def get_player_tag(player_name: str) -> str:
+def get_player_tag(discord_id: int) -> str:
+    """
+    Return the player tag corresponding to a Discord member.
+
+    Args:
+        discord_id(int): Unique Discord id of a member.
+
+    Returns:
+        str: Specified member's player tag.
+    """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_tag FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT player_tag FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
     if (query_result == None):
@@ -377,12 +429,17 @@ def get_player_tag(player_name: str) -> str:
     return player_tag
 
 
-# Remove user from DB along with any roles assigned to them.
-def remove_user(player_name: str):
+def remove_user(discord_id: int):
+    """
+    Remove a user's assigned roles and change their status to either UNREGISTERED or DEPARTED.
+
+    Args:
+        discord_id(int): Unique Discord id of a member.
+    """
     db, cursor = connect_to_db()
 
-    # Get user_id from player_name.
-    cursor.execute("SELECT id FROM users WHERE player_name = %s", (player_name))
+    # Get id and player_tag of user.
+    cursor.execute("SELECT id, player_tag FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
     if (query_result == None):
@@ -390,11 +447,14 @@ def remove_user(player_name: str):
         return
 
     user_id = query_result["id"]
+    player_tag = query_result["player_tag"]
 
+    # Delete any assigned Discord roles associated with the user.
     cursor.execute("DELETE FROM assigned_roles WHERE user_id = %s", (user_id))
     active_members = clash_utils.get_active_members_in_clan()
-    player_tag = get_player_tag(player_name)
 
+    # If the user is still an active member of the primary clan, change their status to UNREGISTERED.
+    # Otherwise change it to DEPARTED.
     if player_tag in active_members:
         cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED' WHERE id = %s",
                        (f"UNREGISTERED{player_tag}", user_id))
@@ -418,21 +478,31 @@ def remove_all_users():
     db.close()
 
 
-# Set user to opposite of their current vacation status. Return new status.
-def update_vacation_for_user(player_name: str, status=None) -> bool:
+def update_vacation_for_user(discord_id: int, status: bool=None) -> bool:
+    """
+    Toggle a user's vacation status.
+
+    Args:
+        discord_id(int): Unique Discord id of a member.
+        status(bool): What to set specified user's vacation status to. If None, set status to opposite of current status.
+
+    Returns:
+        bool: The specified user's updated vacation status.
+    """
     db, cursor = connect_to_db()
 
     if (type(status) == bool):
-        update_vacation_query = "UPDATE users SET vacation = %s WHERE player_name = %s"
-        cursor.execute(update_vacation_query, (status, player_name))
+        update_vacation_query = "UPDATE users SET vacation = %s WHERE discord_id = %s"
+        cursor.execute(update_vacation_query, (status, discord_id))
     else:
-        update_vacation_query = "UPDATE users SET vacation = NOT vacation WHERE player_name = %s"
-        cursor.execute(update_vacation_query, (player_name))
+        update_vacation_query = "UPDATE users SET vacation = NOT vacation WHERE discord_id = %s"
+        cursor.execute(update_vacation_query, (discord_id))
 
-    cursor.execute("SELECT * FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT vacation FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
     if (query_result == None):
+        db.close()
         return False
 
     db.commit()
@@ -516,12 +586,21 @@ def get_strike_status() -> bool:
     db.close()
     return status
 
-# Return a list of discord role_names corresponding to a user.
-def get_roles(player_name: str) -> list:
+
+def get_roles(discord_id: int) -> list:
+    """
+    Get the list of roles currently assigned to a user.
+
+    Args:
+        discord_id(int): Unique Discord id of a member.
+
+    Returns:
+        list[str]: List of role names assigned to the specified user.
+    """
     db, cursor = connect_to_db()
 
     # Get user_id.
-    cursor.execute("SELECT id FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT id FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
     if (query_result == None):
@@ -558,12 +637,18 @@ def get_roles(player_name: str) -> list:
     return roles
 
 
-# Get current normal roles possesed by user.
-def commit_roles(player_name: str, roles: list):
+def commit_roles(discord_id: int, roles: list):
+    """
+    Delete the roles currently assigned to a user. Then record their new roles.
+
+    Args:
+        discord_id(int): Unique Discord id of a member.
+        roles(list): List of new roles to assign to user.
+    """
     db, cursor = connect_to_db()
 
     # Get user_id from player_name.
-    cursor.execute("SELECT id FROM users WHERE player_name = %s", (player_name))
+    cursor.execute("SELECT id FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
     if (query_result == None):
@@ -589,11 +674,17 @@ def commit_roles(player_name: str, roles: list):
     db.close()
 
 
-# True = US, False = EU
-def update_time_zone(player_name: str, US_time: bool):
+def update_time_zone(discord_id: int, US_time: bool):
+    """
+    Change a user's preferred time for receiving automated reminders.
+
+    Args:
+        discord_id(int): Unique Discord id of a member.
+        US_time(bool): Whether user should receive automated reminders on US time (True) or EU time (False).
+    """
     db, cursor = connect_to_db()
 
-    cursor.execute("UPDATE users SET US_time = %s WHERE player_name = %s", (US_time, player_name))
+    cursor.execute("UPDATE users SET US_time = %s WHERE discord_id = %s", (US_time, discord_id))
 
     db.commit()
     db.close()
@@ -684,33 +775,34 @@ def clean_up_db():
     db, cursor = connect_to_db()
 
     active_members = clash_utils.get_active_members_in_clan()
-    cursor.execute("SELECT player_name, player_tag, discord_name, status FROM users")
+    cursor.execute("SELECT player_name, player_tag, discord_name, discord_id, status FROM users")
     query_result = cursor.fetchall()
 
     for user in query_result:
         player_name = user["player_name"]
         player_tag = user["player_tag"]
         discord_name = user["discord_name"]
+        discord_id = user["discord_id"]
         status = user["status"]
 
         if player_tag in active_members:
             if status == 'INACTIVE':
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
-                update_user(clash_data, player_name)
+                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
+                update_user(clash_data)
             elif status == 'DEPARTED':
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
-                update_user(clash_data, player_name)
+                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
+                update_user(clash_data)
                 cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED' WHERE player_tag = %s",
                                (f"UNREGISTERED{player_tag}", player_tag))
         else:
             if status == 'UNREGISTERED':
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
-                update_user(clash_data, player_name)
+                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
+                update_user(clash_data)
                 cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED' WHERE player_tag = %s",
                                (f"DEPARTED{player_tag}", player_tag))
             elif status == 'ACTIVE':
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
-                update_user(clash_data, player_name)
+                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
+                update_user(clash_data)
 
     db.commit()
     db.close()
@@ -793,12 +885,12 @@ def prepare_match_history(last_battle_time: datetime.datetime):
     db.commit()
     db.close()
 
-def get_match_performance_dict(player_name: str) -> dict:
+def get_match_performance_dict(player_tag: str) -> dict:
     """
     Get a dict containing a specified user's match performance.
 
     Args:
-        player_name(str): Player name to get stats for.
+        player_tag(str): Player tag to get stats for.
 
     Returns:
         dict {str: dict{str: int/float}}: dict containing specified player's stats.
@@ -850,9 +942,14 @@ def get_match_performance_dict(player_name: str) -> dict:
     db, cursor = connect_to_db()
 
     cursor.execute("SELECT battle_wins, battle_losses, special_battle_wins, special_battle_losses, boat_attack_wins, boat_attack_losses, duel_match_wins, duel_match_losses, duel_series_wins, duel_series_losses\
-                    FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_name = %s)", (player_name))
+                    FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
 
     match_performance = cursor.fetchone()
+
+    if match_performance == None:
+        db.close()
+        return None
+
     match_performance_dict = {}
 
     # Regular battles
@@ -949,12 +1046,10 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
 
     # Get clan info.
     clans = None
-    primary_clan_id = None
 
     if primary_clan_only:
         cursor.execute("SELECT * FROM clans WHERE clan_tag = %s", (PRIMARY_CLAN_TAG))
         clans = cursor.fetchall()
-        primary_clan_id = clans[0]["id"]
     else:
         cursor.execute("SELECT * FROM clans")
         clans = cursor.fetchall()
@@ -969,7 +1064,7 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
 
     # Get users.
     if primary_clan_only:
-        cursor.execute("SELECT * FROM users WHERE clan_id = %s", (primary_clan_id))
+        cursor.execute("SELECT * FROM users WHERE status = 'ACTIVE' OR status = 'UNREGISTERED'")
     else:
         cursor.execute("SELECT * FROM users")
 
@@ -986,6 +1081,7 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
 
         # Remove keys that aren't relevant outside the database.
         fields_list.remove("id")
+        fields_list.remove("discord_id")
         fields_list.remove("clan_id")
         fields_list.remove("usage_history")
 
@@ -1018,7 +1114,7 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
         match_performance_dict = {}
 
         if include_match_performance_history:
-            match_performance_dict = {user["player_name"]: get_match_performance_dict(user["player_name"]) for user in users}
+            match_performance_dict = {user["player_tag"]: get_match_performance_dict(user["player_tag"]) for user in users}
 
             fields_list.extend(["Regular PvP Wins", "Regular PvP Losses", "Regular PvP Win Rate",
                                 "Special PvP Wins", "Special PvP Losses", "Special PvP Win Rate",
@@ -1035,6 +1131,7 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
         # Iterate through users to log info in CSV.
         for user in users:
             user.pop("id")
+            user.pop("discord_id")
             clan_id = user.pop("clan_id")
             usage_history = user.pop("usage_history")
 
@@ -1059,24 +1156,24 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
                 user[now_field_name] = usage_today
 
             if include_match_performance_history:
-                user["Regular PvP Wins"] = match_performance_dict[user["Player Name"]]["regular"]["wins"]
-                user["Regular PvP Losses"] = match_performance_dict[user["Player Name"]]["regular"]["losses"]
-                user["Regular PvP Win Rate"] = float(match_performance_dict[user["Player Name"]]["regular"]["win_rate"][:-1]) / 100
-                user["Special PvP Wins"] = match_performance_dict[user["Player Name"]]["special"]["wins"]
-                user["Special PvP Losses"] = match_performance_dict[user["Player Name"]]["special"]["losses"]
-                user["Special PvP Win Rate"] = float(match_performance_dict[user["Player Name"]]["special"]["win_rate"][:-1]) / 100
-                user["Duel Match Wins"] = match_performance_dict[user["Player Name"]]["duel_matches"]["wins"]
-                user["Duel Match Losses"] = match_performance_dict[user["Player Name"]]["duel_matches"]["losses"]
-                user["Duel Match Win Rate"] = float(match_performance_dict[user["Player Name"]]["duel_matches"]["win_rate"][:-1]) / 100
-                user["Duel Series Wins"] = match_performance_dict[user["Player Name"]]["duel_series"]["wins"]
-                user["Duel Series Losses"] = match_performance_dict[user["Player Name"]]["duel_series"]["losses"]
-                user["Duel Series Win Rate"] = float(match_performance_dict[user["Player Name"]]["duel_series"]["win_rate"][:-1]) / 100
-                user["Combined PvP Wins"] = match_performance_dict[user["Player Name"]]["combined_pvp"]["wins"]
-                user["Combined PvP Losses"] = match_performance_dict[user["Player Name"]]["combined_pvp"]["losses"]
-                user["Combined PvP Win Rate"] = float(match_performance_dict[user["Player Name"]]["combined_pvp"]["win_rate"][:-1]) / 100
-                user["Boat Attack Wins"] = match_performance_dict[user["Player Name"]]["boat_attacks"]["wins"]
-                user["Boat Attack Losses"] = match_performance_dict[user["Player Name"]]["boat_attacks"]["losses"]
-                user["Boat Attack Win Rate"] = float(match_performance_dict[user["Player Name"]]["boat_attacks"]["win_rate"][:-1]) / 100
+                user["Regular PvP Wins"] = match_performance_dict[user["Player Tag"]]["regular"]["wins"]
+                user["Regular PvP Losses"] = match_performance_dict[user["Player Tag"]]["regular"]["losses"]
+                user["Regular PvP Win Rate"] = float(match_performance_dict[user["Player Tag"]]["regular"]["win_rate"][:-1]) / 100
+                user["Special PvP Wins"] = match_performance_dict[user["Player Tag"]]["special"]["wins"]
+                user["Special PvP Losses"] = match_performance_dict[user["Player Tag"]]["special"]["losses"]
+                user["Special PvP Win Rate"] = float(match_performance_dict[user["Player Tag"]]["special"]["win_rate"][:-1]) / 100
+                user["Duel Match Wins"] = match_performance_dict[user["Player Tag"]]["duel_matches"]["wins"]
+                user["Duel Match Losses"] = match_performance_dict[user["Player Tag"]]["duel_matches"]["losses"]
+                user["Duel Match Win Rate"] = float(match_performance_dict[user["Player Tag"]]["duel_matches"]["win_rate"][:-1]) / 100
+                user["Duel Series Wins"] = match_performance_dict[user["Player Tag"]]["duel_series"]["wins"]
+                user["Duel Series Losses"] = match_performance_dict[user["Player Tag"]]["duel_series"]["losses"]
+                user["Duel Series Win Rate"] = float(match_performance_dict[user["Player Tag"]]["duel_series"]["win_rate"][:-1]) / 100
+                user["Combined PvP Wins"] = match_performance_dict[user["Player Tag"]]["combined_pvp"]["wins"]
+                user["Combined PvP Losses"] = match_performance_dict[user["Player Tag"]]["combined_pvp"]["losses"]
+                user["Combined PvP Win Rate"] = float(match_performance_dict[user["Player Tag"]]["combined_pvp"]["win_rate"][:-1]) / 100
+                user["Boat Attack Wins"] = match_performance_dict[user["Player Tag"]]["boat_attacks"]["wins"]
+                user["Boat Attack Losses"] = match_performance_dict[user["Player Tag"]]["boat_attacks"]["losses"]
+                user["Boat Attack Win Rate"] = float(match_performance_dict[user["Player Tag"]]["boat_attacks"]["win_rate"][:-1]) / 100
 
             writer.writerow(user)
 

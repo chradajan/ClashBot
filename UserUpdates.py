@@ -21,7 +21,7 @@ class UserUpdates(commands.Cog):
         await member.remove_roles(*roles_to_remove)
         await member.add_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
 
-        db_utils.remove_user(member.display_name)
+        db_utils.remove_user(member.id)
 
     """
     Command: !update_user {member} {player_tag}

@@ -54,6 +54,11 @@ def channel_check(CHANNEL_NAME):
         return ctx.message.channel.name == CHANNEL_NAME
     return commands.check(predicate)
 
+def not_welcome_or_rules_check():
+    async def predicate(ctx):
+        return (ctx.message.channel.name != NEW_CHANNEL) and (ctx.message.channel.name != RULES_CHANNEL)
+    return commands.check(predicate)
+
 
 ###########################################
 #                                         #
@@ -138,18 +143,18 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
         return False
 
     if player_tag == None:
-        player_tag = db_utils.get_player_tag(member.display_name)
+        player_tag = db_utils.get_player_tag(member.id)
 
     if player_tag == None:
         return False
 
     discord_name = member.name + "#" + member.discriminator
-    clash_data = clash_utils.get_clash_user_data(player_tag, discord_name)
+    clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, member.id)
 
     if clash_data == None:
         return False
 
-    member_status = db_utils.update_user(clash_data, member.display_name)
+    member_status = db_utils.update_user(clash_data)
 
     if not await is_admin(member):
         if clash_data["player_name"] != member.display_name:
@@ -235,17 +240,18 @@ def datetime_to_battletime(time: datetime.datetime) -> str:
     return f"{time.year}{time.month:02}{time.day:02}T{time.hour:02}{time.minute:02}{time.second:02}.000Z"
 
 
-def create_match_performance_embed(player_name: str) -> discord.Embed:
+def create_match_performance_embed(player_name: str, player_tag: str) -> discord.Embed:
     """
     Create a Discord Embed object displaying a user's River Race stats.
 
     Args:
-        player_name(str): Player to display stats of.
+        player_name(str): Player name of player to display stats of.
+        player_tag(str): Player tag of player to display stats of.
 
     Returns:
         discord.Embed: Sendable embed containing the specified user's stats.
     """
-    history = db_utils.get_match_performance_dict(player_name)
+    history = db_utils.get_match_performance_dict(player_tag)
     embed = discord.Embed(title=f"{player_name}'s River Race Stats")
 
     embed.add_field(name="Regular PvP", value = f"``` Wins:   {history['regular']['wins']} \n Losses: {history['regular']['losses']} \n Total:  {history['regular']['total']} \n Win rate: {history['regular']['win_rate']} ```")

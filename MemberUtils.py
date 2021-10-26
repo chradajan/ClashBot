@@ -19,6 +19,7 @@ class MemberUtils(commands.Cog):
     Show a list of clans in the current river race and how many decks they have remaining today.
     """
     @commands.command()
+    @bot_utils.not_welcome_or_rules_check()
     async def river_race_status(self, ctx):
         """Send a list of clans in the current river race and their number of decks remaining today."""
         clans = clash_utils.get_clan_decks_remaining()
@@ -36,8 +37,9 @@ class MemberUtils(commands.Cog):
 
     @river_race_status.error
     async def river_race_status_error(self, ctx, error):
-        await ctx.send("Something went wrong. Command should be formatted as:  !river_race_status")
-        raise error
+        if not isinstance(error, commands.errors.CheckFailure):
+            await ctx.send("Something went wrong. Command should be formatted as:  !river_race_status")
+            raise error
 
 
     """
@@ -46,6 +48,7 @@ class MemberUtils(commands.Cog):
     Allow individual users to set their reminder time to US or EU.
     """
     @commands.command()
+    @bot_utils.not_welcome_or_rules_check()
     async def set_reminder_time(self, ctx, reminder_time: str):
         """Set reminder time to either US or EU. US reminders go out at 01:00 UTC. EU reminders go out at 17:00 UTC."""
         time_zone = None
@@ -57,13 +60,15 @@ class MemberUtils(commands.Cog):
             await ctx.send("Invalid time zone. Valid reminder times are US or EU")
             return
 
-        db_utils.update_time_zone(ctx.author.display_name, time_zone)
+        db_utils.update_time_zone(ctx.author.id, time_zone)
         await ctx.send("Your reminder time preference has been updated.")
 
     @set_reminder_time.error
     async def set_reminder_time_error(self, ctx, error):
         if isinstance(error, commands.errors.MissingRequiredArgument):
             await ctx.send("You need to specify a reminder time. Valid reminder times are US or EU")
+        elif isinstance(error, commands.errors.CheckFailure):
+            return
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !set_reminder_time <reminder_time>")
             raise error
@@ -78,7 +83,7 @@ class MemberUtils(commands.Cog):
     @bot_utils.channel_check(TIME_OFF_CHANNEL)
     async def vacation(self, ctx):
         """Toggles vacation status."""
-        vacation_status = db_utils.update_vacation_for_user(ctx.author.display_name)
+        vacation_status = db_utils.update_vacation_for_user(ctx.author.id)
         vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
         await ctx.send(f"New vacation status for {ctx.author.mention}: {vacation_status_string}.")
 
@@ -98,6 +103,7 @@ class MemberUtils(commands.Cog):
     Update a user in the database.
     """
     @commands.command()
+    @bot_utils.not_welcome_or_rules_check()
     async def update(self, ctx):
         """Update your player name, clan role/affiliation, Discord server role, and Discord nickname."""
         if not await bot_utils.update_member(ctx.author):
@@ -111,8 +117,9 @@ class MemberUtils(commands.Cog):
 
     @update.error
     async def update_error(self, ctx, error):
-        await ctx.send("Something went wrong. You should have gone through the new user and check rules channels before using this command. Command should be formatted as:  !update")
-        raise error
+        if not isinstance(error, commands.errors.CheckFailure):
+            await ctx.send("Something went wrong. You should have gone through the new user and check rules channels before using this command. Command should be formatted as:  !update")
+            raise error
 
     
     """
@@ -121,9 +128,10 @@ class MemberUtils(commands.Cog):
     Show a user how many strikes they currently have.
     """
     @commands.command()
+    @bot_utils.not_welcome_or_rules_check()
     async def strikes(self, ctx):
         """Get your current strike count."""
-        strikes = db_utils.get_strikes(ctx.author.display_name)
+        strikes = db_utils.get_strikes(ctx.author.id)
         message = ""
 
         if strikes == None:
@@ -135,8 +143,9 @@ class MemberUtils(commands.Cog):
 
     @strikes.error
     async def strikes_error(self, ctx, error):
-        await ctx.send("Something went wrong. Command should be formatted as:  !strikes")
-        raise error
+        if not isinstance(error, commands.errors.CheckFailure):
+            await ctx.send("Something went wrong. Command should be formatted as:  !strikes")
+            raise error
 
     
     """
@@ -145,12 +154,15 @@ class MemberUtils(commands.Cog):
     Show a user their river race stats.
     """
     @commands.command()
+    @bot_utils.not_welcome_or_rules_check()
     async def stats(self, ctx):
         """Get your river race performance stats."""
-        embed = bot_utils.create_match_performance_embed(ctx.author.display_name)
+        player_tag = db_utils.get_player_tag(ctx.author.id)
+        embed = bot_utils.create_match_performance_embed(ctx.author.display_name, player_tag)
         await ctx.send(embed=embed)
 
     @stats.error
     async def stats_error(self, ctx, error):
-        await ctx.send("Something went wrong. Command should be formatted as:  !stats")
-        raise error
+        if not isinstance(error, commands.errors.CheckFailure):
+            await ctx.send("Something went wrong. Command should be formatted as:  !stats")
+            raise error

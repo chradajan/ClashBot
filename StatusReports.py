@@ -132,8 +132,8 @@ class StatusReports(commands.Cog):
         general_info_table = PrettyTable()
 
         general_info_table.add_row(["Player Name", user_data["player_name"]])
-        general_info_table.add_row(["Strikes", user_data["strikes"]])
         general_info_table.add_row(["Player Tag", user_data["player_tag"]])
+        general_info_table.add_row(["Strikes", user_data["strikes"]])
         general_info_table.add_row(["Discord Name", user_data["discord_name"]])
         general_info_table.add_row(["Clan Name", user_data["clan_name"]])
         general_info_table.add_row(["Clan Tag", user_data["clan_tag"]])
@@ -171,8 +171,9 @@ class StatusReports(commands.Cog):
             await ctx.send(f"{user_data['player_name']} has used {decks_used_today} decks today." + "\n\n" +\
                             f"{user_data['player_name']}'s deck usage history" + "\n" + "```\n" + deck_usage_history_table.get_string() + "```")
 
-        match_performance_embed = bot_utils.create_match_performance_embed(user_data["player_name"])
+        match_performance_embed = bot_utils.create_match_performance_embed(user_data["player_name"], user_data["player_tag"])
         await ctx.send(embed=match_performance_embed)
+
 
     """
     Command: !player_report {general_info} {deck_usage_history}
@@ -184,7 +185,13 @@ class StatusReports(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def player_report(self, ctx, member: discord.Member):
         """Get information about a member."""
-        user_data = db_utils.get_user_data(member.display_name)
+        player_tag = db_utils.get_player_tag(member.id)
+
+        if player_tag == None:
+            await ctx.send(f"{member.display_name} is a member of this Discord server but they were not found in the database. Make sure their nickname matches their in-game player name.")
+            return
+
+        user_data = db_utils.get_user_data(player_tag)
 
         if user_data == None:
             await ctx.send(f"{member.display_name} is a member of this Discord server but they were not found in the database. Make sure their nickname matches their in-game player name.")
@@ -202,7 +209,7 @@ class StatusReports(commands.Cog):
             if user_data != None:
                 await self.player_report_helper(ctx, user_data)
             else:
-                await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
+                await ctx.send("Member not found. This could be because there a multiple UNREGISTERED users with identical player_names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !player_report <general_info (optional)> <deck_usage_info (optional)>")
             raise error

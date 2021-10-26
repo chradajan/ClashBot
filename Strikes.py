@@ -20,17 +20,21 @@ class Strikes(commands.Cog):
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def set_strike_count(self, ctx, member: discord.Member, strikes: int):
-        """Set specified user's strike count to specified value."""
-        update_tuple = db_utils.set_strikes(member.display_name, strikes)
+        """Set user's strike count to specified value."""
+        player_tag = db_utils.get_player_tag(member.id)
 
-        if update_tuple == None:
-            await ctx.send("Player not found in database. No strike adjustments have been made.")
+        if player_tag == None:
+            await ctx.send("Player not found in database. No changes have been made.")
             return
 
-        previous_strike_count, new_strike_count = update_tuple
+        prev_strike_count = db_utils.set_strikes(player_tag, strikes)
+
+        if prev_strike_count == None:
+            await ctx.send("Player not found in database. No changes have been made.")
+            return
 
         channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
-        await channel.send(f"Strikes updated for {member.mention}.  {previous_strike_count} -> {new_strike_count}")
+        await channel.send(f"Strikes updated for {member.mention}.  {prev_strike_count} -> {strikes}")
 
     @set_strike_count.error
     async def set_strike_count_error(self, ctx, error):
@@ -38,7 +42,7 @@ class Strikes(commands.Cog):
             await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         elif isinstance(error, commands.errors.CheckFailure):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!set_stike_count command can only be sent in {channel.mention} by Leaders/Admins.")
+            await ctx.send(f"!set_strike_count command can only be sent in {channel.mention} by Leaders/Admins.")
         elif isinstance(error,commands.errors.BadArgument):
             await ctx.send("Invalid strikes value. Strikes must be an integer value.")
         elif isinstance(error, commands.errors.MissingRequiredArgument):
@@ -63,7 +67,7 @@ class Strikes(commands.Cog):
         members_message = ""
 
         for member in members:
-            new_strike_count = db_utils.give_strike(db_utils.get_player_tag(member.display_name))
+            new_strike_count = db_utils.give_strike(db_utils.get_player_tag(member.id))
             if new_strike_count == 0:
                 continue
 

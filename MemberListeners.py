@@ -21,7 +21,7 @@ class MemberListeners(commands.Cog):
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
         """Remove user from database when they leave server."""
-        db_utils.remove_user(member.display_name)
+        db_utils.remove_user(member.id)
 
 
     @commands.Cog.listener()
@@ -37,7 +37,7 @@ class MemberListeners(commands.Cog):
                 await message.channel.send(content="You sent False Logic's clan tag. Please send your player tag instead.", delete_after=5)
             else:
                 discord_name = message.author.name + "#" + message.author.discriminator
-                clash_data = clash_utils.get_clash_user_data(message.content, discord_name)
+                clash_data = clash_utils.get_clash_user_data(message.content, discord_name, message.author.id)
                 if clash_data != None:
                     if db_utils.add_new_user(clash_data):
                         if not await bot_utils.is_admin(message.author):
@@ -77,7 +77,7 @@ class MemberListeners(commands.Cog):
             await member.remove_roles(bot_utils.NORMAL_ROLES[VISITOR_ROLE_NAME])
             return
 
-        db_roles = db_utils.get_roles(member.display_name)
+        db_roles = db_utils.get_roles(member.id)
         saved_roles = []
         for role in db_roles:
             saved_roles.append(bot_utils.NORMAL_ROLES[role])

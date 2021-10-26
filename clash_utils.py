@@ -44,20 +44,22 @@ def parse_player_tag(message: str) -> str:
     return None
 
 
-def get_clash_user_data(message: str, discord_name: str) -> dict:
+def get_clash_user_data(message: str, discord_name: str, discord_id: int) -> dict:
     """
     Get a user's relevant Clash Royale information.
 
     Args:
         message(str): Message that should contain a valid player tag.
         discord_name(str): The user's discord name in the format name#discriminator.
+        discord_id(int): Unique Discord id of a member.
 
     Returns:
-        dict{str:str}: A dictionary of relevant Clash Royale information, or None if an error occurs.
+        dict: A dictionary of relevant Clash Royale information, or None if an error occurs.
             {
                 "player_tag": str,
                 "player_name": str,
                 "discord_name": str,
+                "discord_id": int,
                 "clan_role": str,
                 "clan_name": str,
                 "clan_tag": str
@@ -80,6 +82,7 @@ def get_clash_user_data(message: str, discord_name: str) -> dict:
         "player_tag": player_tag,
         "player_name": json_obj["name"],
         "discord_name": discord_name,
+        "discord_id": discord_id
     }
 
     if "clan" in json_obj.keys():
@@ -413,6 +416,9 @@ def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
                     player_dict["special_battle_losses"] += 1
 
         elif battle["type"] == "boatBattle":
+            if battle["boatBattleSide"] == "defender":
+                continue
+
             if battle["boatBattleWon"]:
                 player_dict["boat_attack_wins"] += 1
             else:

@@ -22,7 +22,7 @@ class Vacation(commands.Cog):
     async def set_vacation(self, ctx, member: discord.Member, status: bool):
         """Set vacation status for the specified member."""
         channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
-        vacation_status = db_utils.update_vacation_for_user(member.display_name, status)
+        vacation_status = db_utils.update_vacation_for_user(member.id, status)
         vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
         await channel.send(f"Updated vacation status of {member.mention} to: {vacation_status_string}.")
 

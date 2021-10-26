@@ -60,7 +60,7 @@ class LeaderUtils(commands.Cog):
         for member in members:
             # Get a list of normal roles (Visitor, Member, Elder, or Leader) that a member current has. These will be restored after reacting to rules message.
             roles_to_commit = [ role.name for role in list(set(bot_utils.NORMAL_ROLES.values()).intersection(set(member.roles))) ]
-            db_utils.commit_roles(member.display_name, roles_to_commit)
+            db_utils.commit_roles(member.id, roles_to_commit)
             await member.remove_roles(*roles_to_remove)
             await member.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
 
