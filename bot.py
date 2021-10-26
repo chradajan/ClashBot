@@ -190,7 +190,7 @@ async def determine_reset_time():
     usage_list = clash_utils.get_deck_usage_today()
     current_sum = 0
 
-    for _, decks_used in usage_list:
+    for decks_used in usage_list.values():
         current_sum += decks_used
 
     if current_sum < prev_deck_usage_sum:

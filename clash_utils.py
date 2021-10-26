@@ -124,7 +124,7 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     return participants
 
 
-def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
+def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
     """
     Get a list of players in a clan and how many decks each player used today.
 
