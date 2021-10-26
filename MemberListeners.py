@@ -32,9 +32,9 @@ class MemberListeners(commands.Cog):
 
         if message.channel.name == NEW_CHANNEL:
             if not message.content.startswith("#"):
-                await message.channel.send(content="You forgot to include the # symbol at the start of your player tag. Try again with that included.", delete_after=5)
+                await message.channel.send(content="You forgot to include the # symbol at the start of your player tag. Try again with that included.", delete_after=10)
             elif message.content == PRIMARY_CLAN_TAG:
-                await message.channel.send(content="You sent False Logic's clan tag. Please send your player tag instead.", delete_after=5)
+                await message.channel.send(content="You sent False Logic's clan tag. Please send your player tag instead.", delete_after=10)
             else:
                 discord_name = message.author.name + "#" + message.author.discriminator
                 clash_data = clash_utils.get_clash_user_data(message.content, discord_name, message.author.id)
@@ -44,6 +44,8 @@ class MemberListeners(commands.Cog):
                             await message.author.edit(nick=clash_data["player_name"])
                         await message.author.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
                         await message.author.remove_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
+                    else:
+                        await message.channel.send(content="A player affiliated with that player tag already exists on the server. Please enter an unused player tag.", delete_after=10)
                 else:
                     await message.channel.send(content="Something went wrong getting your Clash Royale information. Please try again with your player tag. If this issue persists, message a leader for help.", delete_after=5)
 

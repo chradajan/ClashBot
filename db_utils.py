@@ -70,12 +70,20 @@ def add_new_user(clash_data: dict) -> bool:
     # Set their proper status
     clash_data["status"] = "ACTIVE" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "INACTIVE"
 
+    # Check if the user has previously joined the server with a different player tag.
+    # If they have, set their previous associated account's discord_id to NULL and create a new entry.
+    cursor.execute("SELECT * FROM users WHERE discord_id = %(discord_id)s", clash_data)
+    query_result = cursor.fetchone()
+
+    if query_result != None:
+        cursor.execute("UPDATE users SET discord_id = NULL WHERE discord_id = %(discord_id)s", clash_data)
+
     # Check if player already exists in table.
     cursor.execute("SELECT * FROM users WHERE player_tag = %(player_tag)s", clash_data)
     query_result = cursor.fetchone()
 
     if query_result != None:
-        if query_result["status"] == 'ACTIVE':
+        if (query_result["status"] == 'ACTIVE') or (query_result["status"] == 'INACTIVE'):
             db.rollback()
             db.close()
             return False
