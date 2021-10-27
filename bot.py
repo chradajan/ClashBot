@@ -240,7 +240,6 @@ async def night_match_performance_tracker():
     """
     Calculate match performance every hour between 10:00-23:00 Thursday-Sunday.
     """
-    db_utils.clean_up_db()
     clash_utils.calculate_match_performance()
 
 
@@ -249,7 +248,6 @@ async def morning_match_performance_tracker():
     """
     Calculate match performance every hour between 00:00-09:00 Friday-Monday.
     """
-    db_utils.clean_up_db()
     clash_utils.calculate_match_performance()
 
 

@@ -191,7 +191,8 @@ def update_user(clash_data: dict) -> str:
                 "discord_id": int,
                 "clan_role": str,
                 "clan_name": str,
-                "clan_tag": str
+                "clan_tag": str,
+                "status": str (optional)
             }
     """
     db, cursor = connect_to_db()
@@ -207,7 +208,9 @@ def update_user(clash_data: dict) -> str:
         query_result = cursor.fetchone()
 
     clash_data["clan_id"] = query_result["id"]
-    clash_data["status"] = "ACTIVE" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "INACTIVE"
+
+    if clash_data.get("status") == None:
+        clash_data["status"] = "ACTIVE" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "INACTIVE"
 
     update_query = "UPDATE users SET player_tag = %(player_tag)s,\
                     player_name = %(player_name)s,\
@@ -787,29 +790,32 @@ def clean_up_db():
     query_result = cursor.fetchall()
 
     for user in query_result:
-        player_name = user["player_name"]
         player_tag = user["player_tag"]
         discord_name = user["discord_name"]
         discord_id = user["discord_id"]
         status = user["status"]
 
         if player_tag in active_members:
-            if status == 'INACTIVE':
+            if status in ('INACTIVE', 'DEPARTED'):
                 clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
+                if clash_data == None:
+                    continue
+
+                if status == 'DEPARTED':
+                    clash_data["discord_name"] = f"UNREGISTERED{player_tag}"
+                    clash_data["status"] = 'UNREGISTERED'
+
                 update_user(clash_data)
-            elif status == 'DEPARTED':
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
-                update_user(clash_data)
-                cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED' WHERE player_tag = %s",
-                               (f"UNREGISTERED{player_tag}", player_tag))
         else:
-            if status == 'UNREGISTERED':
+            if status in ('ACTIVE', 'UNREGISTERED'):
                 clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
-                update_user(clash_data)
-                cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED' WHERE player_tag = %s",
-                               (f"DEPARTED{player_tag}", player_tag))
-            elif status == 'ACTIVE':
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
+                if clash_data == None:
+                    continue
+
+                if status == 'UNREGISTERED':
+                    clash_data["discord_name"] = f"DEPARTED{player_tag}"
+                    clash_data["status"] = 'DEPARTED'
+
                 update_user(clash_data)
 
     db.commit()
