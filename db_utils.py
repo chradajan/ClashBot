@@ -841,7 +841,7 @@ def get_and_update_match_history_fame_and_battle_time(player_tag: str, fame: int
     if query_result == None:
         add_new_unregistered_user(player_tag)
         cursor.execute("SELECT last_battle_time, fame FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
-        query_result = cursor.fetchone()
+        query_result = {"fame": 0, "last_battle_time": bot_utils.datetime_to_battletime(datetime.datetime.now(datetime.timezone.utc))}
 
     fame_and_time = (query_result["fame"], bot_utils.battletime_to_datetime(query_result["last_battle_time"]))
 
