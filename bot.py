@@ -139,17 +139,20 @@ async def assign_strikes_and_clear_vacation():
     if db_utils.get_strike_status():
         vacation_list = db_utils.get_vacation_list()
         deck_usage_list = db_utils.get_all_user_deck_usage_history()
-        active_members = list(clash_utils.get_active_members_in_clan().values())
+        active_members = clash_utils.get_active_members_in_clan()
         strikes_string = ""
 
         for player_name, player_tag, deck_usage_history in deck_usage_list:
             should_receive_strike, decks_used_in_race = bot_utils.should_receive_strike(deck_usage_history, completed_saturday)
 
-            if (not should_receive_strike) or (player_name in vacation_list) or (player_name not in active_members):
+            if (not should_receive_strike) or (player_name in vacation_list) or (player_tag not in active_members):
                 continue
 
             member = discord.utils.get(strikes_channel.members, display_name=player_name)
             strikes = db_utils.give_strike(player_tag)
+
+            if strikes == 0:
+                continue
 
             if member != None:
                 strikes_string += f"{member.mention} - Decks used: {decks_used_in_race},  Strikes: {strikes - 1} -> {strikes}" + "\n"

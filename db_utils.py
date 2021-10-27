@@ -135,17 +135,23 @@ def add_new_user(clash_data: dict) -> bool:
     return True
 
 
-def add_new_unregistered_user(player_tag: str):
+def add_new_unregistered_user(player_tag: str) -> bool:
     """
     Add an unregistered player (active in clan but not Discord) to the database.
 
     Args:
         player_tag(str): Player tag of player to insert.
+
+    Returns:
+        bool: Whether the user was successfully added.
     """
     db, cursor = connect_to_db()
 
     # Get their data
     clash_data = clash_utils.get_clash_user_data(player_tag, player_tag, None)
+
+    if clash_data == None:
+        return False
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
@@ -176,6 +182,8 @@ def add_new_unregistered_user(player_tag: str):
 
     db.commit()
     db.close()
+
+    return True
 
 
 def update_user(clash_data: dict) -> str:
@@ -212,13 +220,25 @@ def update_user(clash_data: dict) -> str:
     if clash_data.get("status") == None:
         clash_data["status"] = "ACTIVE" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "INACTIVE"
 
-    update_query = "UPDATE users SET player_tag = %(player_tag)s,\
-                    player_name = %(player_name)s,\
-                    discord_name = %(discord_name)s,\
-                    clan_role = %(clan_role)s,\
-                    clan_id = %(clan_id)s,\
-                    status = %(status)s\
-                    WHERE discord_id = %(discord_id)s"
+    update_query = ""
+
+    if clash_data["discord_id"] == None:
+        update_query = "UPDATE users SET player_tag = %(player_tag)s,\
+                        player_name = %(player_name)s,\
+                        discord_name = %(discord_name)s,\
+                        clan_role = %(clan_role)s,\
+                        clan_id = %(clan_id)s,\
+                        status = %(status)s\
+                        WHERE player_tag = %(player_tag)s"
+    else:
+        update_query = "UPDATE users SET player_tag = %(player_tag)s,\
+                        player_name = %(player_name)s,\
+                        discord_name = %(discord_name)s,\
+                        clan_role = %(clan_role)s,\
+                        clan_id = %(clan_id)s,\
+                        status = %(status)s\
+                        WHERE discord_id = %(discord_id)s"
+
     cursor.execute(update_query, clash_data)
 
     db.commit()
@@ -290,8 +310,16 @@ def get_user_data(search_key: str) -> dict:
     return user_data
 
 
-# Add strike to user. Return new number of strikes.
 def give_strike(player_tag: str) -> int:
+    """
+    Give 1 strike to the specified player. Add them as an unregistered user if they don't exist in the database.
+
+    Args:
+        player_tag(str): Player to give strike to.
+
+    Returns:
+        int: Specified user's new strike count, or 0 if unregistered user could not be added.
+    """
     db, cursor = connect_to_db()
 
     strike_count = 0
@@ -300,7 +328,9 @@ def give_strike(player_tag: str) -> int:
 
     # Add unregistered user if they aren't in the users table.
     if query_result == None:
-        add_new_unregistered_user(player_tag)
+        if not add_new_unregistered_user(player_tag):
+            db.close()
+            return 0
         strike_count = 1
 
     cursor.execute("UPDATE users SET strikes = strikes + 1 WHERE player_tag = %s", (player_tag))
@@ -741,7 +771,8 @@ def record_deck_usage_today(deck_usage: dict):
         query_result = cursor.fetchone()
 
         if query_result == None:
-            add_new_unregistered_user(player_tag)
+            if not add_new_unregistered_user(player_tag):
+                continue
             query_result = {"usage_history": 0}
 
         updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (deck_usage[player_tag] & ONE_DAY_MASK)
@@ -839,7 +870,8 @@ def get_and_update_match_history_fame_and_battle_time(player_tag: str, fame: int
     query_result = cursor.fetchone()
 
     if query_result == None:
-        add_new_unregistered_user(player_tag)
+        if not add_new_unregistered_user(player_tag):
+            return (None, None)
         cursor.execute("SELECT last_battle_time, fame FROM match_history WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
         query_result = {"fame": 0, "last_battle_time": bot_utils.datetime_to_battletime(datetime.datetime.now(datetime.timezone.utc))}
 

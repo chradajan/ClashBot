@@ -116,9 +116,9 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = list(get_active_members_in_clan(clan_tag).values())
+    active_members = get_active_members_in_clan(clan_tag)
 
-    participants = [ (participant["name"], 4 - participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["name"] in active_members)) ]
+    participants = [ (participant["name"], 4 - participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["tag"] in active_members)) ]
     participants.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participants
@@ -248,9 +248,9 @@ def get_top_fame_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = list(get_active_members_in_clan(clan_tag).values())
+    active_members = get_active_members_in_clan(clan_tag)
 
-    fame_list = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if participant["name"] in active_members ]
+    fame_list = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if participant["tag"] in active_members ]
     fame_list.sort(key = lambda x : x[1], reverse = True)
 
     if len(fame_list) <= top_n:
@@ -285,9 +285,9 @@ def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = list(get_active_members_in_clan(clan_tag).values())
+    active_members = get_active_members_in_clan(clan_tag)
 
-    participants = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["name"] in active_members)) ]
+    participants = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["tag"] in active_members)) ]
     participants.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participants
@@ -314,11 +314,11 @@ def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
     return_list = []
 
     for clan in json_obj["clans"]:
-        active_members = list(get_active_members_in_clan(clan["tag"]).values())
+        active_members = get_active_members_in_clan(clan["tag"])
         decks_remaining = 0
 
         for participant in clan["participants"]:
-            if participant["name"] in active_members:
+            if participant["tag"] in active_members:
                 decks_remaining += (4 - participant["decksUsedToday"])
 
         return_list.append((clan["name"], decks_remaining))
@@ -373,6 +373,10 @@ def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
             }
     """
     prev_fame, last_check_time = db_utils.get_and_update_match_history_fame_and_battle_time(player_tag, fame)
+
+    if (prev_fame == None) or (last_check_time == None):
+        return {}
+
     fame -= prev_fame
 
     # If no fame has been acquired since last check, no point in grabbing battlelog.
