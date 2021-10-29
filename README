@@ -97,13 +97,18 @@ Bot:
     - Clan name and clan tag refer to your clan's information.
     - DEFAULT_REMINDER_MESSAGE will be included with the automated River Race reminder messages.
 
-- Move ClashBot/setup/credentials_example.py to ClashBot/credentials.py
+- Move ClashBot/setup/credentials_example.py to ClashBot/credentials_example.py
 - Rename to credentials.py
 - Again, all fields need to be filled in in quotes:
     - BOT_TOKEN can be found in the Discord Developer Portal under your bot.
     - GUILD_NAME refers to the name of your Discord server.
     - CLASH_API_KEY can be found on your Clash Royale developer account.
     - Database credentials are whatever you set them to be.
+
+- Move ClashBot/setup/blacklist_example.py to ClashBot/blacklist_example.py
+- Rename to blacklist.py
+- The blacklist prevents players in your clan from receiving the Elder role.
+- Place any user's in-game player names in this list, in quotes, to prevent them from getting the Discord Elder role.
 
 Python:
 - Install the latest version of Python from https://www.python.org/downloads/
