@@ -5,3 +5,4 @@ __pycache__/
 export_files/
 blacklist.py
 testing_tools.py
+.vscode/
