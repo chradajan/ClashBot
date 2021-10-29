@@ -1,0 +1,5 @@
+aiocron==1.4
+discord.py==1.7.3
+prettytable==2.1.0
+PyMySQL==1.0.2
+requests==2.22.0

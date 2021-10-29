@@ -1,0 +1,119 @@
+ClashBot is a Discord bot that helps moderate servers for Clash Royale clans.
+- Track how many war decks each member of your clan uses each day.
+- Track win rates of the members of your clan on war days.
+- Check how many war decks each clan in your River Race has left today.
+- Send automated reminders to members of your clan that have not used all their war decks.
+- Automatically assign strikes to users that did not use enough war decks during the most recent River Race.
+
+
+DISCORD SERVER REQUIREMENTS:
+
+ClashBot relies on your server having the following roles. The exact permissions of the roles on the server don't matter, and the
+exact names of these roles can be configured in config.py. Users with a higher role should also possess the roles below it. For
+example, a Leader should have the Leader, Elder, and Member roles.
+
+New
+- Automatically assigned to everyone when they join the server.
+- Gets removed after a new user enters their in-game player tag.
+
+Check Rules
+- Assigned after a new user enters their player tag.
+- Assigned when a change to the rules has been made and an Admin forces everyone to acknowledge the new rules.
+- Gets removed after a user has acknowledged the rules by reacting to ClashBots message in the #rules channel.
+
+Visitor
+- Role for users that are not active members of your clan.
+
+Member
+- Role for users that are active members of your clan.
+
+Elder
+- Role for users that are elders in your clan.
+
+Leader
+- Role for users on the server that you want to give access to leader commands.
+- This role must be manually assigned. It is not related to the in-game Coleader/Leader roles.
+
+Admin
+- Role for users on the server that you want to give access to admin commands.
+- This role must be manually assigned. It is not related to the in-game Coleader/Leader roles.
+
+ClashBot also relies on the following channels. The exact names of these channels can also be configured in config.py.
+
+#new
+- Users with the New role must enter their in-game player tags on this channel to receive a role.
+
+#rules
+- Users with the Check Rules role must react to ClashBot's message in this channel to receive a Member/Visitor/Elder role.
+
+#reminders
+- This is where automated reminders are sent on battle days. Manual reminder messages will also be sent here.
+
+#strikes
+- When users receive a strike, they will be mentioned in this channel with their current strike count.
+
+#time-off
+- Users that will be on vacation during the next River Race can use the !vacation command in this channel to not receive a strike.
+
+#fame
+- Leader commands that call out people for high or low fame will send messages in this channel.
+
+#commands
+- Leader/Admin commands will only work in this channel.
+
+
+SETUP
+
+Database:
+- ClashBot requires MySql Server to be installed.
+- Once server is setup and configured, create a database.
+- After a database is created, use setup/DB_Creation_Script.sql to create all the necessary tables.
+- mysql -u "db_username" -p "db_name" < setup/DB_Creation_Script.sql
+
+Clash Royale API:
+- Create a developer account at https://developer.clashroyale.com
+- Create an API key and specify the IP address of the server that will be running ClashBot.
+
+Discord Developer:
+- Go to https://discord.com/developers/docs/intro
+- Create a new application and create a bot.
+- It will need the following permissions:
+    - Manage Roles
+    - Manage Nicknames
+    - View Channels
+    - Send Messages
+    - Manage Messages
+    - Embed Links
+    - Attach Files
+    - Read Message History
+    - Mention Everyone
+    - Add Reactions
+
+Bot:
+- Move config_example from ClashBot/setup/config_example.py to ClashBot/config_example.py
+- Rename to config.py
+- Fill in all fields. Names should be in quotes.
+    - Role/Channel names are based on how you setup your Discord server.
+    - Clan name and clan tag refer to your clan's information.
+    - DEFAULT_REMINDER_MESSAGE will be included with the automated River Race reminder messages.
+
+- Move ClashBot/setup/credentials_example.py to ClashBot/credentials.py
+- Rename to credentials.py
+- Again, all fields need to be filled in in quotes:
+    - BOT_TOKEN can be found in the Discord Developer Portal under your bot.
+    - GUILD_NAME refers to the name of your Discord server.
+    - CLASH_API_KEY can be found on your Clash Royale developer account.
+    - Database credentials are whatever you set them to be.
+
+Python:
+- Install the latest version of Python from https://www.python.org/downloads/
+- Python dependencies can be found in setup/requirements.txt
+- Install all dependencies with pip install -r setup/requirements.txt
+
+
+
+After the setup steps listed above have been completed, invite the bot to your Discord server. An invite link can be generated on
+your Discord Developer Portal account. Once the bot has joined, start it with the command python3 bot.py. If the bot is being added
+to an existing server with users already on it, an Admin can use the !reset_all_users command to assign the New role to everyone on
+the server, as well as send a message for users to react to in the #rules channel. This ensures that everyone will be added to the
+database correctly.

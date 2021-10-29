@@ -1063,7 +1063,17 @@ def get_match_performance_dict(player_tag: str) -> dict:
 
 
 def get_file_path() -> str:
+    """
+    Get path of new CSV file that should be created during export process.
+
+    Returns:
+        str: Path to new CSV file.
+    """
     path = 'export_files'
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+
     files = [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
     files.sort(key = lambda x : os.path.getmtime(x))
 
