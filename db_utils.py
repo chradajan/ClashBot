@@ -4,10 +4,10 @@ from credentials import IP, USERNAME, PASSWORD, DB_NAME
 import blacklist
 import bot_utils
 import clash_utils
-import csv
 import datetime
 import os
 import pymysql
+import xlsxwriter
 
 ######################################################
 #                                                    #
@@ -1062,6 +1062,31 @@ def get_match_performance_dict(player_tag: str) -> dict:
     return match_performance_dict
 
 
+def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG):
+    """
+    Add any active members not in the database as UNREGISTERED users.
+
+    Args:
+        clan_tag(str): Clan to get users from.
+    """
+    active_members = clash_utils.get_active_members_in_clan(clan_tag)
+
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT player_tag FROM users")
+    query_result = cursor.fetchall()
+    db.close()
+
+    if query_result == None:
+        return
+
+    for user in query_result:
+        active_members.pop(user["player_tag"], None)
+
+    for player_tag in active_members:
+        add_new_unregistered_user(player_tag)
+
+
 def get_file_path() -> str:
     """
     Get path of new CSV file that should be created during export process.
@@ -1080,23 +1105,25 @@ def get_file_path() -> str:
     if len(files) >= 5:
         os.remove(files[0])
 
-    file_name = "members_" + str(datetime.datetime.now().date()) + ".csv"
+    file_name = "members_" + str(datetime.datetime.now().date()) + ".xlsx"
     new_path = os.path.join(path, file_name)
 
     return new_path
 
 
-def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, include_match_performance_history: bool) -> str:
+def export(primary_clan_only: bool) -> str:
     """
-    Create CSV file containing relevant information from the database.
+    Create Excel spreadsheet containing relevant information from the database.
 
     Args:
         primary_clan_only(bool)
-        include_deck_usage_history(bool)
-        include_match_performance_history(bool)
+
+    Returns:
+        str: Path to spreadsheet.
     """
-    # Before doing anything, update the database.
+    # Clean up the database and add any members of the clan to it that aren't already in it.
     clean_up_db()
+    add_unregistered_users()
 
     db, cursor = connect_to_db()
 
@@ -1116,7 +1143,7 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
     clans_dict = {}
 
     for clan in clans:
-        clans_dict[clan["id"]] = {"Clan Tag": clan["clan_tag"], "Clan Name": clan["clan_name"]}
+        clans_dict[clan["id"]] = clan
 
     # Get users.
     if primary_clan_only:
@@ -1129,109 +1156,106 @@ def output_to_csv(primary_clan_only: bool, include_deck_usage_history: bool, inc
     if users == None:
         return None
 
-    # Get path to new file and open it.
-    file_path = get_file_path()
-
-    with open(file_path, 'w', newline='') as csv_file:
-        fields_list = list(users[0].keys())
-
-        # Remove keys that aren't relevant outside the database.
-        fields_list.remove("id")
-        fields_list.remove("discord_id")
-        fields_list.remove("clan_id")
-        fields_list.remove("usage_history")
-
-        # Swap order of player_name and player_tag.
-        fields_list[0], fields_list[1] = fields_list[1], fields_list[0]
-
-        # Capitalize field names and replace underscores with spaces
-        fields_list = [' '.join(field.split('_')).title() for field in fields_list]
-
-        # Add extra fields that aren't columns in users table.
-        fields_list.append("Clan Tag")
-        fields_list.append("Clan Name")
-        fields_list.append("RoyaleAPI")
-
-        # Add deck usage statistic fields.
-        deck_usage_today = {}
-        now = datetime.datetime.now(datetime.timezone.utc)
-        now_date = now.date()
-        now_field_name = now_date.strftime("%a") + ", " +  now_date.strftime("%b") + " " + str(now_date.day).zfill(2)
-
-        if include_deck_usage_history:
-            day_fields = bot_utils.break_down_usage_history(users[0]["usage_history"], now)
-            for day in day_fields[::-1]:
-                fields_list.append(day[1])
-
-            fields_list.append(now_field_name)
-            deck_usage_today = clash_utils.get_deck_usage_today_dict()
-
-        # Add match performance fields.
-        match_performance_dict = {}
-
-        if include_match_performance_history:
-            match_performance_dict = {user["player_tag"]: get_match_performance_dict(user["player_tag"]) for user in users}
-
-            fields_list.extend(["Regular PvP Wins", "Regular PvP Losses", "Regular PvP Win Rate",
-                                "Special PvP Wins", "Special PvP Losses", "Special PvP Win Rate",
-                                "Duel Match Wins", "Duel Match Losses", "Duel Match Win Rate",
-                                "Duel Series Wins", "Duel Series Losses", "Duel Series Win Rate",
-                                "Combined PvP Wins", "Combined PvP Losses", "Combined PvP Win Rate",
-                                "Boat Attack Wins", "Boat Attack Losses", "Boat Attack Win Rate"])
-
-        # Prepare CSV file.
-        writer = csv.DictWriter(csv_file, fieldnames=fields_list)
-        headers = dict((n,n) for n in fields_list)
-        writer.writerow(headers)
-
-        # Iterate through users to log info in CSV.
-        for user in users:
-            user.pop("id")
-            user.pop("discord_id")
-            clan_id = user.pop("clan_id")
-            usage_history = user.pop("usage_history")
-
-            keys_list = list(user.keys())
-            for key in keys_list:
-                user[' '.join(key.split('_')).title()] = user.pop(key)
-
-            user["Clan Tag"] = clans_dict[clan_id]["Clan Tag"]
-            user["Clan Name"] = clans_dict[clan_id]["Clan Name"]
-            user["RoyaleAPI"] = ("https://royaleapi.com/player/" + user["Player Tag"][1:])
-
-            if include_deck_usage_history:
-                usage_history_list = bot_utils.break_down_usage_history(usage_history, now)
-                for usage, day in usage_history_list:
-                    user[day] = usage
-
-                usage_today = deck_usage_today.get(user["Player Name"])
-
-                if usage_today == None:
-                    usage_today = clash_utils.get_user_decks_used_today(user["Player Tag"])
-
-                user[now_field_name] = usage_today
-
-            if include_match_performance_history:
-                user["Regular PvP Wins"] = match_performance_dict[user["Player Tag"]]["regular"]["wins"]
-                user["Regular PvP Losses"] = match_performance_dict[user["Player Tag"]]["regular"]["losses"]
-                user["Regular PvP Win Rate"] = float(match_performance_dict[user["Player Tag"]]["regular"]["win_rate"][:-1]) / 100
-                user["Special PvP Wins"] = match_performance_dict[user["Player Tag"]]["special"]["wins"]
-                user["Special PvP Losses"] = match_performance_dict[user["Player Tag"]]["special"]["losses"]
-                user["Special PvP Win Rate"] = float(match_performance_dict[user["Player Tag"]]["special"]["win_rate"][:-1]) / 100
-                user["Duel Match Wins"] = match_performance_dict[user["Player Tag"]]["duel_matches"]["wins"]
-                user["Duel Match Losses"] = match_performance_dict[user["Player Tag"]]["duel_matches"]["losses"]
-                user["Duel Match Win Rate"] = float(match_performance_dict[user["Player Tag"]]["duel_matches"]["win_rate"][:-1]) / 100
-                user["Duel Series Wins"] = match_performance_dict[user["Player Tag"]]["duel_series"]["wins"]
-                user["Duel Series Losses"] = match_performance_dict[user["Player Tag"]]["duel_series"]["losses"]
-                user["Duel Series Win Rate"] = float(match_performance_dict[user["Player Tag"]]["duel_series"]["win_rate"][:-1]) / 100
-                user["Combined PvP Wins"] = match_performance_dict[user["Player Tag"]]["combined_pvp"]["wins"]
-                user["Combined PvP Losses"] = match_performance_dict[user["Player Tag"]]["combined_pvp"]["losses"]
-                user["Combined PvP Win Rate"] = float(match_performance_dict[user["Player Tag"]]["combined_pvp"]["win_rate"][:-1]) / 100
-                user["Boat Attack Wins"] = match_performance_dict[user["Player Tag"]]["boat_attacks"]["wins"]
-                user["Boat Attack Losses"] = match_performance_dict[user["Player Tag"]]["boat_attacks"]["losses"]
-                user["Boat Attack Win Rate"] = float(match_performance_dict[user["Player Tag"]]["boat_attacks"]["win_rate"][:-1]) / 100
-
-            writer.writerow(user)
-
     db.close()
+
+    # Create Excel workbook
+    file_path = get_file_path()
+    workbook = xlsxwriter.Workbook(file_path)
+    info_sheet = workbook.add_worksheet("Info")
+    history_sheet = workbook.add_worksheet('History')
+    stats_sheet = workbook.add_worksheet("Stats")
+
+
+    # Info sheet headers
+    info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
+    info_sheet.write_row(0, 0, info_headers)
+
+    # History sheet headers
+    history_headers = ["Player Name", "Player Tag"]
+    now = datetime.datetime.now(datetime.timezone.utc)
+    now_date = None
+
+    if now.time() < bot_utils.RESET_TIME:
+        now_date = (now - datetime.timedelta(days=1)).date()
+    else:
+        now_date = now.date()
+
+    today_header = now_date.strftime("%a") + ", " +  now_date.strftime("%b") + " " + str(now_date.day).zfill(2)
+
+    for _, day in bot_utils.break_down_usage_history(users[0]["usage_history"], now)[::-1]:
+        history_headers.append(day)
+    history_headers.append(today_header)
+
+    history_sheet.write_row(0, 0, history_headers)
+
+    # Stats sheet headers
+    stats_headers = ["Player Name", "Player Tag",
+                     "Regular PvP Wins", "Regular PvP Losses", "Regular PvP Win Rate",
+                     "Special PvP Wins", "Special PvP Losses", "Special PvP Win Rate",
+                     "Duel Match Wins", "Duel Match Losses", "Duel Match Win Rate",
+                     "Duel Series Wins", "Duel Series Losses", "Duel Series Win Rate",
+                     "Combined PvP Wins", "Combined PvP Losses", "Combined PvP Win Rate",
+                     "Boat Attack Wins", "Boat Attack Losses", "Boat Attack Win Rate"]
+
+    stats_sheet.write_row(0, 0, stats_headers)
+
+    # Get data
+    deck_usage_today = clash_utils.get_deck_usage_today()
+    match_performance = {user["player_tag"]: get_match_performance_dict(user["player_tag"]) for user in users}
+
+    # Write data
+    row = 1
+
+    for user in users:
+        # Get info
+        clan_id = user["clan_id"]
+        info_row = [user["player_name"], user["player_tag"], user["discord_name"], user["clan_role"],
+                     "US" if user["US_time"] else "EU",
+                     "Yes" if user["vacation"] else "No",
+                     user["strikes"], user["status"],
+                     clans_dict[clan_id]["clan_name"], clans_dict[clan_id]["clan_tag"],
+                     f"https://royaleapi.com/player/{user['player_tag'][1:]}"]
+
+        # Get history
+        user_history = bot_utils.break_down_usage_history(user["usage_history"], now)
+        history_row = [user["player_name"], user["player_tag"]]
+
+        for usage, _ in user_history[::-1]:
+            history_row.append(usage)
+
+        usage_today = deck_usage_today.get(user["player_name"])
+
+        if usage_today == None:
+            usage_today = clash_utils.get_user_decks_used_today(user["player_tag"])
+
+        history_row.append(usage_today)
+
+        # Get stats
+        stats_row = [user["player_name"], user["player_tag"],
+                     match_performance[user["player_tag"]]["regular"]["wins"],
+                     match_performance[user["player_tag"]]["regular"]["losses"],
+                     (float(match_performance[user["player_tag"]]["regular"]["win_rate"][:-1]) / 100),
+                     match_performance[user["player_tag"]]["special"]["wins"],
+                     match_performance[user["player_tag"]]["special"]["losses"],
+                     (float(match_performance[user["player_tag"]]["special"]["win_rate"][:-1]) / 100),
+                     match_performance[user["player_tag"]]["duel_matches"]["wins"],
+                     match_performance[user["player_tag"]]["duel_matches"]["losses"],
+                     (float(match_performance[user["player_tag"]]["duel_matches"]["win_rate"][:-1]) / 100),
+                     match_performance[user["player_tag"]]["duel_series"]["wins"],
+                     match_performance[user["player_tag"]]["duel_series"]["losses"],
+                     (float(match_performance[user["player_tag"]]["duel_series"]["win_rate"][:-1]) / 100),
+                     match_performance[user["player_tag"]]["combined_pvp"]["wins"],
+                     match_performance[user["player_tag"]]["combined_pvp"]["losses"],
+                     (float(match_performance[user["player_tag"]]["combined_pvp"]["win_rate"][:-1]) / 100),
+                     match_performance[user["player_tag"]]["boat_attacks"]["wins"],
+                     match_performance[user["player_tag"]]["boat_attacks"]["losses"],
+                     (float(match_performance[user["player_tag"]]["boat_attacks"]["win_rate"][:-1]) / 100)]
+
+        # Write data to spreadsheet
+        info_sheet.write_row(row, 0, info_row)
+        history_sheet.write_row(row, 0, history_row)
+        stats_sheet.write_row(row, 0, stats_row)
+        row += 1
+
+    workbook.close()
     return file_path

@@ -13,21 +13,16 @@ class LeaderUtils(commands.Cog):
         self.bot = bot
 
     """
-    Command: !export {update_before_export} {false_logic_only}
+    Command: !export {false_logic_only}
 
-    Export database information to csv.
+    Export database information to spreadsheet.
     """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
-    async def export(self, ctx, update_before_export: bool=True, false_logic_only: bool=True, include_deck_usage_history: bool=True, include_match_performance_history: bool=True):
-        """Export database to csv file."""
-        if update_before_export:
-            await ctx.send("Starting export and updating all player information. This might take a minute.")
-            for member in ctx.guild.members:
-                await bot_utils.update_member(member)
-
-        path = db_utils.output_to_csv(false_logic_only, include_deck_usage_history, include_match_performance_history)
+    async def export(self, ctx, false_logic_only: bool=True):
+        """Export database to Excel spreadsheet."""
+        path = db_utils.export(false_logic_only)
         await ctx.send(file=discord.File(path))
 
     @export.error
@@ -38,7 +33,32 @@ class LeaderUtils(commands.Cog):
         elif isinstance(error, commands.errors.BadBoolArgument):
             await ctx.send(f"Invalid argument. Valid arguments: yes or no")
         else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !export <update_before_export (optional)> <false_logic_only (optional)> <include_deck_usage_history (optional)> <include_match_performance_history (optional)>")
+            await ctx.send("Something went wrong. Command should be formatted as:  !export <false_logic_only (optional)>")
+            raise error
+
+
+    """
+    Command: !update_all_members
+
+    Update all members of the server and apply any necessary Discord role changes.
+    """
+    @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    async def update_all_members(self, ctx):
+        """Update all members in the server and apply any necessary Discord role updates."""
+        await ctx.send("Starting update on all members. This will take a few minutes.")
+        for member in ctx.guild.members:
+            await bot_utils.update_member(member)
+        await ctx.send("Update complete")
+
+    @update_all_members.error
+    async def update_all_members_error(self, ctx, error):
+        if isinstance(error, commands.errors.CheckFailure):
+            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+            await ctx.send(f"!update_all_members command can only be sent in {channel.mention} by Leaders/Admins.")
+        else:
+            await ctx.send("Something went wrong. COmmand should be formatted as:  !update_all_members")
             raise error
 
 
