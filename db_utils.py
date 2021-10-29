@@ -931,6 +931,7 @@ def prepare_match_history(last_battle_time: datetime.datetime):
     db.commit()
     db.close()
 
+
 def get_match_performance_dict(player_tag: str) -> dict:
     """
     Get a dict containing a specified user's match performance.
