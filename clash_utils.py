@@ -15,7 +15,26 @@ def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
         clan_tag(str, optional): Clan to check.
     
     Returns:
-        dict {player_tag(str): player_name(str)}: Dictionary of active members.
+        dict: Dictionary of active members.
+            {
+                player_tag(str): {
+                    "tag": str,
+                    "name": str,
+                    "role": str,
+                    "lastSeen": str,
+                    "expLevel": int,
+                    "trophies": int,
+                    "arena": {
+                        "id": int,
+                        "name": str
+                    },
+                    "clanRank": int,
+                    "previousClanRank": int,
+                    "donations": int,
+                    "donationsReceived": int,
+                    "clanChestPoints": int
+                }
+            }
     """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
@@ -25,7 +44,12 @@ def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    return { member["tag"]: member["name"] for member in json_obj["items"] }
+    active_members = {}
+
+    for member in json_obj["items"]:
+        active_members[member["tag"]] = member
+
+    return active_members
 
 
 def parse_player_tag(message: str) -> str:
@@ -124,7 +148,7 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     return participants
 
 
-def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
+def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None) -> dict:
     """
     Get a list of players in a clan and how many decks each player used today.
 
@@ -142,15 +166,16 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = get_active_members_in_clan(clan_tag)
+    if active_members == None:
+        active_members = get_active_members_in_clan(clan_tag)
+    else:
+        active_members = active_members.copy()
 
     usage_list = {}
 
     for participant in json_obj["clan"]["participants"]:
         usage_list[participant["tag"]] = participant["decksUsedToday"]
-
-        if participant["tag"] in active_members:
-            active_members.pop(participant["tag"], None)
+        active_members.pop(participant["tag"], None)
 
     for player_tag in active_members:
         usage_list[player_tag] = 0
@@ -437,7 +462,7 @@ def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
     return player_dict
 
 
-def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG):
+def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
     """
     Get the match performance of each player in the specified clan. Saves results in match_history table.
 
@@ -452,7 +477,9 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG):
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    active_members = get_active_members_in_clan(clan_tag)
+    if active_members == None:
+        active_members = get_active_members_in_clan(clan_tag)
+
     player_list = [ player for player in json_obj["clan"]["participants"] if (player["tag"] in active_members) and (player["decksUsedToday"] > 0) ]
 
     performance_list = []

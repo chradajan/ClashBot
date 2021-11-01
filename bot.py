@@ -86,6 +86,7 @@ async def automated_reminder_eu():
     if db_utils.get_reminder_status():
         await bot_utils.deck_usage_reminder(bot, US_time=False)
 
+
 @aiocron.crontab('0 19 * * 0')
 async def automated_reminder_eu_sunday():
     """
@@ -102,6 +103,7 @@ async def automated_reminder_us():
     """
     if db_utils.get_reminder_status():
         await bot_utils.deck_usage_reminder(bot, US_time=True)
+
 
 @aiocron.crontab('0 1 * * 1')
 async def automated_reminder_us_sunday():
@@ -189,8 +191,9 @@ async def determine_reset_time():
     if reset_occurred:
         return
 
+    active_members = clash_utils.get_active_members_in_clan()
     weekday = datetime.datetime.utcnow().date().weekday()
-    usage_list = clash_utils.get_deck_usage_today()
+    usage_list = clash_utils.get_deck_usage_today(active_members=active_members)
     current_sum = 0
 
     for decks_used in usage_list.values():
@@ -200,11 +203,11 @@ async def determine_reset_time():
         reset_occurred = True
         reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
         bot_utils.RESET_TIME = reset_time.time()
-        db_utils.clean_up_db()
+        db_utils.clean_up_db(active_members=active_members)
         db_utils.record_deck_usage_today(prev_deck_usage)
 
         if weekday == 0:
-            clash_utils.calculate_match_performance()
+            clash_utils.calculate_match_performance(active_members=active_members)
         elif weekday == 3:
             db_utils.prepare_match_history(reset_time)
     else:
@@ -222,14 +225,15 @@ async def reset_globals():
     global reset_occurred
 
     if not reset_occurred:
+        active_members = clash_utils.get_active_members_in_clan()
         weekday = datetime.datetime.utcnow().date().weekday()
         reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
         bot_utils.RESET_TIME = reset_time.time()
-        db_utils.clean_up_db()
+        db_utils.clean_up_db(active_members=active_members)
         db_utils.record_deck_usage_today(prev_deck_usage)
 
         if weekday == 0:
-            clash_utils.calculate_match_performance()
+            clash_utils.calculate_match_performance(active_members=active_members)
         elif weekday == 3:
             db_utils.prepare_match_history(reset_time)
 

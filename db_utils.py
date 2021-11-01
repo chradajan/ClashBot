@@ -123,7 +123,7 @@ def add_new_user(clash_data: dict) -> bool:
     insert_assigned_roles_query = "INSERT INTO assigned_roles VALUES (%s, %s)"
     cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
 
-    if (clash_data["clan_role"] == "elder") and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_name"] not in blacklist.blacklist):
+    if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_name"] not in blacklist.blacklist):
         role_string = "Elder"
         cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role_string))
         query_result = cursor.fetchone()
@@ -806,7 +806,7 @@ def get_all_user_deck_usage_history() -> list:
     return usage_list
 
 
-def clean_up_db():
+def clean_up_db(active_members: dict=None):
     """
     Checks that every user in the database has an appropriate status.
     ACTIVE users that are no longer active members of the clan are moved to INACTIVE.
@@ -816,7 +816,9 @@ def clean_up_db():
     """
     db, cursor = connect_to_db()
 
-    active_members = clash_utils.get_active_members_in_clan()
+    if active_members == None:
+        active_members = clash_utils.get_active_members_in_clan()
+
     cursor.execute("SELECT player_name, player_tag, discord_name, discord_id, status FROM users")
     query_result = cursor.fetchall()
 
@@ -827,7 +829,7 @@ def clean_up_db():
         status = user["status"]
 
         if player_tag in active_members:
-            if status in ('INACTIVE', 'DEPARTED'):
+            if status in {'INACTIVE', 'DEPARTED'}:
                 clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
                 if clash_data == None:
                     continue
@@ -838,7 +840,7 @@ def clean_up_db():
 
                 update_user(clash_data)
         else:
-            if status in ('ACTIVE', 'UNREGISTERED'):
+            if status in {'ACTIVE', 'UNREGISTERED'}:
                 clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
                 if clash_data == None:
                     continue
@@ -851,6 +853,37 @@ def clean_up_db():
 
     db.commit()
     db.close()
+
+
+def get_server_members_info() -> dict:
+    """
+    Get database information of all members in the server.
+
+    Returns:
+        dict: dict containing info about server members.
+            {
+                discord_id(int): {
+                    player_tag(str),
+                    player_name(str),
+                    discord_id(int),
+                    discord_name(str),
+                    clan_role(str),
+                    status(str)
+                }
+            }
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT player_tag, player_name, discord_id, discord_name, clan_role, status FROM users WHERE discord_id IS NOT NULL")
+    query_result = cursor.fetchall()
+    db.close()
+
+    if query_result == None:
+        return {}
+
+    player_info = {user["discord_id"]: user for user in query_result}
+
+    return player_info
 
 
 def get_and_update_match_history_fame_and_battle_time(player_tag: str, fame: int):
@@ -1165,7 +1198,6 @@ def export(primary_clan_only: bool) -> str:
     info_sheet = workbook.add_worksheet("Info")
     history_sheet = workbook.add_worksheet('History')
     stats_sheet = workbook.add_worksheet("Stats")
-
 
     # Info sheet headers
     info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]

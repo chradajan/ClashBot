@@ -139,7 +139,7 @@ async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMI
 
 
 async def update_member(member: discord.Member, player_tag: str = None) -> bool:
-    if member.bot:
+    if member.bot or (SPECIAL_ROLES[NEW_ROLE_NAME] in member.roles) or (SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] in member.roles):
         return False
 
     if player_tag == None:
@@ -164,7 +164,7 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
         await member.remove_roles(*roles_to_remove)
         await member.add_roles(NORMAL_ROLES[member_status])
 
-        if (clash_data["clan_role"] == "elder") and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_name"] not in blacklist.blacklist):
+        if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_name"] not in blacklist.blacklist):
             await member.add_roles(NORMAL_ROLES[ELDER_ROLE_NAME])
 
     return True
@@ -181,7 +181,7 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = 
 
     usage_history = []
 
-    for i in range(7):
+    for _ in range(7):
         temp_usage = deck_usage & ONE_DAY_MASK
         deck_usage >>= 3
         temp_date = (command_time - time_delta).date()
