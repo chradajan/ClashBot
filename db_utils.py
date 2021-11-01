@@ -1096,14 +1096,17 @@ def get_match_performance_dict(player_tag: str) -> dict:
     return match_performance_dict
 
 
-def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG):
+def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
     """
     Add any active members not in the database as UNREGISTERED users.
 
     Args:
         clan_tag(str): Clan to get users from.
     """
-    active_members = clash_utils.get_active_members_in_clan(clan_tag)
+    if active_members == None:
+        active_members = clash_utils.get_active_members_in_clan(clan_tag)
+    else:
+        active_members = active_members.copy()
 
     db, cursor = connect_to_db()
 
@@ -1156,8 +1159,9 @@ def export(primary_clan_only: bool) -> str:
         str: Path to spreadsheet.
     """
     # Clean up the database and add any members of the clan to it that aren't already in it.
+    active_members = clash_utils.get_active_members_in_clan()
     clean_up_db()
-    add_unregistered_users()
+    add_unregistered_users(active_members=active_members)
 
     db, cursor = connect_to_db()
 
@@ -1233,7 +1237,7 @@ def export(primary_clan_only: bool) -> str:
     stats_sheet.write_row(0, 0, stats_headers)
 
     # Get data
-    deck_usage_today = clash_utils.get_deck_usage_today()
+    deck_usage_today = clash_utils.get_deck_usage_today(active_members=active_members)
     match_performance = {user["player_tag"]: get_match_performance_dict(user["player_tag"]) for user in users}
 
     # Write data
@@ -1256,7 +1260,7 @@ def export(primary_clan_only: bool) -> str:
         for usage, _ in user_history[::-1]:
             history_row.append(usage)
 
-        usage_today = deck_usage_today.get(user["player_name"])
+        usage_today = deck_usage_today.get(user["player_tag"])
 
         if usage_today == None:
             usage_today = clash_utils.get_user_decks_used_today(user["player_tag"])
