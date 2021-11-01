@@ -119,7 +119,7 @@ async def record_race_completion_status():
     """
     Check if the race was completed on Saturday and save result to db.
     """
-    db_utils.save_race_completion_status(clash_utils.river_race_completed())
+    db_utils.set_completed_saturday_status(clash_utils.river_race_completed())
 
 
 @aiocron.crontab('0 18 * * 1')
@@ -130,7 +130,7 @@ async def assign_strikes_and_clear_vacation():
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     vacation_channel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
     strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
-    completed_saturday = db_utils.race_completed_saturday()
+    completed_saturday = db_utils.is_completed_saturday()
     message = ""
 
     if completed_saturday:
@@ -209,7 +209,7 @@ async def determine_reset_time():
         if weekday == 0:
             clash_utils.calculate_match_performance(active_members=active_members)
         elif weekday == 3:
-            db_utils.prepare_match_history(reset_time)
+            db_utils.prepare_for_river_race(reset_time)
     else:
         prev_deck_usage_sum = current_sum
         prev_deck_usage = usage_list
@@ -235,7 +235,7 @@ async def reset_globals():
         if weekday == 0:
             clash_utils.calculate_match_performance(active_members=active_members)
         elif weekday == 3:
-            db_utils.prepare_match_history(reset_time)
+            db_utils.prepare_for_river_race(reset_time)
 
     prev_deck_usage_sum = -1
     prev_deck_usage = None

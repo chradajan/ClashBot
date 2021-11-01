@@ -116,8 +116,9 @@ DROP TABLE IF EXISTS `race_status`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `race_status` (
   `completed_saturday` tinyint(1) NOT NULL,
-  PRIMARY KEY (`completed_saturday`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `colosseum_week` tinyint(1) NOT NULL,
+  PRIMARY KEY (`completed_saturday`,`colosseum_week`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -158,4 +159,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-10-28 22:18:22
+-- Dump completed on 2021-11-01 17:42:06

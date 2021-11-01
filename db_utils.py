@@ -426,7 +426,13 @@ def get_strike_report() -> list:
     return strike_list
 
 
-def save_race_completion_status(status: bool):
+def set_completed_saturday_status(status: bool):
+    """
+    Update database to indicate whether the primary clan has crossed the finish line early.
+
+    Args:
+        status(bool): New status to set completed_saturday to.
+    """
     db, cursor = connect_to_db()
 
     cursor.execute("UPDATE race_status SET completed_saturday = %s", (status))
@@ -435,7 +441,13 @@ def save_race_completion_status(status: bool):
     db.close()
 
 
-def race_completed_saturday() -> bool:
+def is_completed_saturday() -> bool:
+    """
+    Return whether the primary clan crossed the finish line early.
+
+    Returns:
+        bool: Completed Saturday status.
+    """
     db, cursor = connect_to_db()
 
     cursor.execute("SELECT completed_saturday FROM race_status")
@@ -443,6 +455,37 @@ def race_completed_saturday() -> bool:
 
     db.close()
     return query_result["completed_saturday"]
+
+
+def set_colosseum_week_status(status: bool):
+    """
+    Update database to indicate whether or not it's colosseum week.
+
+    Args:
+        status(bool): New status to set colosseum_week to.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("UPDATE race_status SET colosseum_week = %s", (status))
+
+    db.commit()
+    db.close()
+
+
+def is_colosseum_week() -> bool:
+    """
+    Return whether it's colosseum week.
+
+    Returns:
+        bool: Colosseum week status.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT colosseum_week FROM race_status")
+    query_result = cursor.fetchone()
+
+    db.close()
+    return query_result["colosseum_week"]
 
 
 def get_player_tag(discord_id: int) -> str:
@@ -948,14 +991,17 @@ def update_match_history(user_performance_list: list):
     db.close()
 
 
-def prepare_match_history(last_battle_time: datetime.datetime):
+def prepare_for_river_race(last_battle_time: datetime.datetime):
     """
-    Needs to run every Thursday when river race starts. Resets decks_used, fame, and boat_attacks fields. Also sets last_battle_time
-    to current time.
+    Needs to run every Thursday when river race starts. Resets fame to 0 and sets last_battle_time to current time. Also resets
+    race_status fields to False.
 
     Args:
         last_battle_time(datetime.datetime): When match performance is next calculated, do not look at games before this time.
     """
+    set_completed_saturday_status(False)
+    set_colosseum_week_status(False)
+
     db, cursor = connect_to_db()
 
     last_battle_time = bot_utils.datetime_to_battletime(last_battle_time)

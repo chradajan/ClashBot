@@ -332,6 +332,9 @@ def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
     Returns:
         bool: Whether the specified clan has accumulated 10,000 fame and crossed the finish line.
     """
+    if db_utils.is_colosseum_week():
+        return False
+
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
@@ -423,6 +426,10 @@ def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
                 player_dict["boat_attack_losses"] += 1
 
         elif battle["type"].startswith("riverRaceDuel"):
+            # During colosseum week, clan fame will exceed 10,000 so this ensures that strikes/reminders go out correctly.
+            if battle["type"] == "riverRaceDuelColosseum":
+                db_utils.set_colosseum_week_status(True)
+
             # Determine duel series outcome by result of final game
             team_king_hit_points = battle["team"][0].get("kingTowerHitPoints")
             team_princess_list = battle["team"][0].get("princessTowersHitPoints")
