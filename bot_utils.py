@@ -176,7 +176,7 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
         await member.remove_roles(*roles_to_remove)
         await member.add_roles(NORMAL_ROLES[member_status])
 
-        if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_name"] not in blacklist.blacklist):
+        if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in blacklist.blacklist):
             await member.add_roles(NORMAL_ROLES[ELDER_ROLE_NAME])
 
     return True

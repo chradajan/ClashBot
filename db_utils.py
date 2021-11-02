@@ -124,7 +124,7 @@ def add_new_user(clash_data: dict) -> bool:
     insert_assigned_roles_query = "INSERT INTO assigned_roles VALUES (%s, %s)"
     cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
 
-    if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_name"] not in blacklist.blacklist):
+    if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in blacklist.blacklist):
         role_string = "Elder"
         cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role_string))
         query_result = cursor.fetchone()

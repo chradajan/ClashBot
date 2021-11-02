@@ -108,7 +108,7 @@ Bot:
 - Move ClashBot/setup/blacklist_example.py to ClashBot/blacklist_example.py
 - Rename to blacklist.py
 - The blacklist prevents players in your clan from receiving the Elder role.
-- Place any user's in-game player names in this list, in quotes, to prevent them from getting the Discord Elder role.
+- Place any user's player tag in this list, in quotes, to prevent them from getting the Discord Elder role.
 
 Python:
 - Install the latest version of Python from https://www.python.org/downloads/
