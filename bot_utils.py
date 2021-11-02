@@ -254,19 +254,19 @@ def create_match_performance_embed(player_name: str, player_tag: str) -> discord
     history = db_utils.get_match_performance_dict(player_tag)
     embed = discord.Embed(title=f"{player_name}'s River Race Stats")
 
-    embed.add_field(name="Regular PvP", value = f"``` Wins:   {history['regular']['wins']} \n Losses: {history['regular']['losses']} \n Total:  {history['regular']['total']} \n Win rate: {history['regular']['win_rate']} ```")
-    embed.add_field(name="Special PvP", value = f"``` Wins:   {history['special']['wins']} \n Losses: {history['special']['losses']} \n Total:  {history['special']['total']} \n Win rate: {history['special']['win_rate']} ```")
+    embed.add_field(name="Regular PvP", value = f"``` Wins:   {history['all']['regular']['wins']} \n Losses: {history['all']['regular']['losses']} \n Total:  {history['all']['regular']['total']} \n Win rate: {history['all']['regular']['win_rate']} ```")
+    embed.add_field(name="Special PvP", value = f"``` Wins:   {history['all']['special']['wins']} \n Losses: {history['all']['special']['losses']} \n Total:  {history['all']['special']['total']} \n Win rate: {history['all']['special']['win_rate']} ```")
     embed.add_field(name="\u200b", value="\u200b", inline=False)
 
     embed.add_field(name="Duel (individual matches)",
-                    value = f"``` Wins:   {history['duel_matches']['wins']} \n Losses: {history['duel_matches']['losses']} \n Total:  {history['duel_matches']['total']} \n Win rate: {history['duel_matches']['win_rate']} ```",
+                    value = f"``` Wins:   {history['all']['duel_matches']['wins']} \n Losses: {history['all']['duel_matches']['losses']} \n Total:  {history['all']['duel_matches']['total']} \n Win rate: {history['all']['duel_matches']['win_rate']} ```",
                     inline=True)
     embed.add_field(name="Duel (series)",
-                    value = f"``` Wins:   {history['duel_series']['wins']} \n Losses: {history['duel_series']['losses']} \n Total:  {history['duel_series']['total']} \n Win rate: {history['duel_series']['win_rate']} ```",
+                    value = f"``` Wins:   {history['all']['duel_series']['wins']} \n Losses: {history['all']['duel_series']['losses']} \n Total:  {history['all']['duel_series']['total']} \n Win rate: {history['all']['duel_series']['win_rate']} ```",
                     inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=False)
 
-    embed.add_field(name="Combined PvP matches", value = f"``` Wins:   {history['combined_pvp']['wins']} \n Losses: {history['combined_pvp']['losses']} \n Total:  {history['combined_pvp']['total']} \n Win rate: {history['combined_pvp']['win_rate']} ```", inline=False)
-    embed.add_field(name="Boat attacks", value = f"``` Wins:   {history['boat_attacks']['wins']} \n Losses: {history['boat_attacks']['losses']} \n Total:  {history['boat_attacks']['total']} \n Win rate: {history['boat_attacks']['win_rate']} ```")
+    embed.add_field(name="Combined PvP matches", value = f"``` Wins:   {history['all']['combined_pvp']['wins']} \n Losses: {history['all']['combined_pvp']['losses']} \n Total:  {history['all']['combined_pvp']['total']} \n Win rate: {history['all']['combined_pvp']['win_rate']} ```", inline=False)
+    embed.add_field(name="Boat attacks", value = f"``` Wins:   {history['all']['boat_attacks']['wins']} \n Losses: {history['all']['boat_attacks']['losses']} \n Total:  {history['all']['boat_attacks']['total']} \n Win rate: {history['all']['boat_attacks']['win_rate']} ```")
 
     return embed

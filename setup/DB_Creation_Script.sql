@@ -81,13 +81,38 @@ CREATE TABLE `discord_roles` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `match_history`
+-- Table structure for table `match_history_all`
 --
 
-DROP TABLE IF EXISTS `match_history`;
+DROP TABLE IF EXISTS `match_history_all`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `match_history` (
+CREATE TABLE `match_history_all` (
+  `user_id` int NOT NULL,
+  `battle_wins` int NOT NULL,
+  `battle_losses` int NOT NULL,
+  `duel_match_wins` int NOT NULL,
+  `duel_match_losses` int NOT NULL,
+  `duel_series_wins` int NOT NULL,
+  `duel_series_losses` int NOT NULL,
+  `boat_attack_wins` int NOT NULL,
+  `boat_attack_losses` int NOT NULL,
+  `special_battle_wins` int NOT NULL,
+  `special_battle_losses` int NOT NULL,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `user_id` (`user_id`),
+  CONSTRAINT `match_history_all_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `match_history_recent`
+--
+
+DROP TABLE IF EXISTS `match_history_recent`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `match_history_recent` (
   `user_id` int NOT NULL,
   `last_battle_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fame` int NOT NULL,
@@ -103,7 +128,7 @@ CREATE TABLE `match_history` (
   `special_battle_losses` int NOT NULL,
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `user_id` (`user_id`),
-  CONSTRAINT `match_history_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `match_history_recent_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -118,7 +143,7 @@ CREATE TABLE `race_status` (
   `completed_saturday` tinyint(1) NOT NULL,
   `colosseum_week` tinyint(1) NOT NULL,
   PRIMARY KEY (`completed_saturday`,`colosseum_week`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -159,4 +184,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-11-01 17:42:06
+-- Dump completed on 2021-11-02  4:49:08
