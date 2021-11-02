@@ -913,14 +913,13 @@ def get_server_members_info() -> dict:
                     player_name(str),
                     discord_id(int),
                     discord_name(str),
-                    clan_role(str),
-                    status(str)
+                    clan_role(str)
                 }
             }
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_tag, player_name, discord_id, discord_name, clan_role, status FROM users WHERE discord_id IS NOT NULL")
+    cursor.execute("SELECT player_tag, player_name, discord_id, discord_name, clan_role FROM users WHERE discord_id IS NOT NULL")
     query_result = cursor.fetchall()
     db.close()
 

@@ -242,6 +242,15 @@ async def reset_globals():
     reset_occurred = False
 
 
+@aiocron.crontab('30 7,15,23 * * *')
+async def update_members():
+    """
+    Update all members of the server at 07:30, 15:30, and 23:30 UTC everyday.
+    """
+    guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
+    await bot_utils.update_all_members(guild)
+
+
 @aiocron.crontab('0 10-23 * * 4,5,6,0')
 async def night_match_performance_tracker():
     """

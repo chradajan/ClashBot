@@ -45,33 +45,10 @@ class LeaderUtils(commands.Cog):
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
-    async def update_all_members(self, ctx):
+    async def update_all_members(self, ctx: commands.Context):
         """Update all members in the server and apply any necessary Discord role updates."""
         await ctx.send("Starting update on all members. This could take a few minutes.")
-        active_members = clash_utils.get_active_members_in_clan()
-        db_info = db_utils.get_server_members_info()
-
-        for member in ctx.guild.members:
-            if member.bot or member.id not in db_info:
-                continue
-
-            player_tag = db_info[member.id]["player_tag"]
-            current_discord_name = member.name + "#" + member.discriminator
-            status = db_info[member.id]["status"]
-
-            if ((current_discord_name != db_info[member.id]["discord_name"]) or
-                ((player_tag in active_members) and (member.display_name != active_members[player_tag]["name"])) or
-                ((player_tag in active_members) and (db_info[member.id]["clan_role"] != active_members[player_tag]["role"])) or
-                ((player_tag in active_members) and (status == 'INACTIVE')) or
-                ((player_tag not in active_members) and (status == 'ACTIVE'))):
-                # Update members if they meet any of the following criteria:
-                #   Updated Discord name
-                #   Updated player name and a member of the primary clan
-                #   Updated clan role and a member of the primary clan
-                #   In the primary clan but marked INACTIVE in the database
-                #   Not in the primary clan but marked ACTIVE in the database
-                await bot_utils.update_member(member, player_tag)
-
+        await bot_utils.update_all_members(ctx.guild)
         await ctx.send("Update complete")
 
     @update_all_members.error

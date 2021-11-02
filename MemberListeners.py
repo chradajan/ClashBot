@@ -36,7 +36,7 @@ class MemberListeners(commands.Cog):
             elif message.content == PRIMARY_CLAN_TAG:
                 await message.channel.send(content="You sent False Logic's clan tag. Please send your player tag instead.", delete_after=10)
             else:
-                discord_name = message.author.name + "#" + message.author.discriminator
+                discord_name = bot_utils.full_name(message.author)
                 clash_data = clash_utils.get_clash_user_data(message.content, discord_name, message.author.id)
                 if clash_data != None:
                     if db_utils.add_new_user(clash_data):

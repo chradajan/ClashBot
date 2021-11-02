@@ -74,6 +74,18 @@ def not_welcome_or_rules_check():
 ###########################################
 
 
+def full_name(member: discord.Member) -> str:
+    """
+    Get the full Discord name of a member.
+
+    Args:
+        member: Member to get name of.
+
+    Returns:
+        str: Full name in the form of "name#1234"
+    """
+    return member.name + "#" + member.discriminator
+
 
 async def send_rules_message(ctx, user_to_purge: discord.ClientUser):
     rules_channel = discord.utils.get(ctx.guild.channels, name=RULES_CHANNEL)
@@ -148,7 +160,7 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
     if player_tag == None:
         return False
 
-    discord_name = member.name + "#" + member.discriminator
+    discord_name = full_name(member)
     clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, member.id)
 
     if clash_data == None:
@@ -168,6 +180,36 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
             await member.add_roles(NORMAL_ROLES[ELDER_ROLE_NAME])
 
     return True
+
+
+async def update_all_members(guild: discord.Guild):
+    """
+    Update all members of the server that need to be updated. This does not guarantee that all members actually will be updated. For
+    example, a visitor who has switched clans (but not to the primary clan), will not be updated since that switch would not affect
+    their roles on the server. A visitor who has switched to the primary clan on the other hand will be updated.
+
+    Args:
+        guild(discord.Guild): Guild to update members in.
+    """
+    active_members = clash_utils.get_active_members_in_clan()
+    db_info = db_utils.get_server_members_info()
+
+    for member in guild.members:
+        if member.bot or member.id not in db_info:
+            continue
+
+        player_tag = db_info[member.id]["player_tag"]
+        current_discord_name = full_name(member)
+
+        if current_discord_name != db_info[member.id]["discord_name"]:
+            await update_member(member, player_tag)
+        elif player_tag in active_members:
+            if ((member.display_name != active_members[player_tag]["name"]) or
+                (db_info[member.id]["clan_role"] != active_members[player_tag]["role"]) or
+                (NORMAL_ROLES[VISITOR_ROLE_NAME] in member.roles)):
+                await update_member(member, player_tag)
+        elif NORMAL_ROLES[MEMBER_ROLE_NAME] in member.roles:
+            await update_member(member, player_tag)
 
 
 # [(most_recent_usage, day_string), (second_most_recent_usage, day_string), ...]
