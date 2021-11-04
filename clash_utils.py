@@ -383,6 +383,7 @@ def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
     req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}/battlelog", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
+        db_utils.set_last_battle_time(player_tag, last_check_time)
         return {}
 
     json_dump = json.dumps(req.json())

@@ -962,6 +962,24 @@ def get_and_update_match_history_fame_and_battle_time(player_tag: str, fame: int
     return fame_and_time
 
 
+def set_last_battle_time(player_tag: str, last_battle_time: datetime.datetime):
+    """
+    Sets the last battle time of a specific user.
+
+    Args:
+        player_tag(str): Player to update.
+        last_battle_time(datetime.datetime): Time to set for specified user.
+    """
+    db, cursor = connect_to_db()
+    
+    last_battle_time = bot_utils.datetime_to_battletime(last_battle_time)
+    cursor.execute("UPDATE match_history_recent SET last_battle_time = %s WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
+                   (last_battle_time, player_tag))
+
+    db.commit()
+    db.close()
+
+
 def update_match_history(user_performance_list: list):
     """
     Add each player's game stats to the match_history tables.
