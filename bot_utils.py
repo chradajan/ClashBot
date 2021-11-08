@@ -96,7 +96,7 @@ async def send_rules_message(ctx, user_to_purge: discord.ClientUser):
 
 async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMINDER_MESSAGE, automated: bool=True):
     reminder_list = clash_utils.get_remaining_decks_today()
-    vacation_list = db_utils.get_vacation_list()
+    users_on_vacation = db_utils.get_users_on_vacation()
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
 
@@ -107,18 +107,18 @@ async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMI
     non_member_string = ""
 
     check_time_zones = (US_time != None)
-    time_zone_list = []
+    time_zone_set = set()
 
     if check_time_zones:
-        time_zone_list = db_utils.get_members_in_time_zone(US_time)
-        if time_zone_list == None:
+        time_zone_set = db_utils.get_members_in_time_zone(US_time)
+        if time_zone_set == None:
             check_time_zones = False
 
     for player_name, decks_remaining in reminder_list:
-        if player_name in vacation_list:
+        if player_name in users_on_vacation:
             continue
 
-        if check_time_zones and (player_name not in time_zone_list):
+        if check_time_zones and (player_name not in time_zone_set):
             continue
 
         member = discord.utils.get(channel.members, display_name=player_name)

@@ -1,7 +1,7 @@
 from discord import player
 from config import PRIMARY_CLAN_TAG
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
-from typing import Tuple
+from typing import List, Set, Tuple
 import blacklist
 import bot_utils
 import clash_utils
@@ -599,8 +599,13 @@ def update_vacation_for_user(discord_id: int, status: bool=None) -> bool:
     return query_result["vacation"]
 
 
-# Return a list of player_names currently on vacation.
-def get_vacation_list() -> list:
+def get_users_on_vacation() -> Set[str]:
+    """
+    Get a set of players currently on vacation.
+
+    Returns:
+        set[str]: Player names of users on vacation.
+    """
     db, cursor = connect_to_db()
 
     cursor.execute("SELECT player_name FROM users WHERE vacation = TRUE")
@@ -608,13 +613,13 @@ def get_vacation_list() -> list:
 
     if query_result == None:
         db.close()
-        return []
+        return set()
 
-    vacation_list = [ user["player_name"] for user in query_result ]
+    users_on_vacation = { user["player_name"] for user in query_result }
 
     db.close()
 
-    return vacation_list
+    return users_on_vacation
 
 
 # Set vacation to false for all users.
@@ -778,7 +783,13 @@ def update_time_zone(discord_id: int, US_time: bool):
     db.close()
 
 
-def get_members_in_time_zone(US_time: bool) -> list:
+def get_members_in_time_zone(US_time: bool) -> Set[str]:
+    """
+    Get the members in the specified time zone.
+
+    Returns:
+        set[player_name(str)]: Player names of users in specified time zone.
+    """
     db, cursor = connect_to_db()
 
     cursor.execute("SELECT player_name FROM users WHERE US_time = %s", (US_time))
@@ -788,10 +799,10 @@ def get_members_in_time_zone(US_time: bool) -> list:
         db.close()
         return None
 
-    member_list = [ user["player_name"] for user in query_result ]
+    members = { user["player_name"] for user in query_result }
 
     db.close()
-    return member_list
+    return members
 
 
 def record_deck_usage_today(deck_usage: dict):
@@ -836,8 +847,13 @@ def record_deck_usage_today(deck_usage: dict):
     db.close()
 
 
-# [(player_name, player_tag, deck_usage)]
-def get_all_user_deck_usage_history() -> list:
+def get_all_user_deck_usage_history() -> List[Tuple[str, str, int]]:
+    """
+    Get usage history of all users in database.
+
+    Returns:
+        List[Tuple[str, str, int]]: List of player names, tags, and usage histories.
+    """
     db, cursor = connect_to_db()
 
     cursor.execute("SELECT player_name, player_tag, usage_history FROM users")

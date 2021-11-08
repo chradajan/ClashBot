@@ -201,14 +201,14 @@ class LeaderUtils(commands.Cog):
     async def fame_check(self, ctx, threshold: int):
         """Mention users below the specified fame threshold. Ignores users on vacation."""
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)
-        vacation_list = db_utils.get_vacation_list()
+        users_on_vacation = db_utils.get_users_on_vacation()
         fame_channel = discord.utils.get(ctx.guild.channels, name=REMINDER_CHANNEL)
 
         member_string = ""
         non_member_string = ""
 
         for player_name, fame in hall_of_shame:
-            if player_name in vacation_list:
+            if player_name in users_on_vacation:
                 continue
 
             member = discord.utils.get(fame_channel.members, display_name=player_name)

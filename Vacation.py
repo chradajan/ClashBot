@@ -51,7 +51,7 @@ class Vacation(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def vacation_list(self, ctx):
         """Get a list of all users currently on vacation."""
-        users_on_vacation = db_utils.get_vacation_list()
+        users_on_vacation = db_utils.get_users_on_vacation()
         table = PrettyTable()
         table.field_names = ["Member"]
         embed = discord.Embed()
