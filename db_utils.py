@@ -1,6 +1,7 @@
 from discord import player
 from config import PRIMARY_CLAN_TAG
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
+from typing import Tuple
 import blacklist
 import bot_utils
 import clash_utils
@@ -931,7 +932,7 @@ def get_server_members_info() -> dict:
     return player_info
 
 
-def get_and_update_match_history_fame_and_battle_time(player_tag: str, fame: int):
+def get_and_update_match_history_fame_and_battle_time(player_tag: str, fame: int) -> Tuple[int, datetime.datetime]:
     """
     Get a user's fame and time when their battlelog was last checked. Then store their updated fame and current time.
 
@@ -946,16 +947,17 @@ def get_and_update_match_history_fame_and_battle_time(player_tag: str, fame: int
 
     cursor.execute("SELECT last_battle_time, fame FROM match_history_recent WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
     query_result = cursor.fetchone()
+    fame_and_time = None
 
     if query_result == None:
         if not add_new_unregistered_user(player_tag):
             return (None, None)
-        query_result = {"fame": 0, "last_battle_time": bot_utils.datetime_to_battletime(datetime.datetime.now(datetime.timezone.utc))}
-
-    fame_and_time = (query_result["fame"], bot_utils.battletime_to_datetime(query_result["last_battle_time"]))
+        fame_and_time = (fame, datetime.datetime.now(datetime.timezone.utc))
+    else:
+        fame_and_time = (query_result["fame"], bot_utils.battletime_to_datetime(query_result["last_battle_time"]))
 
     cursor.execute("UPDATE match_history_recent SET last_battle_time = %s, fame = %s WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
-                   (bot_utils.datetime_to_battletime(datetime.datetime.now(datetime.timezone.utc)), fame, player_tag))
+                   (bot_utils.datetime_to_battletime(datetime.datetime.utcnow()), fame, player_tag))
 
     db.commit()
     db.close()

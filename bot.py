@@ -176,7 +176,7 @@ prev_deck_usage_sum = -1
 prev_deck_usage = None
 reset_occurred = False
 
-@aiocron.crontab('20-59 9 * * *')
+@aiocron.crontab('20-58 9 * * *')
 async def determine_reset_time():
     """
     Check every minute for a drop in total deck usage today which indicates that the daily reset has occurred. When reset occurs,
@@ -215,7 +215,7 @@ async def determine_reset_time():
         prev_deck_usage = usage_list
 
 
-@aiocron.crontab('0 10 * * *')
+@aiocron.crontab('59 9 * * *')
 async def reset_globals():
     """
     Reset global variables needed for daily reset tracking.
