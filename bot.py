@@ -96,19 +96,19 @@ async def automated_reminder_eu_sunday():
         await bot_utils.deck_usage_reminder(bot, US_time=False)
 
 
-@aiocron.crontab('0 1 * * 5,6,0')
+@aiocron.crontab('0 2 * * 5,6,0')
 async def automated_reminder_us():
     """
-    Send reminder every Friday, Saturday, and Sunday at 01:00 UTC (Thursday, Friday, and Saturday at 6pm PDT).
+    Send reminder every Friday, Saturday, and Sunday at 02:00 UTC (Thursday, Friday, and Saturday at 6pm PST).
     """
     if db_utils.get_reminder_status():
         await bot_utils.deck_usage_reminder(bot, US_time=True)
 
 
-@aiocron.crontab('0 1 * * 1')
+@aiocron.crontab('0 2 * * 1')
 async def automated_reminder_us_sunday():
     """
-    Send reminder every Monday at 01:00 UTC if race not completed (Sunday at 6pm PDT).
+    Send reminder every Monday at 02:00 UTC if race not completed (Sunday at 6pm PST).
     """
     if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
         await bot_utils.deck_usage_reminder(bot, US_time=True)
@@ -176,7 +176,7 @@ prev_deck_usage_sum = -1
 prev_deck_usage = None
 reset_occurred = False
 
-@aiocron.crontab('25-50 9 * * *')
+@aiocron.crontab('20-59 9 * * *')
 async def determine_reset_time():
     """
     Check every minute for a drop in total deck usage today which indicates that the daily reset has occurred. When reset occurs,
@@ -215,7 +215,7 @@ async def determine_reset_time():
         prev_deck_usage = usage_list
 
 
-@aiocron.crontab('51 9 * * *')
+@aiocron.crontab('0 10 * * *')
 async def reset_globals():
     """
     Reset global variables needed for daily reset tracking.
