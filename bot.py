@@ -134,17 +134,21 @@ async def assign_strikes_and_clear_vacation():
     message = ""
 
     if completed_saturday:
-        message = "River Race completed Saturday, so the following strikes have been given based on deck usage between Thursday and Saturday:\n"
+        message = "River Race completed Saturday. Participants with fewer than 10 decks have received strikes.\n"
     else:
-        message = "River Race completed Sunday, so the following strikes have been given based on deck usage between Thursday and Sunday:\n"
+        message = "River Race completed Sunday. Participants with fewer than 14 decks have received strikes.\n"
 
     if db_utils.get_strike_status():
         users_on_vacation = db_utils.get_users_on_vacation()
         deck_usage_list = db_utils.get_all_user_deck_usage_history()
         active_members = clash_utils.get_active_members_in_clan()
-        strikes_string = ""
+        mention_string = ""
+        perfect_week = True
+        embed_one = discord.Embed(title="The following users have received strikes:")
+        embed_two = discord.Embed(title="The following users have received strikes:")
+        field_count = 0
 
-        for player_name, player_tag, deck_usage_history in deck_usage_list:
+        for player_name, player_tag, deck_usage_history, tracked_since in deck_usage_list:
             if (player_tag not in active_members) or (player_name in users_on_vacation):
                 continue
 
@@ -153,27 +157,38 @@ async def assign_strikes_and_clear_vacation():
             if not should_receive_strike:
                 continue
 
+            perfect_week = False
             member = discord.utils.get(strikes_channel.members, display_name=player_name)
+            is_member = (member != None)
+
+            if is_member:
+                mention_string += f"{member.mention} "
+
             strikes = db_utils.give_strike(player_tag)
 
-            if strikes == 0:
-                continue
-
-            if member != None:
-                strikes_string += f"{member.mention} - Decks used: {decks_used_in_race},  Strikes: {strikes - 1} -> {strikes}" + "\n"
+            if field_count < 25:
+                embed_one.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nOn Discord: {is_member}\nDate: {tracked_since}```", inline=False)
+                field_count += 1
             else:
-                strikes_string += f"{player_name} - Decks used: {decks_used_in_race},  Strikes: {strikes - 1} -> {strikes}" + "\n"
+                embed_two.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nOn Discord: {is_member}\nDate: {tracked_since}```", inline=False)
 
-        if len(strikes_string) == 0:
-            message = "Everyone completed their battles this week. Good job!"
+        if perfect_week:
+            message += "Everyone completed their battles this week. Good job!"
         else:
-            message += strikes_string
+            message += mention_string
     else:
-        message = "Automated strikes are currently disabled so no strikes have been given out for the previous River Race."
+        message = "Automated strikes are currently disabled, so no strikes have been given out for the previous River Race."
 
     db_utils.clear_all_vacation()
     await vacation_channel.send("Vacation status for all users has been set to false. Make sure to use !vacation before the next war if you're going to miss it.")
     await strikes_channel.send(message)
+
+    if not perfect_week:
+        await strikes_channel.send(embed=embed_one)
+
+        if field_count == 25:
+            await strikes_channel.send(embed=embed_two)
+
 
 prev_deck_usage_sum = -1
 prev_deck_usage = None
@@ -211,6 +226,7 @@ async def determine_reset_time():
 
         if weekday == 0:
             clash_utils.calculate_match_performance(active_members=active_members)
+            db_utils.set_war_time_status(False)
         elif weekday == 3:
             db_utils.prepare_for_river_race(reset_time)
     else:

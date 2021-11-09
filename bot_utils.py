@@ -282,6 +282,16 @@ def datetime_to_battletime(time: datetime.datetime) -> str:
     return f"{time.year}{time.month:02}{time.day:02}T{time.hour:02}{time.minute:02}{time.second:02}.000Z"
 
 
+def get_current_battletime() -> str:
+    """
+    Get the current time as a Clash Royale API battleTime string.
+
+    Returns:
+        str: Current battleTime.
+    """
+    return datetime_to_battletime(datetime.datetime.utcnow())
+
+
 def create_match_performance_embed(player_name: str, player_tag: str) -> discord.Embed:
     """
     Create a Discord Embed object displaying a user's River Race stats.

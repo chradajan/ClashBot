@@ -102,7 +102,7 @@ CREATE TABLE `match_history_all` (
   PRIMARY KEY (`user_id`),
   UNIQUE KEY `user_id` (`user_id`),
   CONSTRAINT `match_history_all_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -114,7 +114,8 @@ DROP TABLE IF EXISTS `match_history_recent`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `match_history_recent` (
   `user_id` int NOT NULL,
-  `last_battle_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_check_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `tracked_since` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `fame` int NOT NULL,
   `battle_wins` int NOT NULL,
   `battle_losses` int NOT NULL,
@@ -142,8 +143,10 @@ DROP TABLE IF EXISTS `race_status`;
 CREATE TABLE `race_status` (
   `completed_saturday` tinyint(1) NOT NULL,
   `colosseum_week` tinyint(1) NOT NULL,
-  PRIMARY KEY (`completed_saturday`,`colosseum_week`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `war_time` tinyint(1) NOT NULL,
+  `last_check_time` varchar(128) NOT NULL,
+  PRIMARY KEY (`completed_saturday`,`colosseum_week`,`war_time`,`last_check_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -184,4 +187,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-11-02  4:49:08
+-- Dump completed on 2021-11-09 20:02:34
