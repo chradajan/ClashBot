@@ -159,18 +159,17 @@ async def assign_strikes_and_clear_vacation():
 
             perfect_week = False
             member = discord.utils.get(strikes_channel.members, display_name=player_name)
-            is_member = (member != None)
 
-            if is_member:
+            if (member != None):
                 mention_string += f"{member.mention} "
 
             strikes = db_utils.give_strike(player_tag)
 
             if field_count < 25:
-                embed_one.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nOn Discord: {is_member}\nDate: {tracked_since}```", inline=False)
+                embed_one.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
                 field_count += 1
             else:
-                embed_two.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nOn Discord: {is_member}\nDate: {tracked_since}```", inline=False)
+                embed_two.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
 
         if perfect_week:
             message += "Everyone completed their battles this week. Good job!"

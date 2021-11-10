@@ -496,7 +496,7 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: 
     player_list = [ player for player in json_obj["clan"]["participants"] if (player["tag"] in active_members) and (player["decksUsedToday"] > 0) ]
 
     performance_list = []
-    last_check_time = datetime.utcnow()
+    last_check_time = datetime.datetime.utcnow()
 
     for player in player_list:
         performance_list.append(calculate_player_win_rate(player["tag"], player["fame"]))
