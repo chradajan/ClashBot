@@ -252,6 +252,7 @@ async def reset_globals():
 
         if weekday == 0:
             clash_utils.calculate_match_performance(active_members=active_members)
+            db_utils.set_war_time_status(False)
         elif weekday == 3:
             db_utils.prepare_for_river_race(reset_time)
 

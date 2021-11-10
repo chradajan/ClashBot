@@ -1,5 +1,6 @@
 from config import PRIMARY_CLAN_TAG
 from credentials import CLASH_API_KEY
+from typing import List, Tuple
 import bot_utils
 import datetime
 import db_utils
@@ -121,7 +122,7 @@ def get_clash_user_data(message: str, discord_name: str, discord_id: int) -> dic
     return user_dict
 
 
-def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> list:
+def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, int]]:
     """
     Retrieve a list of players in a clan who have not used 4 war decks today.
 
@@ -223,7 +224,7 @@ def get_user_decks_used_today(player_tag: str) -> int:
     return 0
 
 
-def get_top_fame_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> list:
+def get_top_fame_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, int]]:
     """
     Get the top n users in a clan by fame. Can possible return more than n if players are tied for the same amount of fame.
 
@@ -260,7 +261,7 @@ def get_top_fame_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> list:
     return return_list
 
 
-def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> list:
+def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, int]]:
     """
     Get a list of players below a specified fame threshold.
 
@@ -348,7 +349,7 @@ def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
 
 def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
     """
-    Look at a player's battelog and break down their performance in recent river race battles.
+    Look at a player's battle log and break down their performance in recent river race battles.
 
     Args:
         player_tag(str): Player to check match history of.
