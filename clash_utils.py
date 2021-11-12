@@ -494,7 +494,7 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: 
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    player_list = [ player for player in json_obj["clan"]["participants"] if (player["tag"] in active_members) and (player["decksUsedToday"] > 0) ]
+    player_list = [ player for player in json_obj["clan"]["participants"] if (player["tag"] in active_members) ]
 
     performance_list = []
     last_check_time = datetime.datetime.utcnow()
