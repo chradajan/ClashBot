@@ -163,7 +163,10 @@ async def assign_strikes_and_clear_vacation():
             if (member != None):
                 mention_string += f"{member.mention} "
 
-            strikes = db_utils.give_strike(player_tag)
+            _, strikes, _ = db_utils.give_strike(player_tag, 1)
+
+            if strikes is None:
+                continue
 
             if field_count < 25:
                 embed_one.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)

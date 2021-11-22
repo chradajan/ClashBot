@@ -98,7 +98,7 @@ def add_new_user(clash_data: dict) -> bool:
                             WHERE player_tag = %(player_tag)s"
             cursor.execute(update_query, clash_data)
     else:
-        insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(discord_id)s, %(clan_role)s, TRUE, FALSE, 0, 0, %(status)s, %(clan_id)s)"
+        insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(discord_id)s, %(clan_role)s, TRUE, FALSE, 0, 0, 0, %(status)s, %(clan_id)s)"
         cursor.execute(insert_user_query, clash_data)
 
     # Get id of newly inserted user.
@@ -174,7 +174,7 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     clash_data["discord_name"] = f"{clash_data['status']}{player_tag}"
 
     # Insert them
-    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, NULL, %(clan_role)s, TRUE, FALSE, 0, 0, %(status)s, %(clan_id)s)"
+    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, NULL, %(clan_role)s, TRUE, FALSE, 0, 0, 0, %(status)s, %(clan_id)s)"
     cursor.execute(insert_user_query, clash_data)
 
     # Create match_history entries.
@@ -270,6 +270,7 @@ def get_user_data(search_key: str) -> dict:
                 clan_tag: str,
                 vacation: bool,
                 strikes: int,
+                permanent_strikes: int,
                 usage_history: int,
                 status: str
             }
@@ -296,6 +297,7 @@ def get_user_data(search_key: str) -> dict:
     user_data["clan_role"] = query_result["clan_role"]
     user_data["vacation"] = query_result["vacation"]
     user_data["strikes"] = query_result["strikes"]
+    user_data["permanent_strikes"] = query_result["permanent_strikes"]
     user_data["usage_history"] = query_result["usage_history"]
     user_data["status"] = query_result["status"]
 
@@ -315,38 +317,59 @@ def get_user_data(search_key: str) -> dict:
     return user_data
 
 
-def give_strike(player_tag: str) -> int:
+def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int]:
     """
     Give 1 strike to the specified player. Add them as an unregistered user if they don't exist in the database.
 
     Args:
         player_tag(str): Player to give strike to.
+        delta(int): Number of strikes to +/- from current strikes for user.
 
     Returns:
-        int: Specified user's new strike count, or 0 if unregistered user could not be added.
+        Tuple[int, int]: (old_strike_count, new_strike_count, new_permanent_strike_count), or (None, None) if something went wrong.
     """
     db, cursor = connect_to_db()
 
-    strike_count = 0
-    cursor.execute("SELECT * FROM users WHERE player_tag = %s", (player_tag))
+    old_strike_count = None
+    new_strike_count = None
+    new_permanent_strike_count = None
+    cursor.execute("SELECT strikes, permanent_strikes FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
 
-    # Add unregistered user if they aren't in the users table.
-    if query_result == None:
+    if query_result is None:
         if not add_new_unregistered_user(player_tag):
             db.close()
-            return 0
-        strike_count = 1
+            return (old_strike_count, new_strike_count, new_permanent_strike_count)
 
-    cursor.execute("UPDATE users SET strikes = strikes + 1 WHERE player_tag = %s", (player_tag))
+        old_strike_count = 0
 
-    if query_result != None:
-        strike_count = query_result["strikes"] + 1
+        if delta < 0:
+            new_strike_count = 0
+            new_permanent_strike_count = 0
+        else:
+            new_strike_count = delta
+            new_permanent_strike_count = delta
+    else:
+        old_strike_count = query_result["strikes"]
+        old_permanent_strike_count = query_result["permanent_strikes"]
+
+        if old_strike_count + delta < 0:
+            new_strike_count = 0
+        else:
+            new_strike_count = old_strike_count + delta
+
+        if old_permanent_strike_count + delta < 0:
+            new_permanent_strike_count = 0
+        else:
+            new_permanent_strike_count = old_permanent_strike_count + delta
+
+    cursor.execute("UPDATE users SET strikes = %s, permanent_strikes = %s WHERE player_tag = %s",
+                   (new_strike_count, new_permanent_strike_count, player_tag))
 
     db.commit()
     db.close()
 
-    return strike_count
+    return (old_strike_count, new_strike_count, new_permanent_strike_count)
 
 
 def get_strikes(discord_id: int) -> int:
@@ -377,40 +400,6 @@ def reset_strikes():
     cursor.execute("UPDATE users SET strikes = 0")
     db.commit()
     db.close()
-
-
-def set_strikes(search_key: str, strike_count: int) -> tuple:
-    """
-    Set a user's strike count to a specified number.
-
-    Args:
-        search_key(str): Key to search for in database. First try using as a player tag. If no results, then try as a player name.
-        strike_count(int): Number of strikes to set.
-
-    Returns:
-        int: Previous strike count of specified user.
-    """
-    db, cursor = connect_to_db()
-
-    cursor.execute("SELECT player_tag, strikes FROM users WHERE player_tag = %s", (search_key))
-    query_result = cursor.fetchone()
-
-    if query_result == None:
-        cursor.execute("SELECT player_tag, strikes FROM users WHERE player_name = %s", (search_key))
-        query_result = cursor.fetchall()
-        
-        if len(query_result) > 1:
-            db.close()
-            return None
-        else:
-            query_result = query_result[0]
-
-    cursor.execute("UPDATE users SET strikes = %s WHERE player_tag = %s", (strike_count, query_result["player_tag"]))
-
-    db.commit()
-    db.close()
-
-    return query_result["strikes"]
 
 
 # [(player_name, strikes),]
@@ -556,24 +545,30 @@ def get_last_check_time() -> str:
     return query_result["last_check_time"]
 
 
-def get_player_tag(discord_id: int) -> str:
+def get_player_tag(search_key) -> str:
     """
     Return the player tag corresponding to a Discord member.
 
     Args:
-        discord_id(int): Unique Discord id of a member.
+        search_key: Key to search for in database. First try using as a unique Discord id. If no results, then try as a player name.
 
     Returns:
         str: Specified member's player tag.
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_tag FROM users WHERE discord_id = %s", (discord_id))
+    cursor.execute("SELECT player_tag FROM users WHERE discord_id = %s", (search_key))
     query_result = cursor.fetchone()
 
-    if (query_result == None):
-        db.close()
-        return None
+    if query_result is None:
+        cursor.execute("SELECT player_tag FROM users WHERE player_name = %s", (search_key))
+        query_result = cursor.fetchall()
+
+        if len(query_result) > 1:
+            db.close()
+            return None
+        else:
+            query_result = query_result[0]
 
     player_tag = query_result["player_tag"]
 
@@ -1424,7 +1419,7 @@ def export(primary_clan_only: bool) -> str:
     all_stats_sheet = workbook.add_worksheet("All Stats")
 
     # Info sheet headers
-    info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
+    info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes", "Permanent Strikes", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
     info_sheet.write_row(0, 0, info_headers)
 
     # History sheet headers
@@ -1478,7 +1473,7 @@ def export(primary_clan_only: bool) -> str:
         info_row = [user["player_name"], user["player_tag"], user["discord_name"], user["clan_role"],
                      "US" if user["US_time"] else "EU",
                      "Yes" if user["vacation"] else "No",
-                     user["strikes"], user["status"],
+                     user["strikes"], user["permanent_strikes"], user["status"],
                      clans_dict[clan_id]["clan_name"], clans_dict[clan_id]["clan_tag"],
                      f"https://royaleapi.com/player/{user['player_tag'][1:]}"]
 

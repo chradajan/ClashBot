@@ -134,6 +134,7 @@ class StatusReports(commands.Cog):
         general_info_table.add_row(["Player Name", user_data["player_name"]])
         general_info_table.add_row(["Player Tag", user_data["player_tag"]])
         general_info_table.add_row(["Strikes", user_data["strikes"]])
+        general_info_table.add_row(["Permanent Strikes", user_data["permanent_strikes"]])
         general_info_table.add_row(["Discord Name", user_data["discord_name"]])
         general_info_table.add_row(["Clan Name", user_data["clan_name"]])
         general_info_table.add_row(["Clan Tag", user_data["clan_tag"]])
@@ -188,13 +189,13 @@ class StatusReports(commands.Cog):
         player_tag = db_utils.get_player_tag(member.id)
 
         if player_tag == None:
-            await ctx.send(f"{member.display_name} is a member of this Discord server but they were not found in the database. Make sure their nickname matches their in-game player name.")
+            await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
             return
 
         user_data = db_utils.get_user_data(player_tag)
 
         if user_data == None:
-            await ctx.send(f"{member.display_name} is a member of this Discord server but they were not found in the database. Make sure their nickname matches their in-game player name.")
+            await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
             return
         
         await self.player_report_helper(ctx, user_data)
