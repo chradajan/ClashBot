@@ -21,7 +21,7 @@ class Strikes(commands.Cog):
             delta(int): Number of strikes to give or remove.
             member(discord.Member): Member object of user if they are on Discord.
         """
-        old_strike_count, new_strike_count, permanent_strikes = db_utils.give_strike(player_tag, delta)
+        old_strike_count, new_strike_count, old_permanent_strikes, new_permanent_strikes = db_utils.give_strike(player_tag, delta)
 
         if old_strike_count is None:
             await ctx.send(f"Something went wrong while updating {player_name}'s strikes. This should not happen.")
@@ -31,7 +31,7 @@ class Strikes(commands.Cog):
         message = "has received a strike" if delta > 0 else "has had a strike removed"
 
         embed = discord.Embed(title="Strikes Updated")
-        embed.add_field(name=player_name, value=f"```Strikes: {old_strike_count} -> {new_strike_count}\nPermanent Strikes: {permanent_strikes}```")
+        embed.add_field(name=player_name, value=f"```Strikes: {old_strike_count} -> {new_strike_count}\nPermanent Strikes: {old_permanent_strikes} -> {new_permanent_strikes}```")
         await ctx.send(embed=embed)
 
         if member is None:

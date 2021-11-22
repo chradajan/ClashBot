@@ -317,7 +317,7 @@ def get_user_data(search_key: str) -> dict:
     return user_data
 
 
-def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int]:
+def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int, int]:
     """
     Give 1 strike to the specified player. Add them as an unregistered user if they don't exist in the database.
 
@@ -326,12 +326,14 @@ def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int]:
         delta(int): Number of strikes to +/- from current strikes for user.
 
     Returns:
-        Tuple[int, int]: (old_strike_count, new_strike_count, new_permanent_strike_count), or (None, None) if something went wrong.
+        Tuple[int, int, int, int]: (old_strike_count, new_strike_count, old_permanent_strike_count, new_permanent_strike_count),
+                                   or (None, None, None, None) if something went wrong.
     """
     db, cursor = connect_to_db()
 
     old_strike_count = None
     new_strike_count = None
+    old_permanent_strike_count = None
     new_permanent_strike_count = None
     cursor.execute("SELECT strikes, permanent_strikes FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
@@ -339,9 +341,10 @@ def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int]:
     if query_result is None:
         if not add_new_unregistered_user(player_tag):
             db.close()
-            return (old_strike_count, new_strike_count, new_permanent_strike_count)
+            return (old_strike_count, new_strike_count, old_permanent_strike_count, new_permanent_strike_count)
 
         old_strike_count = 0
+        old_permanent_strike_count = 0
 
         if delta < 0:
             new_strike_count = 0
@@ -369,7 +372,7 @@ def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int]:
     db.commit()
     db.close()
 
-    return (old_strike_count, new_strike_count, new_permanent_strike_count)
+    return (old_strike_count, new_strike_count, old_permanent_strike_count, new_permanent_strike_count)
 
 
 def get_strikes(discord_id: int) -> int:
