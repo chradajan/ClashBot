@@ -227,7 +227,7 @@ async def determine_reset_time():
         db_utils.record_deck_usage_today(prev_deck_usage)
 
         if weekday == 0:
-            clash_utils.calculate_match_performance(active_members=active_members)
+            clash_utils.calculate_match_performance_after_race(active_members=active_members)
             db_utils.set_war_time_status(False)
         elif weekday == 3:
             db_utils.prepare_for_river_race(reset_time)
@@ -254,7 +254,7 @@ async def reset_globals():
         db_utils.record_deck_usage_today(prev_deck_usage)
 
         if weekday == 0:
-            clash_utils.calculate_match_performance(active_members=active_members)
+            clash_utils.calculate_match_performance_after_race(active_members=active_members)
             db_utils.set_war_time_status(False)
         elif weekday == 3:
             db_utils.prepare_for_river_race(reset_time)

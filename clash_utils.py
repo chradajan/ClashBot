@@ -480,6 +480,7 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: 
 
     Args:
         clan_tag(str, optional): Check player match performance of players in this clan.
+        active_members(dict, optional): Dict of active members if available.
     """
     if active_members == None:
         active_members = get_active_members_in_clan(clan_tag)
@@ -501,6 +502,42 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: 
 
     for player in player_list:
         performance_list.append(calculate_player_win_rate(player["tag"], player["fame"]))
+
+    db_utils.update_match_history(performance_list)
+    db_utils.set_last_check_time(last_check_time)
+
+
+def calculate_match_performance_after_race(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
+    """
+    The final match performance check runs after the river race has concluded, so it needs to evaluate based on latest entry in the
+    river race log rather than current river race.
+
+    Args:
+        clan_tag(str, optional): Check player match performance of players in this clan.
+        active_members(dict, optional): Dict of active members if available.
+    """
+
+    if active_members == None:
+        active_members = get_active_members_in_clan(clan_tag)
+
+    db_utils.clean_up_db(active_members)
+
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/riverracelog?limit=1", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    json_obj = req.json()
+    clan_index = 0
+    performance_list = []
+    last_check_time = datetime.datetime.utcnow()
+
+    for clan in json_obj["items"][0]["standings"]:
+        if clan["clan"]["tag"] == clan_tag:
+            break
+        else:
+            clan_index += 1
+
+    for player in json_obj["items"][0]["standings"][clan_index]["clan"]["participants"]:
+        if player["tag"] in active_members:
+            performance_list.append(calculate_player_win_rate(player["tag"], player["fame"]))
 
     db_utils.update_match_history(performance_list)
     db_utils.set_last_check_time(last_check_time)
