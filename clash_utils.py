@@ -142,8 +142,14 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
     json_obj = json.loads(json_dump)
 
     active_members = get_active_members_in_clan(clan_tag)
+    participants = []
 
-    participants = [ (participant["name"], 4 - participant["decksUsedToday"]) for participant in json_obj["clan"]["participants"] if ((participant["decksUsedToday"] < 4) and (participant["tag"] in active_members)) ]
+    for participant in json_obj["clan"]["participants"]:
+        player_tag = participant["tag"]
+        remaining_decks = 4 - participant["decksUsedToday"]
+        if (remaining_decks != 0) and (player_tag in active_members):
+            participants.append((active_members[player_tag]["name"], remaining_decks))
+
     participants.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participants
@@ -245,7 +251,7 @@ def get_top_fame_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tup
 
     active_members = get_active_members_in_clan(clan_tag)
 
-    fame_list = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if participant["tag"] in active_members ]
+    fame_list = [ (active_members[participant["tag"]]["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if participant["tag"] in active_members ]
     fame_list.sort(key = lambda x : x[1], reverse = True)
 
     if len(fame_list) <= top_n:
@@ -282,7 +288,7 @@ def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
 
     active_members = get_active_members_in_clan(clan_tag)
 
-    participants = [ (participant["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["tag"] in active_members)) ]
+    participants = [ (active_members[participant["tag"]]["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["tag"] in active_members)) ]
     participants.sort(key = lambda x : (x[1], x[0].lower()))
 
     return participants
