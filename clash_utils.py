@@ -294,7 +294,7 @@ def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     return participants
 
 
-def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
+def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, int]]:
     """
     Get the number of available war decks remaining for all clans in a race with specified clan.
 
@@ -315,12 +315,10 @@ def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
     return_list = []
 
     for clan in json_obj["clans"]:
-        active_members = get_active_members_in_clan(clan["tag"])
-        decks_remaining = 0
+        decks_remaining = 200
 
         for participant in clan["participants"]:
-            if participant["tag"] in active_members:
-                decks_remaining += (4 - participant["decksUsedToday"])
+            decks_remaining -= participant["decksUsedToday"]
 
         return_list.append((clan["name"], decks_remaining))
 
