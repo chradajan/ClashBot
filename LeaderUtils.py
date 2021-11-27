@@ -237,3 +237,47 @@ class LeaderUtils(commands.Cog):
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !fame_check <threshold>")
             raise error
+
+
+    async def kick_helper(self, ctx, player_name: str, player_tag: str):
+        """
+        Kick the specified player and send an embed confirming the kick.
+
+        Args:
+            ctx: Context object.
+            player_name(str): Name of player to kick.
+            player_tag(str): Tag of player to kick.
+        """
+        total_kicks, last_kick_date = db_utils.kick_user(player_tag)
+        embed = discord.Embed(title="Kick Logged")
+        embed.add_field(name=f"{player_name}", value=f"```Times kicked: {total_kicks}\nLast Kicked: {last_kick_date}")
+
+        await ctx.send(embed=embed)
+
+    """
+    Command: !kick {player_name}
+
+    Add a kick entry to the database with the current time for specified user.
+    """
+    @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    async def kick(self, ctx, member: discord.Member):
+        """Log that the specified user was kicked from the clan."""
+        player_tag = db_utils.get_player_tag(member.id)
+        await self.kick_helper(player_tag)
+
+    @kick.error
+    async def kick_error(self, ctx, error):
+        if isinstance(error, commands.errors.CheckFailure):
+            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+            await ctx.send(f"!player_report command can only be sent in {channel.mention} by Leaders/Admins.")
+        elif isinstance(error, commands.errors.MemberNotFound):
+            player_tag = db_utils.get_player_tag(error.argument)
+            if player_tag != None:
+                await self.kick_helper(ctx, error.argument, player_tag)
+            else:
+                await ctx.send("Member not found. This could be because there a multiple UNREGISTERED users with identical player_names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
+        else:
+            await ctx.send("Something went wrong. Command should be formatted as:  !player_report <general_info (optional)> <deck_usage_info (optional)>")
+            raise error

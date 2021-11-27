@@ -135,6 +135,7 @@ class StatusReports(commands.Cog):
         general_info_table.add_row(["Player Tag", user_data["player_tag"]])
         general_info_table.add_row(["Strikes", user_data["strikes"]])
         general_info_table.add_row(["Permanent Strikes", user_data["permanent_strikes"]])
+        general_info_table.add_row(["Kicks", len(db_utils.get_kicks(user_data["player_tag"]))])
         general_info_table.add_row(["Discord Name", user_data["discord_name"]])
         general_info_table.add_row(["Clan Name", user_data["clan_name"]])
         general_info_table.add_row(["Clan Tag", user_data["clan_tag"]])
@@ -171,9 +172,6 @@ class StatusReports(commands.Cog):
         except:
             await ctx.send(f"{user_data['player_name']} has used {decks_used_today} decks today." + "\n\n" +\
                             f"{user_data['player_name']}'s deck usage history" + "\n" + "```\n" + deck_usage_history_table.get_string() + "```")
-
-        match_performance_embed = bot_utils.create_match_performance_embed(user_data["player_name"], user_data["player_tag"])
-        await ctx.send(embed=match_performance_embed)
 
 
     """

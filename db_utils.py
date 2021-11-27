@@ -1341,6 +1341,63 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=
         add_new_unregistered_user(player_tag)
 
 
+def kick_user(player_tag: str) -> Tuple[int, str]:
+    """
+    Insert a kick entry for the specified user.
+
+    Args:
+        player_tag(str): Player tag of user to kick.
+
+    Returns:
+        Tuple[int, str]: Tuple of total number of kicks and last time user was kicked.
+    """
+    kick_time = bot_utils.get_current_battletime()
+    db, cursor = connect_to_db()
+
+    id = cursor.execute("SELECT id FROM users WHERE player_tag = %s", (player_tag))
+    cursor.execute("INSERT INTO kicks VALUES (%s, %s)", (id, kick_time))
+
+    db.commit()
+    db.close()
+
+    kicks = get_kicks()
+    total_kicks = len(kicks)
+    last_kick_date = None
+
+    if total_kicks == 1:
+        last_kick_date = "Today"
+    else:
+        last_kick_date = kicks[-2]
+
+    return (total_kicks, last_kick_date)
+
+
+def get_kicks(player_tag: str) -> List[str]:
+    """
+    Get a list of times a user was kicked.
+
+    Args:
+        player_tag(str): Player tag of user to get kicks for.
+    
+    Returns:
+        List[datetime.date]: List of times the user was kicked.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT kick_time FROM kicks WHERE user_id = (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
+    query_result = cursor.fetchall()
+    kicks = []
+
+    for kick in query_result:
+        kick_time = bot_utils.battletime_to_datetime(kick["kick_time"])
+        kicks.append(kick_time.strftime("%Y-%m-%d"))
+
+    kicks.sort()
+
+    db.close()
+    return kicks
+
+
 def get_file_path() -> str:
     """
     Get path of new CSV file that should be created during export process.
@@ -1417,12 +1474,13 @@ def export(primary_clan_only: bool) -> str:
     file_path = get_file_path()
     workbook = xlsxwriter.Workbook(file_path)
     info_sheet = workbook.add_worksheet("Info")
-    history_sheet = workbook.add_worksheet('History')
+    history_sheet = workbook.add_worksheet("History")
+    kicks_sheet = workbook.add_worksheet("Kicks")
     recent_stats_sheet = workbook.add_worksheet("Recent Stats")
     all_stats_sheet = workbook.add_worksheet("All Stats")
 
     # Info sheet headers
-    info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes", "Permanent Strikes", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
+    info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes", "Permanent Strikes", "Kicks", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
     info_sheet.write_row(0, 0, info_headers)
 
     # History sheet headers
@@ -1442,6 +1500,10 @@ def export(primary_clan_only: bool) -> str:
     history_headers.append(today_header)
 
     history_sheet.write_row(0, 0, history_headers)
+
+    # Kicks sheet headers
+    kicks_headers = ["Player Name", "Player Tag"]
+    kicks_sheet.write_row(0, 0, kicks_headers)
 
     # Stat sheets headers
     recent_stats_headers = ["Player Name", "Player Tag", "Fame", "Decks Used", "Tracked Since",
@@ -1473,10 +1535,11 @@ def export(primary_clan_only: bool) -> str:
     for user in users:
         # Get info
         clan_id = user["clan_id"]
+        kicks = get_kicks(user["player_tag"])
         info_row = [user["player_name"], user["player_tag"], user["discord_name"], user["clan_role"],
                      "US" if user["US_time"] else "EU",
                      "Yes" if user["vacation"] else "No",
-                     user["strikes"], user["permanent_strikes"], user["status"],
+                     user["strikes"], user["permanent_strikes"], len(kicks), user["status"],
                      clans_dict[clan_id]["clan_name"], clans_dict[clan_id]["clan_tag"],
                      f"https://royaleapi.com/player/{user['player_tag'][1:]}"]
 
@@ -1493,6 +1556,10 @@ def export(primary_clan_only: bool) -> str:
             usage_today = clash_utils.get_user_decks_used_today(user["player_tag"])
 
         history_row.append(usage_today)
+
+        # Kicks
+        kicks_row = [user["player_name"], user["player_tag"]]
+        kicks_row.extend(kicks)
 
         # Get stats
         match_performance = get_match_performance_dict(user["player_tag"])
@@ -1551,6 +1618,7 @@ def export(primary_clan_only: bool) -> str:
         # Write data to spreadsheet
         info_sheet.write_row(row, 0, info_row)
         history_sheet.write_row(row, 0, history_row)
+        kicks_sheet.write_row(row, 0, kicks_row)
         recent_stats_sheet.write_row(row, 0, recent_stats_row)
         all_stats_sheet.write_row(row, 0, all_stats_row)
         row += 1
