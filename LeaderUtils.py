@@ -250,7 +250,7 @@ class LeaderUtils(commands.Cog):
         """
         total_kicks, last_kick_date = db_utils.kick_user(player_tag)
         embed = discord.Embed(title="Kick Logged")
-        embed.add_field(name=player_name, value=f"```Times kicked: {total_kicks}\nLast Kicked: {last_kick_date}```")
+        embed.add_field(name=player_name, value=f"```Times kicked: {total_kicks}\nLast kicked: {last_kick_date}```")
 
         await ctx.send(embed=embed)
 
