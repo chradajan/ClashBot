@@ -1,5 +1,6 @@
 from config import *
 from discord.ext import commands
+from prettytable import PrettyTable
 import bot_utils
 import db_utils
 import discord
@@ -135,4 +136,39 @@ class Strikes(commands.Cog):
             await ctx.send(f"!send_reminder command can only be sent in {channel.mention} by Leaders/Admins.")
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !reset_all_strikes")
+            raise error
+
+
+    """
+    Command: !strikes_report
+
+    Get a list of users with at least 1 strike.
+    """
+    @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    async def strikes_report(self, ctx):
+        """Get a report of players with strikes."""
+        strike_list = db_utils.get_strike_report()
+        table = PrettyTable()
+        table.field_names = ["Member", "Strikes"]
+        embed = discord.Embed(title="Status Report")
+
+        for player_name, strikes in strike_list:
+            table.add_row([player_name, strikes])
+
+        embed.add_field(name="Players with at least 1 strike", value = "```\n" + table.get_string() + "```")
+
+        try:
+            await ctx.send(embed=embed)
+        except:
+            await ctx.send("Players with at least 1 strike\n" + "```\n" + table.get_string() + "```")
+
+    @strikes_report.error
+    async def strikes_report_error(self, ctx, error):
+        if isinstance(error, commands.errors.CheckFailure):
+            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+            await ctx.send(f"!strikes_report command can only be sent in {channel.mention} by Leaders/Admins.")
+        else:
+            await ctx.send("Something went wrong. Command should be formatted as:  !strikes_report")
             raise error
