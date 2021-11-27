@@ -175,6 +175,8 @@ class StatusReports(commands.Cog):
                 await self.player_report_helper(ctx, user_data)
             else:
                 await ctx.send("Member not found. This could be because there a multiple UNREGISTERED users with identical player_names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
+        elif isinstance(error, commands.errors.MissingRequiredArgument):
+            await ctx.send("You did not specify a user. Command should be formatted as:  !player_report <member>")
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !player_report <member>")
             raise error
