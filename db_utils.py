@@ -567,11 +567,11 @@ def get_player_tag(search_key) -> str:
         cursor.execute("SELECT player_tag FROM users WHERE player_name = %s", (search_key))
         query_result = cursor.fetchall()
 
-        if len(query_result) > 1:
+        if len(query_result) == 1:
+            query_result = query_result[0]
+        else:
             db.close()
             return None
-        else:
-            query_result = query_result[0]
 
     player_tag = query_result["player_tag"]
 
@@ -1354,13 +1354,16 @@ def kick_user(player_tag: str) -> Tuple[int, str]:
     kick_time = bot_utils.get_current_battletime()
     db, cursor = connect_to_db()
 
-    id = cursor.execute("SELECT id FROM users WHERE player_tag = %s", (player_tag))
+    cursor.execute("SELECT id FROM users WHERE player_tag = %s", (player_tag))
+    query_result = cursor.fetchone()
+    id = query_result["id"]
+
     cursor.execute("INSERT INTO kicks VALUES (%s, %s)", (id, kick_time))
 
     db.commit()
     db.close()
 
-    kicks = get_kicks()
+    kicks = get_kicks(player_tag)
     total_kicks = len(kicks)
     last_kick_date = None
 
@@ -1370,6 +1373,41 @@ def kick_user(player_tag: str) -> Tuple[int, str]:
         last_kick_date = kicks[-2]
 
     return (total_kicks, last_kick_date)
+
+
+def undo_kick(player_tag: str) -> str:
+    """
+    Undo the latest kick of the specified user.
+
+    Args:
+        player_tag(str): Player tag of user to undo kick for.
+
+    Returns:
+        str: Time of undone kick, or None if user has not been kicked before.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT id FROM users WHERE player_tag = %s", (player_tag))
+    query_result = cursor.fetchone()
+    id = query_result["id"]
+
+    cursor.execute("SELECT kick_time FROM kicks WHERE user_id = %s", (id))
+    query_result = cursor.fetchall()
+
+    if len(query_result) == 0:
+        db.close()
+        return None
+
+    kicks = [ kick["kick_time"] for kick in query_result ]
+    kicks.sort()
+    latest_kick_time = kicks[-1]
+
+    cursor.execute("DELETE FROM kicks WHERE user_id = %s AND kick_time = %s", (id, latest_kick_time))
+    latest_kick_time = bot_utils.battletime_to_datetime(latest_kick_time).strftime("%Y-%m-%d")
+    
+    db.commit()
+    db.close()
+    return latest_kick_time
 
 
 def get_kicks(player_tag: str) -> List[str]:

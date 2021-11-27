@@ -250,7 +250,7 @@ class LeaderUtils(commands.Cog):
         """
         total_kicks, last_kick_date = db_utils.kick_user(player_tag)
         embed = discord.Embed(title="Kick Logged")
-        embed.add_field(name=f"{player_name}", value=f"```Times kicked: {total_kicks}\nLast Kicked: {last_kick_date}")
+        embed.add_field(name=player_name, value=f"```Times kicked: {total_kicks}\nLast Kicked: {last_kick_date}```")
 
         await ctx.send(embed=embed)
 
@@ -265,13 +265,13 @@ class LeaderUtils(commands.Cog):
     async def kick(self, ctx, member: discord.Member):
         """Log that the specified user was kicked from the clan."""
         player_tag = db_utils.get_player_tag(member.id)
-        await self.kick_helper(player_tag)
+        await self.kick_helper(ctx, member.display_name, player_tag)
 
     @kick.error
     async def kick_error(self, ctx, error):
         if isinstance(error, commands.errors.CheckFailure):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!player_report command can only be sent in {channel.mention} by Leaders/Admins.")
+            await ctx.send(f"!kick command can only be sent in {channel.mention} by Leaders/Admins.")
         elif isinstance(error, commands.errors.MemberNotFound):
             player_tag = db_utils.get_player_tag(error.argument)
             if player_tag != None:
@@ -279,5 +279,52 @@ class LeaderUtils(commands.Cog):
             else:
                 await ctx.send("Member not found. This could be because there a multiple UNREGISTERED users with identical player_names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !player_report <general_info (optional)> <deck_usage_info (optional)>")
+            await ctx.send("Something went wrong. Command should be formatted as:  !kick <member>")
+            raise error
+
+
+    async def undo_kick_helper(self, ctx, player_name: str, player_tag: str):
+        """
+        Undo the latest kick of the specified user and send an embed with details about the kick.
+
+        Args:
+            player_name(str): Name of player to undo kick for.
+            player_tag(str): Tag of player to undo kick for.
+        """
+        removed_kick = db_utils.undo_kick(player_tag)
+        embed = discord.Embed(title="Kick Undone")
+
+        if removed_kick is None:
+            embed.add_field(name=player_name, value="This user has no kicks to undo.")
+        else:
+            embed.add_field(name=player_name, value=f"```Undid kick from: {removed_kick}```")
+
+        await ctx.send(embed=embed)
+
+    """
+    Command: !undo_kick {player_name}
+
+    Undo the latest kick for specified user.
+    """
+    @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    async def undo_kick(self, ctx, member: discord.Member):
+        """Undo the latest kick of the specified user."""
+        player_tag = db_utils.get_player_tag(member.id)
+        await self.undo_kick_helper(ctx, member.display_name, player_tag)
+
+    @undo_kick.error
+    async def undo_kick_error(self, ctx, error):
+        if isinstance(error, commands.errors.CheckFailure):
+            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+            await ctx.send(f"!undo_kick command can only be sent in {channel.mention} by Leaders/Admins.")
+        elif isinstance(error, commands.errors.MemberNotFound):
+            player_tag = db_utils.get_player_tag(error.argument)
+            if player_tag != None:
+                await self.undo_kick_helper(ctx, error.argument, player_tag)
+            else:
+                await ctx.send("Member not found. This could be because there a multiple UNREGISTERED users with identical player_names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
+        else:
+            await ctx.send("Something went wrong. Command should be formatted as:  !undo_kick <member>")
             raise error
