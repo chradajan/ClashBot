@@ -81,6 +81,21 @@ CREATE TABLE `discord_roles` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `kicks`
+--
+
+DROP TABLE IF EXISTS `kicks`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `kicks` (
+  `user_id` int NOT NULL,
+  `kick_time` varchar(128) NOT NULL,
+  PRIMARY KEY (`user_id`,`kick_time`),
+  CONSTRAINT `kicks_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `match_history_all`
 --
 
@@ -115,7 +130,7 @@ DROP TABLE IF EXISTS `match_history_recent`;
 CREATE TABLE `match_history_recent` (
   `user_id` int NOT NULL,
   `last_check_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `tracked_since` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tracked_since` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `fame` int NOT NULL,
   `battle_wins` int NOT NULL,
   `battle_losses` int NOT NULL,
@@ -144,9 +159,9 @@ CREATE TABLE `race_status` (
   `completed_saturday` tinyint(1) NOT NULL,
   `colosseum_week` tinyint(1) NOT NULL,
   `war_time` tinyint(1) NOT NULL,
-  `last_check_time` varchar(128) NOT NULL,
+  `last_check_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`completed_saturday`,`colosseum_week`,`war_time`,`last_check_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -166,6 +181,7 @@ CREATE TABLE `users` (
   `US_time` tinyint(1) NOT NULL,
   `vacation` tinyint(1) NOT NULL,
   `strikes` int NOT NULL,
+  `permanent_strikes` int NOT NULL,
   `usage_history` int NOT NULL,
   `status` enum('ACTIVE','INACTIVE','UNREGISTERED','DEPARTED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `clan_id` int NOT NULL,
@@ -187,4 +203,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-11-09 20:02:34
+-- Dump completed on 2021-11-27  3:18:36
