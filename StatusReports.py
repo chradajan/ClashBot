@@ -96,12 +96,18 @@ class StatusReports(commands.Cog):
 
     async def player_report_helper(self, ctx, user_data: dict):
         general_info_table = PrettyTable()
+        kicks = db_utils.get_kicks(user_data["player_tag"])
+        total_kicks = len(kicks)
+        last_kicked = "Never"
+        if total_kicks > 0:
+            last_kicked = kicks[-1]
 
         general_info_table.add_row(["Player Name", user_data["player_name"]])
         general_info_table.add_row(["Player Tag", user_data["player_tag"]])
         general_info_table.add_row(["Strikes", user_data["strikes"]])
         general_info_table.add_row(["Permanent Strikes", user_data["permanent_strikes"]])
-        general_info_table.add_row(["Kicks", len(db_utils.get_kicks(user_data["player_tag"]))])
+        general_info_table.add_row(["Kicks", total_kicks])
+        general_info_table.add_row(["Last Kicked", last_kicked])
         general_info_table.add_row(["Discord Name", user_data["discord_name"]])
         general_info_table.add_row(["Clan Name", user_data["clan_name"]])
         general_info_table.add_row(["Clan Tag", user_data["clan_tag"]])
