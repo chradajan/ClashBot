@@ -351,13 +351,14 @@ def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
     return json_obj["clan"]["fame"] >= 10000
 
 
-def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
+def calculate_player_win_rate(player_tag: str, fame: int, current_check_time: datetime.datetime) -> dict:
     """
     Look at a player's battle log and break down their performance in recent river race battles.
 
     Args:
         player_tag(str): Player to check match history of.
         fame(int): Total fame they've accumulated in the current river race.
+        current_check_time(datetime.datetime): Time to set last_check_time after this check.
 
     Returns:
         dict{str: int}: Number of wins and losses in each river race battle type for the specified player.
@@ -374,7 +375,7 @@ def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
                 "duel_series_losses": int
             }
     """
-    prev_fame, last_check_time = db_utils.get_and_update_match_history_info(player_tag, fame)
+    prev_fame, last_check_time = db_utils.get_and_update_match_history_info(player_tag, fame, current_check_time)
 
     # This should only happen when an unregistered user is added but their information can't be retrieved from the API.
     if prev_fame == None:
@@ -395,8 +396,9 @@ def calculate_player_win_rate(player_tag: str, fame: int) -> dict:
     river_race_battle_list = []
 
     for battle in battles:
+        battle_time = bot_utils.battletime_to_datetime(battle["battleTime"])
         if (((battle["type"].startswith("riverRace")) or (battle["type"] == "boatBattle")) and
-            (bot_utils.battletime_to_datetime(battle["battleTime"]) > last_check_time) and
+            (battle_time >= last_check_time) and (battle_time < current_check_time) and
             (battle["team"][0]["clan"]["tag"] == PRIMARY_CLAN_TAG)):
             river_race_battle_list.append(battle)
 
@@ -486,9 +488,6 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: 
         clan_tag(str, optional): Check player match performance of players in this clan.
         active_members(dict, optional): Dict of active members if available.
     """
-    if active_members == None:
-        active_members = get_active_members_in_clan(clan_tag)
-
     db_utils.clean_up_db(active_members)
 
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
@@ -499,31 +498,25 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: 
     json_dump = json.dumps(req.json())
     json_obj = json.loads(json_dump)
 
-    player_list = [ player for player in json_obj["clan"]["participants"] if (player["tag"] in active_members) ]
-
     performance_list = []
-    last_check_time = datetime.datetime.utcnow()
+    current_time = datetime.datetime.now(datetime.timezone.utc)
 
-    for player in player_list:
-        performance_list.append(calculate_player_win_rate(player["tag"], player["fame"]))
+    for player in json_obj["clan"]["participants"]:
+        performance_list.append(calculate_player_win_rate(player["tag"], player["fame"], current_time))
 
     db_utils.update_match_history(performance_list)
-    db_utils.set_last_check_time(last_check_time)
+    db_utils.set_last_check_time(current_time)
 
 
 def calculate_match_performance_after_race(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
     """
-    The final match performance check runs after the river race has concluded, so it needs to evaluate based on latest entry in the
-    river race log rather than current river race.
+    The final match performance check runs after the river race has concluded, therefore it needs to grab fame info from the
+    riverracelog rather than currentriverrace.
 
     Args:
         clan_tag(str, optional): Check player match performance of players in this clan.
         active_members(dict, optional): Dict of active members if available.
     """
-
-    if active_members == None:
-        active_members = get_active_members_in_clan(clan_tag)
-
     db_utils.clean_up_db(active_members)
 
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/riverracelog?limit=1", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
@@ -531,7 +524,7 @@ def calculate_match_performance_after_race(clan_tag: str=PRIMARY_CLAN_TAG, activ
     json_obj = req.json()
     clan_index = 0
     performance_list = []
-    last_check_time = datetime.datetime.utcnow()
+    reset_time = db_utils.get_reset_time()
 
     for clan in json_obj["items"][0]["standings"]:
         if clan["clan"]["tag"] == clan_tag:
@@ -540,8 +533,7 @@ def calculate_match_performance_after_race(clan_tag: str=PRIMARY_CLAN_TAG, activ
             clan_index += 1
 
     for player in json_obj["items"][0]["standings"][clan_index]["clan"]["participants"]:
-        if player["tag"] in active_members:
-            performance_list.append(calculate_player_win_rate(player["tag"], player["fame"]))
+        performance_list.append(calculate_player_win_rate(player["tag"], player["fame"], reset_time))
 
     db_utils.update_match_history(performance_list)
-    db_utils.set_last_check_time(last_check_time)
+    db_utils.set_last_check_time(reset_time)

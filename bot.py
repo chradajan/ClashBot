@@ -37,7 +37,8 @@ import Vacation
 menu = DefaultMenu('◀️', '▶️', '❌')
 intents = discord.Intents.default()
 intents.members = True
-bot = commands.Bot(command_prefix='!', help_command=PrettyHelp(navigation=menu, color=discord.Colour.green()), intents=intents)
+activity = discord.Game(name="Clash Royale")
+bot = commands.Bot(command_prefix='!', activity=activity, help_command=PrettyHelp(navigation=menu, color=discord.Colour.green()), intents=intents)
 
 bot.add_cog(AutomationTools.AutomationTools(bot))
 bot.add_cog(LeaderUtils.LeaderUtils(bot))
@@ -222,14 +223,11 @@ async def determine_reset_time():
     if current_sum < prev_deck_usage_sum:
         reset_occurred = True
         reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
-        bot_utils.RESET_TIME = reset_time.time()
+        db_utils.set_reset_time(reset_time)
         db_utils.clean_up_db(active_members=active_members)
         db_utils.record_deck_usage_today(prev_deck_usage)
 
-        if weekday == 0:
-            clash_utils.calculate_match_performance_after_race(active_members=active_members)
-            db_utils.set_war_time_status(False)
-        elif weekday == 3:
+        if weekday == 3:
             db_utils.prepare_for_river_race(reset_time)
     else:
         prev_deck_usage_sum = current_sum
@@ -248,15 +246,12 @@ async def reset_globals():
     if not reset_occurred:
         active_members = clash_utils.get_active_members_in_clan()
         weekday = datetime.datetime.utcnow().date().weekday()
-        reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
-        bot_utils.RESET_TIME = reset_time.time()
+        reset_time = datetime.datetime.now(datetime.timezone.utc)
+        db_utils.set_reset_time(reset_time)
         db_utils.clean_up_db(active_members=active_members)
         db_utils.record_deck_usage_today(prev_deck_usage)
 
-        if weekday == 0:
-            clash_utils.calculate_match_performance_after_race(active_members=active_members)
-            db_utils.set_war_time_status(False)
-        elif weekday == 3:
+        if weekday == 3:
             db_utils.prepare_for_river_race(reset_time)
 
     prev_deck_usage_sum = -1
@@ -287,6 +282,15 @@ async def morning_match_performance_tracker():
     Calculate match performance every hour between 00:00-09:00 Friday-Monday.
     """
     clash_utils.calculate_match_performance()
+
+
+@aiocron.crontab('0 10 * * 1')
+async def final_match_performance_check():
+    """
+    Calculate match performance after the war concludes on Monday.
+    """
+    clash_utils.calculate_match_performance_after_race()
+    db_utils.set_war_time_status(False)
 
 
 #####################################################

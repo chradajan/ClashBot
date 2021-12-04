@@ -17,7 +17,6 @@ import db_utils
 #                                                    #
 ######################################################
 
-RESET_TIME = datetime.time(9, 33)
 SIX_DAY_MASK = 0x3FFFF
 ONE_DAY_MASK = 0x7
 
@@ -216,7 +215,7 @@ async def update_all_members(guild: discord.Guild):
 def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)) -> list:
     time_delta = None
 
-    if command_time.time() > RESET_TIME:
+    if command_time.time() > db_utils.get_reset_time().time():
         time_delta = datetime.timedelta(days=1)
     else:
         time_delta = datetime.timedelta(days=2)

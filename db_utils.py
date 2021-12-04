@@ -548,6 +548,39 @@ def get_last_check_time() -> str:
     return query_result["last_check_time"]
 
 
+def set_reset_time(reset_time: datetime.datetime):
+    """
+    Save most recent daily reset time to database.
+
+    Args:
+        reset_time(datetime.datetime): Most recent reset time.
+    """
+    db, cursor = connect_to_db()
+
+    reset_time = bot_utils.datetime_to_battletime(reset_time)
+    cursor.execute("UPDATE race_status SET reset_time = %s", (reset_time))
+
+    db.commit()
+    db.close()
+
+
+def get_reset_time() -> datetime.datetime:
+    """
+    Get the most recent daily reset time from the database.
+
+    Returns:
+        datetime.datetime: Most recent reset time.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT reset_time FROM race_status")
+    query_result = cursor.fetchone()
+    reset_time = bot_utils.battletime_to_datetime(query_result["reset_time"])
+
+    db.close()
+    return reset_time
+
+
 def get_player_tag(search_key) -> str:
     """
     Return the player tag corresponding to a Discord member.
@@ -1031,13 +1064,14 @@ def get_server_members_info() -> dict:
     return player_info
 
 
-def get_and_update_match_history_info(player_tag: str, fame: int) -> Tuple[int, datetime.datetime]:
+def get_and_update_match_history_info(player_tag: str, fame: int, new_check_time: datetime.datetime) -> Tuple[int, datetime.datetime]:
     """
     Get a user's fame and time when their battlelog was last checked. Then store their updated fame and current time.
 
     Args:
         player_tag(str): Player to get/set fame for.
         fame(int): Current fame value.
+        new_check_time(datetime.datetime): Current time to set last_check_time to.
 
     Returns:
         tuple(fame(int), last_check_time(datetime.datetime: Previous fame value and battle time.
@@ -1048,7 +1082,7 @@ def get_and_update_match_history_info(player_tag: str, fame: int) -> Tuple[int, 
     query_result = cursor.fetchone()
     fame_and_time = (None, None)
 
-    if query_result == None:
+    if query_result is None:
         if not add_new_unregistered_user(player_tag):
             db.close()
             return fame_and_time
@@ -1057,7 +1091,7 @@ def get_and_update_match_history_info(player_tag: str, fame: int) -> Tuple[int, 
         fame_and_time = (query_result["fame"], bot_utils.battletime_to_datetime(query_result["last_check_time"]))
 
     cursor.execute("UPDATE match_history_recent SET last_check_time = %s, fame = %s WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
-                   (bot_utils.get_current_battletime(), fame, player_tag))
+                   (bot_utils.datetime_to_battletime(new_check_time), fame, player_tag))
 
     db.commit()
     db.close()
@@ -1526,7 +1560,7 @@ def export(primary_clan_only: bool) -> str:
     now = datetime.datetime.now(datetime.timezone.utc)
     now_date = None
 
-    if now.time() < bot_utils.RESET_TIME:
+    if now.time() < get_reset_time().time():
         now_date = (now - datetime.timedelta(days=1)).date()
     else:
         now_date = now.date()
