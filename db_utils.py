@@ -285,7 +285,7 @@ def get_user_data(search_key: str) -> dict:
         cursor.execute("SELECT * FROM users WHERE player_name = %s", (search_key))
         query_result = cursor.fetchall()
 
-        if len(query_result) > 1:
+        if len(query_result) != 1:
             db.close()
             return None
         else:
@@ -600,11 +600,11 @@ def get_player_tag(search_key) -> str:
         cursor.execute("SELECT player_tag FROM users WHERE player_name = %s", (search_key))
         query_result = cursor.fetchall()
 
-        if len(query_result) == 1:
-            query_result = query_result[0]
-        else:
+        if len(query_result) != 1:
             db.close()
             return None
+        else:
+            query_result = query_result[0]
 
     player_tag = query_result["player_tag"]
 
