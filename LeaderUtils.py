@@ -277,7 +277,7 @@ class LeaderUtils(commands.Cog):
             if player_tag != None:
                 await self.kick_helper(ctx, error.argument, player_tag)
             else:
-                await ctx.send("Member not found. This could be because there a multiple UNREGISTERED users with identical player_names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
+                await ctx.send("Member not found. This could be because there are multiple UNREGISTERED users with identical player names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !kick <member>")
             raise error
@@ -324,7 +324,7 @@ class LeaderUtils(commands.Cog):
             if player_tag != None:
                 await self.undo_kick_helper(ctx, error.argument, player_tag)
             else:
-                await ctx.send("Member not found. This could be because there a multiple UNREGISTERED users with identical player_names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
+                await ctx.send("Member not found. This could be because there are multiple UNREGISTERED users with identical player names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !undo_kick <member>")
             raise error
