@@ -14,7 +14,7 @@ class StatusReports(commands.Cog):
         self.bot = bot
 
 
-    """
+        """
     Command: !decks_report
 
     Get a list of users and their number of decks remaining today.
@@ -24,24 +24,80 @@ class StatusReports(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def decks_report(self, ctx):
         """Get a report of players with decks remaining today."""
-        usage_list = clash_utils.get_remaining_decks_today()
+        usage_info = clash_utils.get_remaining_decks_today_dicts()
         users_on_vacation = db_utils.get_users_on_vacation()
-        table = PrettyTable()
-        table.field_names = ["Member", "Decks"]
-        embed = discord.Embed(title="Status Report", footer="Users on vacation are not included in this list")
 
-        for player_name, decks_remaining in usage_list:
-            if player_name in users_on_vacation:
-                continue
+        embed = discord.Embed(title="Deck Usage Report",
+                              description=f"{usage_info['participants']} players have participated in war today.\n\
+                                            They have used a total of {200 - usage_info['remaining_decks']} decks.")
 
-            table.add_row([player_name, decks_remaining])
+        remaining_participants = 50 - usage_info["participants"]
+        non_warring_active_members = usage_info["active_members_with_no_decks_used"]
+        if non_warring_active_members > remaining_participants:
+            embed.add_field(name="`WARNING`", value=f"Only {remaining_participants} player can still participate in war today, but there are currently {non_warring_active_members} active members of the clan that have not used any decks. Some players could get locked out.")
 
-        embed.add_field(name="Players with decks remaining", value = "```\n" + table.get_string() + "```")
+        await ctx.send(embed=embed)
 
-        try:
-            await ctx.send(embed=embed)
-        except:
-            await ctx.send("Players with decks remaining\n" + "```\n" + table.get_string() + "```")
+        if len(usage_info["active_members_with_remaining_decks"]) > 0:
+            embed = discord.Embed()
+            table = PrettyTable()
+            table.field_names = ["Member", "Decks"]
+
+            for player_name, decks_remaining in usage_info["active_members_with_remaining_decks"]:
+                table.add_row([player_name, decks_remaining])
+
+            embed.add_field(name="Active members with decks remaining", value = "```\n" + table.get_string() + "```")
+
+            try:
+                await ctx.send(embed=embed)
+            except:
+                await ctx.send("Active members with decks remaining\n" + "```\n" + table.get_string() + "```")
+
+        if len(usage_info["inactive_members_with_decks_used"]) > 0:
+            embed = discord.Embed()
+            table = PrettyTable()
+            table.field_names = ["Member", "Decks"]
+
+            for player_name, decks_remaining in usage_info["inactive_members_with_decks_used"]:
+                table.add_row([player_name, decks_remaining])
+
+            embed.add_field(name="Former members that participated today", value = "```\n" + table.get_string() + "```")
+
+            try:
+                await ctx.send(embed=embed)
+            except:
+                await ctx.send("Former members that participated today\n" + "```\n" + table.get_string() + "```")
+
+        if len(usage_info["locked_out_active_members"]) > 0:
+            embed = discord.Embed()
+            table = PrettyTable()
+            table.field_names = ["Member", "Decks"]
+
+            for player_name, decks_remaining in usage_info["locked_out_active_members"]:
+                table.add_row([player_name, decks_remaining])
+
+            embed.add_field(name="Active members locked out today", value = "```\n" + table.get_string() + "```")
+
+            try:
+                await ctx.send(embed=embed)
+            except:
+                await ctx.send("Active members locked out today\n" + "```\n" + table.get_string() + "```")
+
+        if len(users_on_vacation):
+            embed = discord.Embed()
+            table = PrettyTable()
+            table.field_names = ["Member"]
+
+            for player_name in users_on_vacation:
+                table.add_row([player_name])
+
+            embed.add_field(name="Members currently on vacation", value = "```\n" + table.get_string() + "```")
+
+            try:
+                await ctx.send(embed=embed)
+            except:
+                await ctx.send("Members currently on vacation\n" + "```\n" + table.get_string() + "```")
+
 
     @decks_report.error
     async def decks_report_error(self, ctx, error):
@@ -67,7 +123,7 @@ class StatusReports(commands.Cog):
         users_on_vacation = db_utils.get_users_on_vacation()
         table = PrettyTable()
         table.field_names = ["Member", "Fame"]
-        embed = discord.Embed(title="Status Report", footer="Users on vacation are not included in this list")
+        embed = discord.Embed(title="Fame Report")
 
         for player_name, fame in hall_of_shame:
             if player_name in users_on_vacation:
@@ -115,7 +171,7 @@ class StatusReports(commands.Cog):
         general_info_table.add_row(["On Vacation", "Yes" if user_data["vacation"] else "No"])
         general_info_table.add_row(["Status", user_data["status"]])
 
-        embed = discord.Embed(title="Status Report")
+        embed = discord.Embed(title="Player Report")
         embed.add_field(name=f"{user_data['player_name']}'s general info", value = "```\n" + general_info_table.get_string(header=False) + "```")
 
         try:
@@ -135,7 +191,7 @@ class StatusReports(commands.Cog):
         for decks_used, date in usage_history_list:
             deck_usage_history_table.add_row([date, decks_used])
 
-        embed = discord.Embed(title="Status Report")
+        embed = discord.Embed()
         embed.set_footer(text=f"{user_data['player_name']} has used {decks_used_today} decks today.")
         embed.add_field(name=f"{user_data['player_name']}'s deck usage history", value = "```\n" + deck_usage_history_table.get_string() + "```")
 

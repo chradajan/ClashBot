@@ -155,6 +155,71 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
     return participants
 
 
+def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
+    """
+    Retrieve a dict containing detailed information about deck usage today.
+
+    Args:
+        clan_tag(str, optional): Clan to check.
+
+    Returns:
+        dict: Detailed lists of specified clan's deck usage.
+            {
+                remaining_decks: int                                                                Maximum number of decks that could still be used today.
+                participants: int                                                                   Number of players who have used at least 1 deck today.
+                active_members_with_no_decks_used: int                                              Number of players in the clan that have not used decks.
+                active_members_with_remaining_decks: List[Tuple[player_name, decks_remaining]]      Members in clan that could still battle.
+                active_members_without_remaining_decks: List[Tuple[player_name, decks_remaining]]   Members in clan that have used 4 decks today.
+                inactive_members_with_decks_used: List[Tuple[player_name, decks_remaining]]         Members no longer in clan that battled today while in the clan.
+                locked_out_active_members: List[Tuple[player_name, decks_remaining]]                Members in clan that are locked out of battling today.
+            }
+    """
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if (req.status_code != 200):
+        return {}
+
+    json_obj = req.json()
+    active_members = get_active_members_in_clan(clan_tag)
+
+    return_info = {
+        "remaining_decks": 200,
+        "participants": 0,
+        "active_members_with_no_decks_used": 0,
+        "active_members_with_remaining_decks": [],
+        "active_members_without_remaining_decks": [],
+        "inactive_members_with_decks_used": [],
+        "locked_out_active_members": []
+    }
+
+    for participant in json_obj["clan"]["participants"]:
+        if participant["decksUsedToday"] > 0:
+            return_info["remaining_decks"] -= participant["decksUsedToday"]
+            return_info["participants"] += 1
+
+    for participant in json_obj["clan"]["participants"]:
+        if participant["tag"] in active_members:
+            if participant["decksUsedToday"] == 4:
+                return_info["active_members_without_remaining_decks"].append((participant["name"], 0))
+            elif participant["decksUsedToday"] == 0:
+                return_info["active_members_with_no_decks_used"] += 1
+                if return_info["participants"] == 50:
+                    return_info["locked_out_active_members"].append((participant["name"], 4))
+                else:
+                    return_info["active_members_with_remaining_decks"].append((participant["name"], 4))
+            else:
+                return_info["active_members_with_remaining_decks"].append((participant["name"], (4 - participant["decksUsedToday"])))
+        elif participant["decksUsedToday"] > 0:
+            return_info["inactive_members_with_decks_used"].append((participant["name"], (4 - participant["decksUsedToday"])))
+
+    return_info["active_members_with_remaining_decks"].sort(key = lambda x : (x[1], x[0].lower()))
+    return_info["active_members_without_remaining_decks"].sort(key = lambda x : (x[1], x[0].lower()))
+    return_info["inactive_members_with_decks_used"].sort(key = lambda x : (x[1], x[0].lower()))
+    return_info["locked_out_active_members"].sort(key = lambda x : (x[1], x[0].lower()))
+
+    return return_info
+
+
 def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None) -> dict:
     """
     Get a list of players in a clan and how many decks each player used today.
