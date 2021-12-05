@@ -175,12 +175,12 @@ def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
             }
     """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+    active_members = get_active_members_in_clan(clan_tag)
 
-    if (req.status_code != 200):
+    if (req.status_code != 200) or len(active_members) == 0:
         return {}
 
     json_obj = req.json()
-    active_members = get_active_members_in_clan(clan_tag)
 
     return_info = {
         "remaining_decks": 200,

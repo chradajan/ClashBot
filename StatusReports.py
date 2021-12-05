@@ -27,14 +27,16 @@ class StatusReports(commands.Cog):
         usage_info = clash_utils.get_remaining_decks_today_dicts()
         users_on_vacation = db_utils.get_users_on_vacation()
 
+        if len(usage_info) == 0:
+            await ctx.send("Something went wrong. There might be issues accessing the Clash Royale API right now.")
+
         embed = discord.Embed(title="Deck Usage Report",
-                              description=f"{usage_info['participants']} players have participated in war today.\n\
-                                            They have used a total of {200 - usage_info['remaining_decks']} decks.")
+                              description=f"{usage_info['participants']} players have participated in war today.\nThey have used a total of {200 - usage_info['remaining_decks']} decks.")
 
         remaining_participants = 50 - usage_info["participants"]
         non_warring_active_members = usage_info["active_members_with_no_decks_used"]
         if non_warring_active_members > remaining_participants:
-            embed.add_field(name="`WARNING`", value=f"Only {remaining_participants} player can still participate in war today, but there are currently {non_warring_active_members} active members of the clan that have not used any decks. Some players could get locked out.")
+            embed.add_field(name="`WARNING`", value=f"Only {remaining_participants} players can still participate in war today, but there are currently {non_warring_active_members} active members of the clan that have not used any decks. Some players could be locked out.")
 
         await ctx.send(embed=embed)
 
