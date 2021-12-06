@@ -656,6 +656,7 @@ def remove_all_users():
     cursor.execute("DELETE FROM assigned_roles")
     cursor.execute("DELETE FROM match_history_recent")
     cursor.execute("DELETE FROM match_history_all")
+    cursor.execute("DELETE FROM kicks")
     cursor.execute("DELETE FROM users")
 
     db.commit()
