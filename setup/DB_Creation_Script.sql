@@ -89,10 +89,10 @@ DROP TABLE IF EXISTS `kicks`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `kicks` (
   `user_id` int NOT NULL,
-  `kick_time` varchar(128) NOT NULL,
+  `kick_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`user_id`,`kick_time`),
   CONSTRAINT `kicks_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -160,8 +160,25 @@ CREATE TABLE `race_status` (
   `colosseum_week` tinyint(1) NOT NULL,
   `war_time` tinyint(1) NOT NULL,
   `last_check_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  PRIMARY KEY (`completed_saturday`,`colosseum_week`,`war_time`,`last_check_time`)
+  `reset_time` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY (`completed_saturday`,`colosseum_week`,`war_time`,`last_check_time`,`reset_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `river_race_clans`
+--
+
+DROP TABLE IF EXISTS `river_race_clans`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `river_race_clans` (
+  `clan_tag` varchar(128) NOT NULL,
+  `clan_name` varchar(128) NOT NULL,
+  `fame` int NOT NULL,
+  PRIMARY KEY (`clan_tag`),
+  UNIQUE KEY `clan_tag` (`clan_tag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -203,4 +220,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-11-27  3:18:36
+-- Dump completed on 2021-12-06  2:16:27
