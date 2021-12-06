@@ -967,7 +967,7 @@ def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, str]]:
         else:
             tracked_since = bot_utils.battletime_to_datetime(tracked_since)
             tracked_since = (tracked_since.strftime("%a") + ", " +  tracked_since.strftime("%b") + " " + str(tracked_since.day).zfill(2) +
-                            " " + tracked_since.strftime("%H:%M"))
+                            " " + tracked_since.strftime("%H:%M") + " UTC")
 
         usage_list.append((user["player_name"], user["player_tag"], user["usage_history"], tracked_since))
 

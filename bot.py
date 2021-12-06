@@ -229,7 +229,7 @@ async def determine_reset_time():
 
         if weekday == 3:
             db_utils.prepare_for_river_race(reset_time)
-        elif weekday in {4, 5, 6}:
+        elif weekday in {4, 5, 6} and not db_utils.is_colosseum_week():
             db_utils.save_clans_fame()
     else:
         prev_deck_usage_sum = current_sum
@@ -255,7 +255,7 @@ async def reset_globals():
 
         if weekday == 3:
             db_utils.prepare_for_river_race(reset_time)
-        elif weekday in {4, 5, 6}:
+        elif weekday in {4, 5, 6} and not db_utils.is_colosseum_week():
             db_utils.save_clans_fame()
 
     prev_deck_usage_sum = -1
