@@ -1196,8 +1196,48 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
                     user_id IN (SELECT id FROM users WHERE status = 'ACTIVE' OR status = 'UNREGISTERED')",
                     (last_check_time))
 
+    clans_in_race = clash_utils.get_clans_and_fame()
+    cursor.execute("DELETE FROM river_race_clans")
+
+    for clan_tag in clans_in_race:
+        clan_name, _ = clans_in_race[clan_tag]
+        cursor.execute("INSERT INTO river_race_clans VALUES (%s, %s, 0)", (clan_tag, clan_name))
+
     db.commit()
     db.close()
+
+
+def save_clans_fame():
+    """
+    Update river_race_clans table with clans' current accumulated fames.
+    """
+    db, cursor = connect_to_db()
+    clans_in_race = clash_utils.get_clans_and_fame()
+
+    for clan_tag in clans_in_race:
+        _, fame = clans_in_race[clan_tag]
+        cursor.execute("UPDATE river_race_clans SET fame = %s WHERE clan_tag = %s", (fame, clan_tag))
+
+    db.commit()
+    db.close()
+
+
+def get_saved_clans_and_fame() -> dict:
+    """
+    Get the clans and their saved fame values from river_race_clans.
+
+    Returns:
+        dict{clan_tag: Tuple[clan_name, fame]}: Clans and their saved fame.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT * FROM river_race_clans")
+    query_result = cursor.fetchall()
+
+    clans_info = {clan["clan_tag"]: (clan["clan_name"], clan["fame"]) for clan in query_result}
+
+    db.close()
+    return clans_info
 
 
 def get_match_performance_dict(player_tag: str) -> dict:

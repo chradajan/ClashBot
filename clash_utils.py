@@ -359,7 +359,7 @@ def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     return participants
 
 
-def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, int]]:
+def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[Tuple[str, str], int]]:
     """
     Get the number of available war decks remaining for all clans in a race with specified clan.
 
@@ -367,16 +367,15 @@ def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, 
         clan_tag(str, optional): Clan to check the race status of.
 
     Returns:
-        list[tuple(clan_name(str), decks_remaining(int))]: List of clans in the specified clan's race and their remaining deck count today.
+        List[Tuple[Tuple[clan_tag, clan_name], decks_remaining]]: List of clans in the specified clan's race and their remaining 
+        deck count today.
     """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if (req.status_code != 200):
         return []
 
-    json_dump = json.dumps(req.json())
-    json_obj = json.loads(json_dump)
-
+    json_obj = req.json()
     return_list = []
 
     for clan in json_obj["clans"]:
@@ -385,9 +384,9 @@ def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, 
         for participant in clan["participants"]:
             decks_remaining -= participant["decksUsedToday"]
 
-        return_list.append((clan["name"], decks_remaining))
+        return_list.append(((clan["tag"], clan["name"]), decks_remaining))
 
-    return_list.sort(key = lambda x : (x[1], x[0]))
+    return_list.sort(key = lambda x : (x[1], x[0][1]))
 
     return return_list
 
@@ -586,6 +585,9 @@ def calculate_match_performance_after_race(clan_tag: str=PRIMARY_CLAN_TAG, activ
 
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/riverracelog?limit=1", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
+    if req.status_code != 200:
+        return
+
     json_obj = req.json()
     clan_index = 0
     performance_list = []
@@ -602,3 +604,32 @@ def calculate_match_performance_after_race(clan_tag: str=PRIMARY_CLAN_TAG, activ
 
     db_utils.update_match_history(performance_list)
     db_utils.set_last_check_time(reset_time)
+
+
+def get_clans_and_fame(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
+    """
+    Get a dict containing the clans and their current fame from the river race of the specified clan.
+
+    Args:
+        clan_tag(str, optional): Clan tag of clan to get river race info for.
+
+    Returns:
+        dict{clan_tag: Tuple[clan_name, fame]}: Clans and their current fame.
+    """
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if req.status_code != 200:
+        return {}
+
+    json_obj = req.json()
+    clans_info = {}
+
+    for clan in json_obj["clans"]:
+        fame = 0
+
+        for participant in clan["participants"]:
+            fame += participant["fame"]
+
+        clans_info[clan["tag"]] = (clan["name"], fame)
+
+    return clans_info

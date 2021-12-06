@@ -23,17 +23,32 @@ class MemberUtils(commands.Cog):
     async def river_race_status(self, ctx):
         """Send a list of clans in the current river race and their number of decks remaining today."""
         clans = clash_utils.get_clan_decks_remaining()
-        embed = discord.Embed(title="Current River Race Status")
+        embed = discord.Embed()
 
         table = PrettyTable()
         table.field_names = ["Clan", "Decks"]
 
-        for clan_name, decks_remaining in clans:
+        for clan, decks_remaining in clans:
+            _, clan_name = clan
             table.add_row([clan_name, decks_remaining])
 
         embed.add_field(name="Remaining decks for each clan", value="```\n" + table.get_string() + "```")
 
         await ctx.send(embed=embed)
+
+        if db_utils.is_war_time():
+            predicted_outcomes = bot_utils.get_predicted_race_outcome(clans)
+            embed = discord.Embed()
+            table = PrettyTable()
+            table.field_names = ["Clan", "Score"]
+
+            for clan_name, fame in predicted_outcomes:
+                table.add_row([clan_name, fame])
+
+            embed.add_field(name="Predicted outcome for today", value="```\n" + table.get_string() + "```")
+            embed.set_footer(text="Assuming each clan uses all remaining decks at a 50% winrate")
+
+            await ctx.send(embed=embed)
 
     @river_race_status.error
     async def river_race_status_error(self, ctx, error):

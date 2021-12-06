@@ -1,5 +1,6 @@
 from config import *
 from discord.ext import commands
+from typing import List, Tuple
 import blacklist
 import discord
 import clash_utils
@@ -321,3 +322,34 @@ def create_match_performance_embed(player_name: str, player_tag: str) -> discord
     embed.add_field(name="Boat attacks", value = f"``` Wins:   {history['all']['boat_attacks']['wins']} \n Losses: {history['all']['boat_attacks']['losses']} \n Total:  {history['all']['boat_attacks']['total']} \n Win rate: {history['all']['boat_attacks']['win_rate']} ```")
 
     return embed
+
+
+def get_predicted_race_outcome(remaining_decks_list: list=None) -> List[Tuple[str, int]]:
+    """
+    Get the predicted clan placement outcome for today.
+
+    Returns:
+        List[str, int]: Sorted list of clans and their predicted placement based on remaining decks with 50% winrate.
+    """
+    if remaining_decks_list is None:
+        remaining_decks_list = clash_utils.get_clan_decks_remaining()
+
+    remaining_decks_dict = {}
+    for clan, decks_remaining in remaining_decks_list:
+        remaining_decks_dict[clan[0]] = decks_remaining
+
+    current_clan_info = clash_utils.get_clans_and_fame()
+    saved_clan_info = db_utils.get_saved_clans_and_fame()
+    predicted_outcomes = []
+
+    for clan_tag in current_clan_info:
+        clan_name, current_fame = current_clan_info[clan_tag]
+        _, saved_fame = saved_clan_info[clan_tag]
+        fame_earned_today = current_fame - saved_fame
+        decks_remaining = remaining_decks_dict[clan_tag]
+        predicted_fame = 50 * round((fame_earned_today + (decks_remaining * 165.625)) / 50)
+        predicted_outcomes.append((clan_name, predicted_fame))
+
+    predicted_outcomes.sort(key = lambda x : x[1], reverse=True)
+
+    return predicted_outcomes
