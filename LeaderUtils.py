@@ -207,11 +207,15 @@ class LeaderUtils(commands.Cog):
         member_string = ""
         non_member_string = ""
 
-        for player_name, fame in hall_of_shame:
+        for player_name, player_tag, fame in hall_of_shame:
             if player_name in users_on_vacation:
                 continue
 
-            member = discord.utils.get(fame_channel.members, display_name=player_name)
+            member = None
+            discord_id = db_utils.get_member_id(player_tag)
+
+            if discord_id is not None:
+                member = discord.utils.get(fame_channel.members, id=discord_id)
 
             if member == None:
                 non_member_string += f"{player_name} - Fame: {fame}" + "\n"

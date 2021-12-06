@@ -122,7 +122,7 @@ def get_clash_user_data(message: str, discord_name: str, discord_id: int) -> dic
     return user_dict
 
 
-def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, int]]:
+def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, str, int]]:
     """
     Retrieve a list of players in a clan who have not used 4 war decks today.
 
@@ -130,8 +130,8 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
         clan_tag(str, optional): Clan to check.
 
     Returns:
-        list[tuple(str, int)]: List of players in the specified clan that haven't used 4 war decks today.
-            [(player_name(str), decks_remaining(int))]
+        List[Tuple[str, str, int]]: List of players in the specified clan that haven't used 4 war decks today.
+            [(player_name(str), player_tag(str), decks_remaining(int))]
     """
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
@@ -148,9 +148,9 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
         player_tag = participant["tag"]
         remaining_decks = 4 - participant["decksUsedToday"]
         if (remaining_decks != 0) and (player_tag in active_members):
-            participants.append((active_members[player_tag]["name"], remaining_decks))
+            participants.append((active_members[player_tag]["name"], participant["tag"], remaining_decks))
 
-    participants.sort(key = lambda x : (x[1], x[0].lower()))
+    participants.sort(key = lambda x : (x[2], x[0].lower()))
 
     return participants
 
@@ -332,7 +332,7 @@ def get_top_fame_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tup
     return return_list
 
 
-def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, int]]:
+def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, str, int]]:
     """
     Get a list of players below a specified fame threshold.
 
@@ -348,15 +348,16 @@ def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     if (req.status_code != 200):
         return []
 
-    json_dump = json.dumps(req.json())
-    json_obj = json.loads(json_dump)
-
+    json_obj = req.json()
     active_members = get_active_members_in_clan(clan_tag)
+    hall_of_shame = []
 
-    participants = [ (active_members[participant["tag"]]["name"], participant["fame"]) for participant in json_obj["clan"]["participants"] if ((participant["fame"] < threshold) and (participant["tag"] in active_members)) ]
-    participants.sort(key = lambda x : (x[1], x[0].lower()))
+    for participant in json_obj["clan"]["participants"]:
+        if (participant["fame"] < threshold) and (participant["tag"] in active_members):
+            hall_of_shame.append((active_members[participant["tag"]]["name"], participant["tag"], participant["fame"]))
 
-    return participants
+    hall_of_shame.sort(key = lambda x : (x[2], x[0].lower()))
+    return hall_of_shame
 
 
 def get_clan_decks_remaining(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[Tuple[str, str], int]]:

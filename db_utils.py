@@ -612,6 +612,29 @@ def get_player_tag(search_key) -> str:
     return player_tag
 
 
+def get_member_id(player_tag: str) -> int:
+    """
+    Return the Discord ID corresponding to the specified player tag, or None if member is not on Discord.
+
+    Args:
+        player_tag(str): Player tag of user to find ID of.
+
+    Returns:
+        int: Discord ID of specified user, or None if not found.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT discord_id FROM users WHERE player_tag = %s", (player_tag))
+    query_result = cursor.fetchone()
+    db.close()
+
+    if query_result is None:
+        return None
+
+    return query_result["discord_id"]
+
+
+
 def remove_user(discord_id: int):
     """
     Remove a user's assigned roles and change their status to either UNREGISTERED or DEPARTED.
@@ -944,16 +967,16 @@ def record_deck_usage_today(deck_usage: dict):
     db.close()
 
 
-def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, str]]:
+def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, int, str]]:
     """
     Get usage history of all users in database.
 
     Returns:
-        List[Tuple[str, str, int, str]]: List of player names, tags, usage histories, and tracked since dates.
+        List[Tuple[str, str, int, str]]: List of player names, tags, discord ids, usage histories, and tracked since dates.
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT id, player_name, player_tag, usage_history FROM users")
+    cursor.execute("SELECT id, player_name, player_tag, discord_id, usage_history FROM users")
     users = cursor.fetchall()
 
     usage_list = []
@@ -969,7 +992,7 @@ def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, str]]:
             tracked_since = (tracked_since.strftime("%a") + ", " +  tracked_since.strftime("%b") + " " + str(tracked_since.day).zfill(2) +
                             " " + tracked_since.strftime("%H:%M") + " UTC")
 
-        usage_list.append((user["player_name"], user["player_tag"], user["usage_history"], tracked_since))
+        usage_list.append((user["player_name"], user["player_tag"], user["discord_id"], user["usage_history"], tracked_since))
 
     usage_list.sort(key = lambda x : x[0].lower())
     db.close()

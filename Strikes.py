@@ -124,7 +124,7 @@ class Strikes(commands.Cog):
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def reset_all_strikes(self, ctx):
-        """Reset each member's strikes to 0."""
+        """Reset each member's strikes to 0. Permanent strikes are not affected."""
         db_utils.reset_strikes()
         channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
         await channel.send("Strikes for all members have been reset to 0.")

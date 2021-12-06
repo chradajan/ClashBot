@@ -114,14 +114,18 @@ async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMI
         if time_zone_set == None:
             check_time_zones = False
 
-    for player_name, decks_remaining in reminder_list:
+    for player_name, player_tag, decks_remaining in reminder_list:
         if player_name in users_on_vacation:
             continue
 
         if check_time_zones and (player_name not in time_zone_set):
             continue
 
-        member = discord.utils.get(channel.members, display_name=player_name)
+        member = None
+        discord_id = db_utils.get_member_id(player_tag)
+
+        if discord_id is not None:
+            member = discord.utils.get(channel.members, id=discord_id)
 
         if member == None:
             non_member_string += f"{player_name} - Decks left: {decks_remaining}" + "\n"

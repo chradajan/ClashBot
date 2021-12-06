@@ -149,7 +149,7 @@ async def assign_strikes_and_clear_vacation():
         embed_two = discord.Embed(title="The following users have received strikes:")
         field_count = 0
 
-        for player_name, player_tag, deck_usage_history, tracked_since in deck_usage_list:
+        for player_name, player_tag, discord_id, deck_usage_history, tracked_since in deck_usage_list:
             if (player_tag not in active_members) or (player_name in users_on_vacation):
                 continue
 
@@ -159,9 +159,12 @@ async def assign_strikes_and_clear_vacation():
                 continue
 
             perfect_week = False
-            member = discord.utils.get(strikes_channel.members, display_name=player_name)
+            member = None
 
-            if (member != None):
+            if discord_id is not None:
+                member = discord.utils.get(strikes_channel.members, id=discord_id)
+
+            if member is not None:
                 mention_string += f"{member.mention} "
 
             _, strikes, _, _ = db_utils.give_strike(player_tag, 1)

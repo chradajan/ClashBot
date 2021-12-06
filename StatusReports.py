@@ -127,7 +127,7 @@ class StatusReports(commands.Cog):
         table.field_names = ["Member", "Fame"]
         embed = discord.Embed(title="Fame Report")
 
-        for player_name, fame in hall_of_shame:
+        for player_name, player_tag, fame in hall_of_shame:
             if player_name in users_on_vacation:
                 continue
 
