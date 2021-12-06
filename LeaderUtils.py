@@ -208,7 +208,7 @@ class LeaderUtils(commands.Cog):
         non_member_string = ""
 
         for player_name, player_tag, fame in hall_of_shame:
-            if player_name in users_on_vacation:
+            if player_tag in users_on_vacation:
                 continue
 
             member = None

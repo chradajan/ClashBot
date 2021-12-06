@@ -719,26 +719,23 @@ def update_vacation_for_user(discord_id: int, status: bool=None) -> bool:
     return query_result["vacation"]
 
 
-def get_users_on_vacation() -> Set[str]:
+def get_users_on_vacation() -> dict:
     """
     Get a set of players currently on vacation.
 
     Returns:
-        set[str]: Player names of users on vacation.
+        dict{player_tag(str): player_name(str)}: Player names and tags of users on vacation.
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_name FROM users WHERE vacation = TRUE")
+    cursor.execute("SELECT player_name, player_tag FROM users WHERE vacation = TRUE")
     query_result = cursor.fetchall()
-
-    if query_result == None:
-        db.close()
-        return set()
-
-    users_on_vacation = { user["player_name"] for user in query_result }
-
     db.close()
 
+    if query_result is None:
+        return {}
+
+    users_on_vacation = { user["player_tag"]: user["player_name"] for user in query_result }
     return users_on_vacation
 
 

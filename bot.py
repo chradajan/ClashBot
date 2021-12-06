@@ -150,7 +150,7 @@ async def assign_strikes_and_clear_vacation():
         field_count = 0
 
         for player_name, player_tag, discord_id, deck_usage_history, tracked_since in deck_usage_list:
-            if (player_tag not in active_members) or (player_name in users_on_vacation):
+            if (player_tag not in active_members) or (player_tag in users_on_vacation):
                 continue
 
             should_receive_strike, decks_used_in_race = bot_utils.should_receive_strike(deck_usage_history, completed_saturday)

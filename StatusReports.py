@@ -90,7 +90,7 @@ class StatusReports(commands.Cog):
             table = PrettyTable()
             table.field_names = ["Member"]
 
-            for player_name in users_on_vacation:
+            for player_name in users_on_vacation.values():
                 table.add_row([player_name])
 
             embed.add_field(name="Members currently on vacation", value = "```\n" + table.get_string() + "```")
@@ -128,7 +128,7 @@ class StatusReports(commands.Cog):
         embed = discord.Embed(title="Fame Report")
 
         for player_name, player_tag, fame in hall_of_shame:
-            if player_name in users_on_vacation:
+            if player_tag in users_on_vacation:
                 continue
 
             table.add_row([player_name, fame])

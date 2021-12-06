@@ -56,8 +56,8 @@ class Vacation(commands.Cog):
         table.field_names = ["Member"]
         embed = discord.Embed()
 
-        for user in users_on_vacation:
-            table.add_row([user])
+        for player_name in users_on_vacation.values():
+            table.add_row([player_name])
 
         embed.add_field(name="Vacation List", value="```\n" + table.get_string() + "```")
 
