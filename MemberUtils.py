@@ -20,7 +20,7 @@ class MemberUtils(commands.Cog):
     """
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
-    async def river_race_status(self, ctx):
+    async def river_race_status(self, ctx, show_predictions: bool=False):
         """Send a list of clans in the current river race and their number of decks remaining today."""
         clans = clash_utils.get_clan_decks_remaining()
         embed = discord.Embed()
@@ -36,7 +36,7 @@ class MemberUtils(commands.Cog):
 
         await ctx.send(embed=embed)
 
-        if db_utils.is_war_time():
+        if show_predictions and db_utils.is_war_time():
             predicted_outcomes = bot_utils.get_predicted_race_outcome(clans)
             embed = discord.Embed()
             table = PrettyTable()
