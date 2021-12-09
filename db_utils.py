@@ -1686,7 +1686,7 @@ def export(primary_clan_only: bool) -> str:
         usage_today = deck_usage_today.get(user["player_tag"])
 
         if usage_today == None:
-            usage_today = clash_utils.get_user_decks_used_today(user["player_tag"])
+            usage_today = 0
 
         history_row.append(usage_today)
 
