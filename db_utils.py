@@ -1426,7 +1426,7 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=
     query_result = cursor.fetchall()
     db.close()
 
-    if query_result == None:
+    if query_result is None:
         return
 
     for user in query_result:

@@ -553,16 +553,18 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: 
         clan_tag(str, optional): Check player match performance of players in this clan.
         active_members(dict, optional): Dict of active members if available.
     """
+    if active_members is None:
+        active_members = get_active_members_in_clan(clan_tag)
+
     db_utils.clean_up_db(active_members)
+    db_utils.add_unregistered_users(clan_tag, active_members)
 
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
-    if (req.status_code != 200):
+    if req.status_code != 200:
         return
 
-    json_dump = json.dumps(req.json())
-    json_obj = json.loads(json_dump)
-
+    json_obj = req.json()
     performance_list = []
     current_time = datetime.datetime.now(datetime.timezone.utc)
 
