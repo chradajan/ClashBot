@@ -155,50 +155,50 @@ class LeaderUtils(commands.Cog):
 
 
     """
-    Command: !top_fame
+    Command: !top_medals
 
-    Send a list of the members with the top fame to the fame channel.
+    Send a list of the members with the top medals to the fame channel.
     """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
-    async def top_fame(self, ctx):
-        """Send a list of top users by fame in the fame channel."""
-        top_members = clash_utils.get_top_fame_users()
+    async def top_medals(self, ctx):
+        """Send a list of top users by medals in the fame channel."""
+        top_members = clash_utils.get_top_medal_users()
         fame_channel = discord.utils.get(ctx.guild.channels, name=FAME_CHANNEL)
         table = PrettyTable()
-        table.field_names = ["Member", "Fame"]
+        table.field_names = ["Member", "Medals"]
         embed = discord.Embed()
 
         for player_name, fame in top_members:
             table.add_row([player_name, fame])
 
-        embed.add_field(name="Top members by fame", value="```\n" + table.get_string() + "```")
+        embed.add_field(name="Top members by medals", value="```\n" + table.get_string() + "```")
 
         try:
             await fame_channel.send(embed=embed)
         except:
-            await fame_channel.send("Top members by fame\n" + "```\n" + table.get_string() + "```")
+            await fame_channel.send("Top members by medals\n" + "```\n" + table.get_string() + "```")
 
-    @top_fame.error
-    async def top_fame_error(self, ctx, error):
+    @top_medals.error
+    async def top_medals_error(self, ctx, error):
         if isinstance(error, commands.errors.CheckFailure):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!top_fame command can only be sent in {channel.mention} by Leaders/Admins.")
+            await ctx.send(f"!top_medals command can only be sent in {channel.mention} by Leaders/Admins.")
         else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !top_fame")
+            await ctx.send("Something went wrong. Command should be formatted as:  !top_medals")
             raise error
 
 
     """
-    Command: !fame_check {threshold}
+    Command: !medals_check {threshold}
 
     Mention users below the threshold in the fame channel.
     """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
-    async def fame_check(self, ctx, threshold: int):
+    async def medals_check(self, ctx, threshold: int):
         """Mention users below the specified fame threshold. Ignores users on vacation."""
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)
         users_on_vacation = db_utils.get_users_on_vacation()
@@ -226,20 +226,20 @@ class LeaderUtils(commands.Cog):
             await ctx.send("There are currently no members below the threshold you specified.")
             return
 
-        fame_string = f"The following members are below {threshold} fame:" + "\n" + member_string + non_member_string
+        fame_string = f"The following members are below {threshold} medals:" + "\n" + member_string + non_member_string
         await fame_channel.send(fame_string)
 
-    @fame_check.error
-    async def fame_check_error(self, ctx, error):
+    @medals_check.error
+    async def medals_check_error(self, ctx, error):
         if isinstance(error, commands.errors.CheckFailure):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!fame_check command can only be sent in {channel.mention} by Leaders/Admins.")
+            await ctx.send(f"!medals_check command can only be sent in {channel.mention} by Leaders/Admins.")
         elif isinstance(error, commands.errors.BadArgument):
-            await ctx.send("Invalid fame threshold. Fame must be an integer value.")
+            await ctx.send("Invalid medals threshold. Threshold must be an integer value.")
         elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing arguments. Command should be formatted as:  !fame_check <threshold>")
+            await ctx.send("Missing arguments. Command should be formatted as:  !medals_check <threshold>")
         else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !fame_check <threshold>")
+            await ctx.send("Something went wrong. Command should be formatted as:  !medals_check <threshold>")
             raise error
 
 
