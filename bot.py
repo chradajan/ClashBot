@@ -280,7 +280,7 @@ async def night_match_performance_tracker():
     """
     Calculate match performance every hour between 10:00-23:00 Thursday-Sunday.
     """
-    clash_utils.calculate_match_performance()
+    clash_utils.calculate_match_performance(False)
 
 
 @aiocron.crontab('0 0-9 * * 5,6,0,1')
@@ -288,7 +288,7 @@ async def morning_match_performance_tracker():
     """
     Calculate match performance every hour between 00:00-09:00 Friday-Monday.
     """
-    clash_utils.calculate_match_performance()
+    clash_utils.calculate_match_performance(False)
 
 
 @aiocron.crontab('0 10 * * 1')
@@ -296,7 +296,7 @@ async def final_match_performance_check():
     """
     Calculate match performance after the war concludes on Monday.
     """
-    clash_utils.calculate_match_performance_after_race()
+    clash_utils.calculate_match_performance(True)
     db_utils.set_war_time_status(False)
 
 

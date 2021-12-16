@@ -597,11 +597,12 @@ def calculate_player_win_rate(player_tag: str, fame: int, current_check_time: da
     return player_dict
 
 
-def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
+def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
     """
     Get the match performance of each player in the specified clan. Saves results in match_history table.
 
     Args:
+        post_race(bool): Whether this check is occuring during or after the river race.
         clan_tag(str, optional): Check player match performance of players in this clan.
         active_members(dict, optional): Dict of active members if available.
     """
@@ -609,42 +610,26 @@ def calculate_match_performance(clan_tag: str=PRIMARY_CLAN_TAG, active_members: 
         active_members = get_active_members_in_clan(clan_tag)
 
     db_utils.clean_up_db(active_members)
-    participants = get_river_race_participants(clan_tag)
+    db_utils.add_unregistered_users(clan_tag, active_members)
+    performance_list = []
+    participants = None
+    check_time = None
+
+    if post_race:
+        participants = get_last_river_race_participants(clan_tag)
+        check_time = db_utils.get_reset_time()
+    else:
+        participants = get_river_race_participants(clan_tag)
+        check_time = datetime.datetime.now(datetime.timezone.utc)
 
     if len(participants) == 0:
         return
 
-    db_utils.add_unregistered_users(clan_tag, active_members)
-    performance_list = []
-    current_time = datetime.datetime.now(datetime.timezone.utc)
-
     for participant in participants:
-        performance_list.append(calculate_player_win_rate(participant["tag"], participant["fame"], current_time))
+        performance_list.append(calculate_player_win_rate(participant["tag"], participant["fame"], check_time))
 
     db_utils.update_match_history(performance_list)
-    db_utils.set_last_check_time(current_time)
-
-
-def calculate_match_performance_after_race(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
-    """
-    The final match performance check runs after the river race has concluded, therefore it needs to grab fame info from the
-    riverracelog rather than currentriverrace.
-
-    Args:
-        clan_tag(str, optional): Check player match performance of players in this clan.
-        active_members(dict, optional): Dict of active members if available.
-    """
-    db_utils.clean_up_db(active_members)
-
-    performance_list = []
-    reset_time = db_utils.get_reset_time()
-    participants = get_last_river_race_participants(clan_tag)
-
-    for participant in participants:
-        performance_list.append(calculate_player_win_rate(participant["tag"], participant["fame"], reset_time))
-
-    db_utils.update_match_history(performance_list)
-    db_utils.set_last_check_time(reset_time)
+    db_utils.set_last_check_time(check_time)
 
 
 def get_clans_and_fame(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
