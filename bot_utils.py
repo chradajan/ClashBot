@@ -1,11 +1,16 @@
 from config import *
+from difflib import SequenceMatcher
 from discord.ext import commands
 from typing import List, Tuple
 import blacklist
+import cv2
 import discord
 import clash_utils
 import datetime
 import db_utils
+import os
+import pytesseract
+import re
 
 ######################################################
 #                                                    #
@@ -357,3 +362,118 @@ def get_predicted_race_outcome(remaining_decks_list: list=None) -> List[Tuple[st
     predicted_outcomes.sort(key = lambda x : x[1], reverse=True)
 
     return predicted_outcomes
+
+
+def kick(player_name: str, player_tag: str) -> discord.Embed:
+    """
+    Kick the specified player and return an embed confirming the kick.
+
+    Args:
+        player_name(str): Name of player to kick.
+        player_tag(str): Tag of player to kick.
+
+    Returns:
+        discord.Embed: Embed object with details about the kick.
+    """
+    total_kicks, last_kick_date = db_utils.kick_user(player_tag)
+    embed = discord.Embed(title="Kick Logged")
+    embed.add_field(name=player_name, value=f"```Times kicked: {total_kicks}\nLast kicked: {last_kick_date}```")
+
+    return embed
+
+
+def parse_image_text(text: str) -> Tuple[str, str]:
+    """
+    Parse text for a player tag and/or player name.
+
+    Args:
+        text(str): Text parsed from a screenshot.
+
+    Returns:
+        Tuple[str, str]: (player_tag, player_name) detected in parsed information.
+    """
+    tag = re.search(r"(#[A-Z0-9]+)", text)
+
+    if tag is not None:
+        tag = tag.group(1)
+    else:
+        tag = None
+
+    name = re.search(r"(?i)kick (.*) out of the clan\?", text)
+
+    if name is not None:
+        name = name.group(1)
+    else:
+        name = None
+
+    return (tag, name)
+
+
+async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, str]:
+    """
+    Parse a kick screenshot for a player name and/or player tag.
+
+    Args:
+        image(discord.Attachment): Image of in-game kick screenshot.
+
+    Returns:
+        Tuple[str, str]: (player_tag, player_name) Closest matching player tag and player name in screenshot.
+    """
+    participants = None
+    if db_utils.is_war_time():
+        participants = clash_utils.get_river_race_participants()
+    else:
+        participants = clash_utils.get_last_river_race_participants()
+
+    file_path = 'kick_images'
+
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+
+    file_path += '/' + image.filename
+    await image.save(file_path)
+
+    img = cv2.imread(file_path)
+    text = pytesseract.image_to_string(img)
+    os.remove(file_path)
+
+    tag, name = parse_image_text(text)
+    closest_tag = None
+    closest_name = None
+    highest_tag_similarity = 0
+    highest_name_similarity = 0
+
+    for participant in participants:
+        active_tag = participant["tag"]
+        active_name = participant["name"]
+
+        if tag is not None:
+            temp_tag_similarity = SequenceMatcher(None, tag, active_tag).ratio()
+            if temp_tag_similarity > highest_tag_similarity:
+                highest_tag_similarity = temp_tag_similarity
+                closest_tag = active_tag
+
+                if name is None:
+                    closest_name = active_name
+        
+        if name is not None:
+            temp_name_similarity = SequenceMatcher(None, name, active_name).ratio()
+
+            if temp_name_similarity > highest_name_similarity:
+                highest_name_similarity = temp_name_similarity
+                closest_name = active_name
+
+                if tag is None:
+                    closest_tag = active_tag
+
+    return_info = (closest_tag, closest_name)
+
+    if (tag is not None) and (name is not None):
+        for participant in participants:
+            if participant["tag"] != closest_tag:
+                continue
+            if participant["name"] != closest_name:
+                return_info = (None, None)
+            break
+
+    return return_info

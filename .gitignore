@@ -2,6 +2,7 @@ credentials.py
 config.py
 __pycache__/
 export_files/
+kick_images/
 blacklist.py
 testing_tools.py
 .vscode/

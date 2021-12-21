@@ -8,6 +8,7 @@ import discord
 class MemberListeners(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.kick_messages = {}
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
@@ -26,7 +27,7 @@ class MemberListeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Monitor welcome channel for users posting player tags."""
+        """Monitor welcome channel for users posting player tags and kicks channel for people posting images of kick screenshots."""
         if message.author.bot:
             return
 
@@ -50,9 +51,42 @@ class MemberListeners(commands.Cog):
                     await message.channel.send(content="Something went wrong getting your Clash Royale information. Please try again with your player tag. If this issue persists, message a leader for help.", delete_after=5)
 
             await message.delete()
+        elif message.channel.name == KICKS_CHANNEL and len(message.attachments) > 0:
+            for attachment in message.attachments:
+                if attachment.content_type in {'image/png', 'image/jpeg'}:
+                    player_tag, player_name = await bot_utils.get_player_info_from_image(attachment)
 
-        #await self.bot.process_commands(message)
+                    if player_tag is None:
+                        embed = discord.Embed()
+                        embed.add_field(name="Unable to parse player info.", value="You can still log this kick manually with !kick.")
+                        await message.channel.send(embed=embed)
+                        return
 
+                    embed = discord.Embed(title=f"Did you just kick {player_name}?")
+                    embed.add_field(name="React to log this kick if everything looks correct.", value=f"```Name: {player_name}\nTag: {player_tag}```")
+                    kick_message = await message.channel.send(embed=embed)
+                    await kick_message.add_reaction('✅')
+                    await kick_message.add_reaction('❌')
+                    self.kick_messages[kick_message.id] = (player_tag, player_name)
+
+
+    @commands.Cog.listener()
+    async def on_reaction_add(self, reaction, user):
+        """Monitor reacts to kick messages."""
+        kick_info = self.kick_messages.get(reaction.message.id)
+
+        if kick_info is None or user.bot:
+            return
+
+        player_tag, player_name = kick_info
+        self.kick_messages.pop(reaction.message.id, None)
+
+        if reaction.emoji == '✅':
+            embed = bot_utils.kick(player_name, player_tag)
+            await reaction.message.channel.send(embed=embed)
+            await reaction.message.delete()
+        elif reaction.emoji == '❌':
+            await reaction.message.delete()
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):

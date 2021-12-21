@@ -243,21 +243,6 @@ class LeaderUtils(commands.Cog):
             raise error
 
 
-    async def kick_helper(self, ctx, player_name: str, player_tag: str):
-        """
-        Kick the specified player and send an embed confirming the kick.
-
-        Args:
-            ctx: Context object.
-            player_name(str): Name of player to kick.
-            player_tag(str): Tag of player to kick.
-        """
-        total_kicks, last_kick_date = db_utils.kick_user(player_tag)
-        embed = discord.Embed(title="Kick Logged")
-        embed.add_field(name=player_name, value=f"```Times kicked: {total_kicks}\nLast kicked: {last_kick_date}```")
-
-        await ctx.send(embed=embed)
-
     """
     Command: !kick {player_name}
 
@@ -269,7 +254,8 @@ class LeaderUtils(commands.Cog):
     async def kick(self, ctx, member: discord.Member):
         """Log that the specified user was kicked from the clan."""
         player_tag = db_utils.get_player_tag(member.id)
-        await self.kick_helper(ctx, member.display_name, player_tag)
+        embed = bot_utils.kick(member.display_name, player_tag)
+        await ctx.send(embed=embed)
 
     @kick.error
     async def kick_error(self, ctx, error):
@@ -279,7 +265,8 @@ class LeaderUtils(commands.Cog):
         elif isinstance(error, commands.errors.MemberNotFound):
             player_tag = db_utils.get_player_tag(error.argument)
             if player_tag != None:
-                await self.kick_helper(ctx, error.argument, player_tag)
+                embed = bot_utils.kick(error.argument, player_tag)
+                await ctx.send(embed=embed)
             else:
                 await ctx.send("Member not found. This could be because there are multiple UNREGISTERED users with identical player names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
         else:
