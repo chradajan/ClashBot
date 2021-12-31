@@ -905,18 +905,18 @@ def get_members_in_time_zone(US_time: bool) -> Set[str]:
     Get the members in the specified time zone.
 
     Returns:
-        set[player_name(str)]: Player names of users in specified time zone.
+        set[player_tag(str)]: Player tags of users in specified time zone.
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_name FROM users WHERE US_time = %s", (US_time))
+    cursor.execute("SELECT player_tag FROM users WHERE US_time = %s", (US_time))
     query_result = cursor.fetchall()
 
     if query_result == None:
         db.close()
         return None
 
-    members = { user["player_name"] for user in query_result }
+    members = { user["player_tag"] for user in query_result }
 
     db.close()
     return members

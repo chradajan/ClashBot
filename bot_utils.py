@@ -123,7 +123,7 @@ async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMI
         if player_tag in users_on_vacation:
             continue
 
-        if check_time_zones and (player_name not in time_zone_set):
+        if check_time_zones and (player_tag not in time_zone_set):
             continue
 
         member = None
