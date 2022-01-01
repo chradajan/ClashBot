@@ -262,16 +262,17 @@ def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
 
     for participant in participants:
         if participant["tag"] in active_members:
+            participant_name = active_members[participant["tag"]]["name"]
             if participant["decksUsedToday"] == 4:
-                return_info["active_members_without_remaining_decks"].append((participant["name"], 0))
+                return_info["active_members_without_remaining_decks"].append((participant_name, 0))
             elif participant["decksUsedToday"] == 0:
                 return_info["active_members_with_no_decks_used"] += 1
                 if return_info["participants"] == 50:
-                    return_info["locked_out_active_members"].append((participant["name"], 4))
+                    return_info["locked_out_active_members"].append((participant_name, 4))
                 else:
-                    return_info["active_members_with_remaining_decks"].append((participant["name"], 4))
+                    return_info["active_members_with_remaining_decks"].append((participant_name, 4))
             else:
-                return_info["active_members_with_remaining_decks"].append((participant["name"], (4 - participant["decksUsedToday"])))
+                return_info["active_members_with_remaining_decks"].append((participant_name, (4 - participant["decksUsedToday"])))
         elif participant["decksUsedToday"] > 0:
             return_info["inactive_members_with_decks_used"].append((participant["name"], (4 - participant["decksUsedToday"])))
 

@@ -57,7 +57,7 @@ class LeaderUtils(commands.Cog):
             channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
             await ctx.send(f"!update_all_members command can only be sent in {channel.mention} by Leaders/Admins.")
         else:
-            await ctx.send("Something went wrong. COmmand should be formatted as:  !update_all_members")
+            await ctx.send("Something went wrong. Command should be formatted as:  !update_all_members")
             raise error
 
 
