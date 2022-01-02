@@ -405,22 +405,26 @@ def reset_strikes():
     db.close()
 
 
-# [(player_name, strikes),]
-def get_strike_report() -> list:
+def get_users_with_strikes() -> List[Tuple[str, str, int]]:
+    """
+    Get all users in the database that have non-permanent strikes.
+
+    Returns:
+        List[Tuple[player_tag(str), player_name(str), strikes(int)]]: List of users with strikes.
+    """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_name, strikes FROM users WHERE strikes > 0")
+    cursor.execute("SELECT player_name, player_tag, strikes FROM users WHERE strikes > 0")
     query_result = cursor.fetchall()
-
-    strike_list = []
-
-    if query_result != None:
-        strike_list = [ (user["player_name"], user["strikes"]) for user in query_result ]
-
-    strike_list.sort(key = lambda x : (x[1], x[0].lower()))
-
     db.close()
-    return strike_list
+
+    if query_result is None:
+        return {}
+
+    strikes_list = [ (user["player_tag"], user["player_name"], user["strikes"]) for user in query_result ]
+    strikes_list.sort(key = lambda x : (x[2], x[0].lower()))
+
+    return strikes_list
 
 
 def set_completed_saturday_status(status: bool):

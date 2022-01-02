@@ -2,6 +2,7 @@ from config import *
 from discord.ext import commands
 from prettytable import PrettyTable
 import bot_utils
+import clash_utils
 import db_utils
 import discord
 
@@ -149,20 +150,49 @@ class Strikes(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def strikes_report(self, ctx):
         """Get a report of players with strikes."""
-        strike_list = db_utils.get_strike_report()
-        table = PrettyTable()
-        table.field_names = ["Member", "Strikes"]
-        embed = discord.Embed(title="Status Report")
+        strikes = db_utils.get_users_with_strikes()
+        active_members = clash_utils.get_active_members_in_clan()
 
-        for player_name, strikes in strike_list:
-            table.add_row([player_name, strikes])
+        active_table = PrettyTable()
+        active_table.field_names = ["Member", "Strikes"]
+        active_members_have_strikes = False
 
-        embed.add_field(name="Players with at least 1 strike", value = "```\n" + table.get_string() + "```")
+        non_active_table = PrettyTable()
+        non_active_table.field_names = ["Member", "Strikes"]
+        non_active_members_have_strikes = False
 
-        try:
+        for player_tag, player_name, strikes in strikes:
+            if player_tag in active_members:
+                active_members_have_strikes = True
+                active_name = active_members[player_tag]["name"]
+                active_table.add_row([active_name, strikes])
+            else:
+                non_active_members_have_strikes = True
+                non_active_table.add_row([player_name, strikes])
+
+        if active_members_have_strikes:
+            active_embed = discord.Embed()
+            active_embed.add_field(name="Active members with strikes", value="```\n" + active_table.get_string() + "```")
+
+            try:
+                await ctx.send(embed=active_embed)
+            except:
+                await ctx.send("Active members with strikes\n" + "```\n" + active_table.get_string() + "```")
+
+        if non_active_members_have_strikes:
+            non_active_embed = discord.Embed()
+            non_active_embed.add_field(name="Users not in clan with strikes", value="```\n" + non_active_table.get_string() + "```")
+
+            try:
+                await ctx.send(embed=non_active_embed)
+            except:
+                await ctx.send("Active members with strikes\n" + "```\n" + non_active_table.get_string() + "```")
+
+        if (not active_members_have_strikes) and (not non_active_members_have_strikes):
+            embed = discord.Embed()
+            embed.add_field(name="Strikes Report", value="No users currently have strikes")
             await ctx.send(embed=embed)
-        except:
-            await ctx.send("Players with at least 1 strike\n" + "```\n" + table.get_string() + "```")
+
 
     @strikes_report.error
     async def strikes_report_error(self, ctx, error):
