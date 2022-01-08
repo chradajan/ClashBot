@@ -166,13 +166,13 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
     if player_tag == None:
         player_tag = db_utils.get_player_tag(member.id)
 
-    if player_tag == None:
+    if player_tag is None:
         return False
 
     discord_name = full_name(member)
     clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, member.id)
 
-    if clash_data == None:
+    if clash_data is None:
         return False
 
     member_status = db_utils.update_user(clash_data)
@@ -181,12 +181,15 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
         if clash_data["player_name"] != member.display_name:
             await member.edit(nick = clash_data["player_name"])
 
-        roles_to_remove = [NORMAL_ROLES[MEMBER_ROLE_NAME], NORMAL_ROLES[VISITOR_ROLE_NAME], NORMAL_ROLES[ELDER_ROLE_NAME]]
-        await member.remove_roles(*roles_to_remove)
-        await member.add_roles(NORMAL_ROLES[member_status])
+        current_roles = set(member.roles).intersection({NORMAL_ROLES[MEMBER_ROLE_NAME], NORMAL_ROLES[VISITOR_ROLE_NAME], NORMAL_ROLES[ELDER_ROLE_NAME]})
+        correct_roles = { NORMAL_ROLES[member_status] }
 
         if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in blacklist.blacklist):
-            await member.add_roles(NORMAL_ROLES[ELDER_ROLE_NAME])
+            correct_roles.add(NORMAL_ROLES[ELDER_ROLE_NAME])
+
+        if correct_roles != current_roles:
+            await member.remove_roles(*list(current_roles - correct_roles))
+            await member.add_roles(*list(correct_roles))
 
     return True
 
