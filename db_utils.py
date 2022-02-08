@@ -725,7 +725,7 @@ def update_vacation_for_user(discord_id: int, status: bool=None) -> bool:
 
 def get_users_on_vacation() -> dict:
     """
-    Get a set of players currently on vacation.
+    Get a dict of active members that are currently on vacation.
 
     Returns:
         dict{player_tag(str): player_name(str)}: Player names and tags of users on vacation.
@@ -739,7 +739,8 @@ def get_users_on_vacation() -> dict:
     if query_result is None:
         return {}
 
-    users_on_vacation = { user["player_tag"]: user["player_name"] for user in query_result }
+    active_members = clash_utils.get_active_members_in_clan()
+    users_on_vacation = { user["player_tag"]: user["player_name"] for user in query_result if user["player_tag"] in active_members }
     return users_on_vacation
 
 

@@ -48,12 +48,12 @@ class StatusReports(commands.Cog):
             for player_name, decks_remaining in usage_info["active_members_with_remaining_decks"]:
                 table.add_row([player_name, decks_remaining])
 
-            embed.add_field(name="Active members with decks remaining", value = "```\n" + table.get_string() + "```")
+            embed.add_field(name="Active members with remaining decks", value = "```\n" + table.get_string() + "```")
 
             try:
                 await ctx.send(embed=embed)
             except:
-                await ctx.send("Active members with decks remaining\n" + "```\n" + table.get_string() + "```")
+                await ctx.send("Active members with remaining decks\n" + "```\n" + table.get_string() + "```")
 
         if len(usage_info["inactive_members_with_decks_used"]) > 0:
             embed = discord.Embed()
@@ -63,12 +63,12 @@ class StatusReports(commands.Cog):
             for player_name, decks_remaining in usage_info["inactive_members_with_decks_used"]:
                 table.add_row([player_name, decks_remaining])
 
-            embed.add_field(name="Former members that participated today", value = "```\n" + table.get_string() + "```")
+            embed.add_field(name="Former members with remaining decks", value = "```\n" + table.get_string() + "```")
 
             try:
                 await ctx.send(embed=embed)
             except:
-                await ctx.send("Former members that participated today\n" + "```\n" + table.get_string() + "```")
+                await ctx.send("Former members with remaining decks\n" + "```\n" + table.get_string() + "```")
 
         if len(usage_info["locked_out_active_members"]) > 0:
             embed = discord.Embed()
@@ -85,13 +85,14 @@ class StatusReports(commands.Cog):
             except:
                 await ctx.send("Active members locked out today\n" + "```\n" + table.get_string() + "```")
 
-        if len(users_on_vacation):
+        if len(users_on_vacation) > 0:
             embed = discord.Embed()
             table = PrettyTable()
-            table.field_names = ["Member"]
+            table.field_names = ["Member", "Decks"]
 
-            for player_name in users_on_vacation.values():
-                table.add_row([player_name])
+            for player_tag, player_name in users_on_vacation.items():
+                decks_remaining = 4 - clash_utils.get_user_decks_used_today(player_tag)
+                table.add_row([player_name, decks_remaining])
 
             embed.add_field(name="Members currently on vacation", value = "```\n" + table.get_string() + "```")
 
