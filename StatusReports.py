@@ -206,7 +206,7 @@ class StatusReports(commands.Cog):
 
 
     """
-    Command: !player_report {general_info} {deck_usage_history}
+    Command: !player_report {member}
 
     Get information about a member in the server.
     """
@@ -244,4 +244,41 @@ class StatusReports(commands.Cog):
             await ctx.send("You did not specify a user. Command should be formatted as:  !player_report <member>")
         else:
             await ctx.send("Something went wrong. Command should be formatted as:  !player_report <member>")
+            raise error
+
+    """
+    Command: !stats_report {member}
+
+    Get war stats of specified user.
+    """
+    @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    async def stats_report(self, ctx, member: discord.Member):
+        """Get war stats of specified user."""
+        player_tag = db_utils.get_player_tag(member.id)
+
+        if player_tag is None:
+            await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
+            return
+
+        embed = bot_utils.create_match_performance_embed(member.display_name, player_tag)
+        await ctx.send(embed=embed)
+
+    @stats_report.error
+    async def stats_report_error(self, ctx, error):
+        if isinstance(error, commands.errors.CheckFailure):
+            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
+            await ctx.send(f"!stats_report command can only be sent in {channel.mention} by Leaders/Admins.")
+        elif isinstance(error, commands.errors.MemberNotFound):
+            player_tag = db_utils.get_player_tag(error.argument)
+            if player_tag is not None:
+                embed = bot_utils.create_match_performance_embed(error.argument, player_tag)
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send("Member not found. This could be because there are multiple UNREGISTERED users with identical player names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
+        elif isinstance(error, commands.errors.MissingRequiredArgument):
+            await ctx.send("You did not specify a user. Command should be formatted as:  !stats_report <member>")
+        else:
+            await ctx.send("Something went wrong. Command should be formatted as:  !stats_report <member>")
             raise error

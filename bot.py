@@ -135,9 +135,9 @@ async def assign_strikes_and_clear_vacation():
     message = ""
 
     if completed_saturday:
-        message = "River Race completed Saturday. Participants with fewer than 10 decks have received strikes.\n"
+        message = "River Race completed Saturday. Participants with fewer than 12 decks have received strikes.\n"
     else:
-        message = "River Race completed Sunday. Participants with fewer than 14 decks have received strikes.\n"
+        message = "River Race completed Sunday. Participants with fewer than 16 decks have received strikes.\n"
 
     if db_utils.get_strike_status():
         users_on_vacation = db_utils.get_users_on_vacation()
