@@ -249,7 +249,7 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = 
 # (should_receive_strike, decks_used)
 def should_receive_strike(deck_usage: int, completed_saturday: bool) -> tuple:
     usage_history_list = break_down_usage_history(deck_usage)
-    decks_required = 10 if completed_saturday else 14
+    decks_required = 12 if completed_saturday else 16
     decks_used_in_race = 0
 
     for i in range(1, 4):
