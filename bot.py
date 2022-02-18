@@ -133,6 +133,7 @@ async def assign_strikes_and_clear_vacation():
     strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
     completed_saturday = db_utils.is_completed_saturday()
     message = ""
+    send_missing_data_message = False
 
     if completed_saturday:
         message = "River Race completed Saturday. Participants with fewer than 12 decks have received strikes.\n"
@@ -153,7 +154,10 @@ async def assign_strikes_and_clear_vacation():
             if (player_tag not in active_members) or (player_tag in users_on_vacation):
                 continue
 
-            should_receive_strike, decks_used_in_race = bot_utils.should_receive_strike(deck_usage_history, completed_saturday)
+            should_receive_strike, decks_used_in_race, missing_data = bot_utils.should_receive_strike(deck_usage_history, completed_saturday)
+
+            if missing_data:
+                send_missing_data_message = True
 
             if not should_receive_strike:
                 continue
@@ -197,6 +201,11 @@ async def assign_strikes_and_clear_vacation():
         if field_count == 25:
             await strikes_channel.send(embed=embed_two)
 
+    if send_missing_data_message:
+        missing_data_embed = discord.Embed()
+        missing_data_embed.add_field(name="Missing Data Warning", value="War participation data is missing for one or more days. Threshold for assigning strikes has been adjusted accordingly.")
+        await strikes_channel.send(embed=missing_data_embed)
+
 
 prev_deck_usage_sum = -1
 prev_deck_usage = None
@@ -221,6 +230,9 @@ async def determine_reset_time():
     weekday = datetime.datetime.utcnow().date().weekday()
     usage_list = clash_utils.get_deck_usage_today(active_members=active_members)
     current_sum = 0
+
+    if (len(active_members) == 0) or (len(usage_list) == 0):
+        return
 
     for decks_used in usage_list.values():
         current_sum += decks_used

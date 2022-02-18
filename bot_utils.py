@@ -246,19 +246,41 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = 
     return usage_history
 
 
-# (should_receive_strike, decks_used)
-def should_receive_strike(deck_usage: int, completed_saturday: bool) -> tuple:
+def should_receive_strike(deck_usage: int, completed_saturday: bool) -> Tuple[bool, int, bool]:
+    """
+    Based on deck usage and race completion date, determine whether user should receive strike.
+
+    Args:
+        deck_usage(int): Concatenated deck usage history value from database.
+        completed_saturday(bool): Whether race completed early or not.
+
+    Returns:
+        Tuple[bool, int, bool]: Whether user should receive strike, how many decks were used in war, and whether any data was missing.
+    """
     usage_history_list = break_down_usage_history(deck_usage)
     decks_required = 12 if completed_saturday else 16
     decks_used_in_race = 0
+    missing_data = False
 
     for i in range(1, 4):
-        decks_used_in_race += usage_history_list[i][0]
+        temp_usage = usage_history_list[i][0]
+
+        if temp_usage == 7:
+            missing_data = True
+            decks_required -= 4
+        else:
+            decks_used_in_race += temp_usage
 
     if not completed_saturday:
-        decks_used_in_race += usage_history_list[0][0]
+        temp_usage = usage_history_list[0][0]
 
-    return (decks_used_in_race < decks_required, decks_used_in_race)
+        if temp_usage == 7:
+            missing_data = True
+            decks_required -= 4
+        else:
+            decks_used_in_race += temp_usage
+
+    return (decks_used_in_race < decks_required, decks_used_in_race, missing_data)
 
 
 def battletime_to_datetime(battle_time: str) -> datetime.datetime:
@@ -341,7 +363,7 @@ def get_predicted_race_outcome(remaining_decks_list: list=None) -> List[Tuple[st
     Get the predicted clan placement outcome for today.
 
     Returns:
-        List[str, int]: Sorted list of clans and their predicted placement based on remaining decks with 50% winrate.
+        List[Tuple[str, int]]: Sorted list of clans and their predicted placement based on remaining decks with 50% winrate.
     """
     if remaining_decks_list is None:
         remaining_decks_list = clash_utils.get_clan_decks_remaining()
@@ -356,7 +378,7 @@ def get_predicted_race_outcome(remaining_decks_list: list=None) -> List[Tuple[st
 
     for clan_tag in current_clan_info:
         clan_name, current_fame = current_clan_info[clan_tag]
-        _, saved_fame = saved_clan_info[clan_tag]
+        _, saved_fame = saved_clan_info.get(clan_tag, ("", 0))
         fame_earned_today = current_fame - saved_fame
         decks_remaining = remaining_decks_dict[clan_tag]
         predicted_fame = 50 * round((fame_earned_today + (decks_remaining * 165.625)) / 50)

@@ -942,8 +942,14 @@ def record_deck_usage_today(deck_usage: dict):
     query_result = cursor.fetchall()
     db_users = set()
 
-    if query_result != None:
+    if query_result is not None:
         db_users = {user["player_tag"] for user in query_result}
+
+    default_deck_usage = 0
+
+    if deck_usage is None:
+        deck_usage = {}
+        default_deck_usage = 7
 
     for player_tag in deck_usage:
         db_users.discard(player_tag)
@@ -962,7 +968,7 @@ def record_deck_usage_today(deck_usage: dict):
         cursor.execute("SELECT usage_history FROM users WHERE player_tag = %s", (player_tag))
         query_result = cursor.fetchone()
 
-        updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (0 & ONE_DAY_MASK)
+        updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (default_deck_usage & ONE_DAY_MASK)
         cursor.execute("UPDATE users SET usage_history = %s WHERE player_tag = %s", (updated_history, player_tag))
 
     db.commit()
@@ -1013,6 +1019,9 @@ def clean_up_db(active_members: dict=None):
 
     if active_members == None:
         active_members = clash_utils.get_active_members_in_clan()
+
+    if len(active_members) == 0:
+        return
 
     cursor.execute("SELECT id, player_name, player_tag, discord_name, discord_id, status FROM users")
     query_result = cursor.fetchall()

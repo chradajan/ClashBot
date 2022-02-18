@@ -77,7 +77,7 @@ def get_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[dict]:
     req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
     if req.status_code != 200:
-        return None
+        return []
 
     json_obj = req.json()
     return json_obj["clan"]["participants"]
@@ -296,10 +296,13 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=No
     """
     participants = get_river_race_participants(clan_tag)
 
-    if active_members == None:
+    if active_members is None:
         active_members = get_active_members_in_clan(clan_tag)
     else:
         active_members = active_members.copy()
+
+    if (len(participants) == 0) or (len(active_members) == 0):
+        return {}
 
     usage_list = {}
 
