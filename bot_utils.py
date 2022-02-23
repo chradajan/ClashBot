@@ -538,4 +538,7 @@ async def send_new_member_info(info_channel: discord.TextChannel, clash_data: di
 
     embed.add_field(name="Card Levels", value=f"```{card_level_string}```", inline=False)
 
-    await info_channel.send(embed=embed)
+    try:
+        await info_channel.send(embed=embed)
+    except:
+        return
