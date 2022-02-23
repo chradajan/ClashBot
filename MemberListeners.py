@@ -39,12 +39,14 @@ class MemberListeners(commands.Cog):
             else:
                 discord_name = bot_utils.full_name(message.author)
                 clash_data = clash_utils.get_clash_user_data(message.content, discord_name, message.author.id)
-                if clash_data != None:
+                if clash_data is not None:
                     if db_utils.add_new_user(clash_data):
                         if not await bot_utils.is_admin(message.author):
                             await message.author.edit(nick=clash_data["player_name"])
                         await message.author.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
                         await message.author.remove_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
+                        info_channel = discord.utils.get(message.guild.channels, name=LEADER_INFO_CHANNEL)
+                        await bot_utils.send_new_member_info(info_channel, clash_data)
                     else:
                         await message.channel.send(content="A player affiliated with that player tag already exists on the server. Please enter an unused player tag.", delete_after=10)
                 else:

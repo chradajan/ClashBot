@@ -52,6 +52,9 @@ def add_new_user(clash_data: dict) -> bool:
                 "clan_name": str,
                 "clan_tag": str
             }
+
+    Returns:
+        bool: Whether player was successfully inserted into database.
     """
     db, cursor = connect_to_db()
 
@@ -83,7 +86,7 @@ def add_new_user(clash_data: dict) -> bool:
     cursor.execute("SELECT * FROM users WHERE player_tag = %(player_tag)s", clash_data)
     query_result = cursor.fetchone()
 
-    if query_result != None:
+    if query_result is not None:
         if (query_result["status"] == 'ACTIVE') or (query_result["status"] == 'INACTIVE'):
             db.rollback()
             db.close()

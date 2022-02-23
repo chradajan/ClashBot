@@ -502,3 +502,40 @@ async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, st
             break
 
     return return_info
+
+
+async def send_new_member_info(info_channel: discord.TextChannel, clash_data: dict):
+    """
+    Send an informational message to leaders when a new member joins the server.
+
+    Args:
+        info_channel(discord.TextChannel): Channel to send message to.
+        clash_data(dict): Dict containing info about new member.
+    """
+    extended_clash_data = clash_utils.get_extended_user_data(clash_data['player_tag'])
+
+    if extended_clash_data is None:
+        return
+
+    url = f"https://royaleapi.com/player/{clash_data['player_tag'][1:]}"
+    embed = discord.Embed(title=f"{clash_data['player_name']} just joined the server!", url=url)
+
+    embed.add_field(name=f"About {clash_data['player_name']}",
+                    value="```Level: {expLevel}\nTrophies: {trophies}\nBest Trophies: {bestTrophies}```".format(**extended_clash_data),
+                    inline=False)
+
+    total_cards = extended_clash_data["totalCards"]
+    card_level_string = ""
+    percentile = 0
+
+    for i in range(14, 0, -1):
+        percentile += extended_clash_data["cards"][i] / total_cards
+        percentage = round(percentile * 100)
+        card_level_string += f"{i:02d}: {(percentage // 5) * '■':<20}  {percentage:02d}%\n"
+
+        if percentage == 100:
+            break
+
+    embed.add_field(name="Card Levels", value=f"```{card_level_string}```", inline=False)
+
+    await info_channel.send(embed=embed)

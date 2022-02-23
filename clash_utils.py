@@ -663,3 +663,38 @@ def get_clans_and_fame(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
         clans_info[clan["tag"]] = (clan["name"], fame)
 
     return clans_info
+
+
+def get_extended_user_data(player_tag: str) -> dict:
+    """
+    Get extended dict containing info about specified player and card levels.
+
+    Args:
+        player_tag(str): Player to get information about.
+
+    Returns:
+        dict:
+    """
+    req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if req.status_code != 200:
+        return None
+
+    json_obj = req.json()
+
+    clash_data = {
+        "player_tag": player_tag,
+        "player_name": json_obj["name"],
+        "expLevel": json_obj["expLevel"],
+        "trophies": json_obj["trophies"],
+        "bestTrophies": json_obj["bestTrophies"],
+        "cards": {i: 0 for i in range(1, 15)},
+        "totalCards": 0
+    }
+
+    for card in json_obj["cards"]:
+        card_level = 14 - (card["maxLevel"] - card["level"])
+        clash_data["cards"][card_level] += 1
+        clash_data["totalCards"] += 1
+
+    return clash_data
