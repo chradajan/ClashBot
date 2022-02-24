@@ -564,8 +564,14 @@ def set_reset_time(reset_time: datetime.datetime):
     """
     db, cursor = connect_to_db()
 
-    reset_time = bot_utils.datetime_to_battletime(reset_time)
-    cursor.execute("UPDATE race_status SET reset_time = %s", (reset_time))
+    reset_time_str = bot_utils.datetime_to_battletime(reset_time)
+    cursor.execute("UPDATE race_status SET reset_time = %s", (reset_time_str))
+
+    river_race_days = {4: 'thursday', 5: 'friday', 6: 'saturday', 0: 'sunday'}
+    weekday = river_race_days.get(reset_time.weekday(), None)
+
+    if weekday is not None:
+        cursor.execute(f"UPDATE race_reset_times SET {weekday} = %s", (reset_time_str))
 
     db.commit()
     db.close()
@@ -586,6 +592,27 @@ def get_reset_time() -> datetime.datetime:
 
     db.close()
     return reset_time
+
+
+def get_river_race_reset_times() -> dict:
+    """
+    Get the reset time of each day during the most recent river race.
+
+    Returns:
+        dict{str: datetime.datetime}: Dict of weekday and reset time pairs.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT * FROM race_reset_times")
+    query_result = cursor.fetchone()
+    db.close()
+
+    reset_times = {"thursday":  bot_utils.battletime_to_datetime(query_result["thursday"]),
+                   "friday":    bot_utils.battletime_to_datetime(query_result["friday"]),
+                   "saturday":  bot_utils.battletime_to_datetime(query_result["saturday"]),
+                   "sunday":    bot_utils.battletime_to_datetime(query_result["sunday"])}
+
+    return reset_times
 
 
 def get_player_tag(search_key) -> str:

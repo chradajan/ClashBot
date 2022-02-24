@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 8.0.27, for Linux (aarch64)
+-- MySQL dump 10.13  Distrib 8.0.28, for Linux (aarch64)
 --
 -- Host: localhost    Database: clash
 -- ------------------------------------------------------
--- Server version	8.0.27-0ubuntu0.20.04.1
+-- Server version	8.0.28-0ubuntu0.20.04.3
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -149,6 +149,22 @@ CREATE TABLE `match_history_recent` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `race_reset_times`
+--
+
+DROP TABLE IF EXISTS `race_reset_times`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `race_reset_times` (
+  `thursday` varchar(128) NOT NULL,
+  `friday` varchar(128) NOT NULL,
+  `saturday` varchar(128) NOT NULL,
+  `sunday` varchar(128) NOT NULL,
+  PRIMARY KEY (`thursday`,`friday`,`saturday`,`sunday`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `race_status`
 --
 
@@ -160,7 +176,7 @@ CREATE TABLE `race_status` (
   `colosseum_week` tinyint(1) NOT NULL,
   `war_time` tinyint(1) NOT NULL,
   `last_check_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `reset_time` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reset_time` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   PRIMARY KEY (`completed_saturday`,`colosseum_week`,`war_time`,`last_check_time`,`reset_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -173,12 +189,12 @@ DROP TABLE IF EXISTS `river_race_clans`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `river_race_clans` (
-  `clan_tag` varchar(128) NOT NULL,
-  `clan_name` varchar(128) NOT NULL,
+  `clan_tag` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clan_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fame` int NOT NULL,
   PRIMARY KEY (`clan_tag`),
   UNIQUE KEY `clan_tag` (`clan_tag`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -220,4 +236,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2021-12-06  2:16:27
+-- Dump completed on 2022-02-24  0:14:07
