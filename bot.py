@@ -149,12 +149,16 @@ async def assign_strikes_and_clear_vacation():
         embed_one = discord.Embed(title="The following users have received strikes:")
         embed_two = discord.Embed(title="The following users have received strikes:")
         field_count = 0
+        reset_times = db_utils.get_river_race_reset_times()
 
         for player_name, player_tag, discord_id, deck_usage_history, tracked_since in deck_usage_list:
             if (player_tag not in active_members) or (player_tag in users_on_vacation):
                 continue
 
-            should_receive_strike, decks_used_in_race, missing_data = bot_utils.should_receive_strike(deck_usage_history, completed_saturday)
+            should_receive_strike, decks_used_in_race, missing_data = bot_utils.should_receive_strike(deck_usage_history,
+                                                                                                      completed_saturday,
+                                                                                                      tracked_since,
+                                                                                                      reset_times)
 
             if missing_data:
                 send_missing_data_message = True
@@ -175,6 +179,12 @@ async def assign_strikes_and_clear_vacation():
 
             if strikes is None:
                 continue
+
+            if tracked_since is None:
+                tracked_since = "Unknown"
+            else:
+                tracked_since = (tracked_since.strftime("%a") + ", " +  tracked_since.strftime("%b") + " " + str(tracked_since.day).zfill(2) +
+                                " " + tracked_since.strftime("%H:%M") + " UTC")
 
             if field_count < 25:
                 embed_one.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
@@ -239,15 +249,18 @@ async def determine_reset_time():
 
     if current_sum < prev_deck_usage_sum:
         reset_occurred = True
-        reset_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=1)
-        db_utils.set_reset_time(reset_time)
         db_utils.clean_up_db(active_members=active_members)
         db_utils.record_deck_usage_today(prev_deck_usage)
 
         if weekday == 3:
-            db_utils.prepare_for_river_race(reset_time)
-        elif weekday in {4, 5, 6} and not db_utils.is_colosseum_week():
-            db_utils.save_clans_fame()
+            db_utils.prepare_for_river_race(datetime.datetime.now(datetime.timezone.utc))
+        elif weekday in {4, 5, 6}:
+            clash_utils.calculate_match_performance(False)
+
+            if not db_utils.is_colosseum_week():
+                db_utils.save_clans_fame()
+
+        db_utils.set_reset_time(datetime.datetime.now(datetime.timezone.utc))
     else:
         prev_deck_usage_sum = current_sum
         prev_deck_usage = usage_list
@@ -265,15 +278,18 @@ async def reset_globals():
     if not reset_occurred:
         active_members = clash_utils.get_active_members_in_clan()
         weekday = datetime.datetime.utcnow().date().weekday()
-        reset_time = datetime.datetime.now(datetime.timezone.utc)
-        db_utils.set_reset_time(reset_time)
         db_utils.clean_up_db(active_members=active_members)
         db_utils.record_deck_usage_today(prev_deck_usage)
 
         if weekday == 3:
-            db_utils.prepare_for_river_race(reset_time)
-        elif weekday in {4, 5, 6} and not db_utils.is_colosseum_week():
-            db_utils.save_clans_fame()
+            db_utils.prepare_for_river_race(datetime.datetime.now(datetime.timezone.utc))
+        elif weekday in {4, 5, 6}:
+            clash_utils.calculate_match_performance(False)
+
+            if not db_utils.is_colosseum_week():
+                db_utils.save_clans_fame()
+
+        db_utils.set_reset_time(datetime.datetime.now(datetime.timezone.utc))
 
     prev_deck_usage_sum = -1
     prev_deck_usage = None

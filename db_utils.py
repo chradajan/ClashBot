@@ -1005,12 +1005,12 @@ def record_deck_usage_today(deck_usage: dict):
     db.close()
 
 
-def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, int, str]]:
+def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, int, datetime.datetime]]:
     """
     Get usage history of all users in database.
 
     Returns:
-        List[Tuple[str, str, int, str]]: List of player names, tags, discord ids, usage histories, and tracked since dates.
+        List[Tuple[str, str, int, datetime.datetime]]: List of player names, tags, discord ids, usage histories, and tracked since dates.
     """
     db, cursor = connect_to_db()
 
@@ -1023,12 +1023,8 @@ def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, int, str]]:
         cursor.execute("SELECT tracked_since FROM match_history_recent WHERE user_id = %s", (user["id"]))
         tracked_since = cursor.fetchone()["tracked_since"]
 
-        if tracked_since == None:
-            tracked_since = "Unknown"
-        else:
+        if tracked_since is not None:
             tracked_since = bot_utils.battletime_to_datetime(tracked_since)
-            tracked_since = (tracked_since.strftime("%a") + ", " +  tracked_since.strftime("%b") + " " + str(tracked_since.day).zfill(2) +
-                            " " + tracked_since.strftime("%H:%M") + " UTC")
 
         usage_list.append((user["player_name"], user["player_tag"], user["discord_id"], user["usage_history"], tracked_since))
 
@@ -1236,7 +1232,6 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
     set_colosseum_week_status(False)
     set_war_time_status(True)
     set_last_check_time(last_check_time)
-    clean_up_db()
 
     db, cursor = connect_to_db()
 
@@ -1459,10 +1454,13 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=
     Args:
         clan_tag(str): Clan to get users from.
     """
-    if active_members == None:
+    if active_members is None:
         active_members = clash_utils.get_active_members_in_clan(clan_tag)
     else:
         active_members = active_members.copy()
+
+    if len(active_members) == 0:
+        return
 
     db, cursor = connect_to_db()
 

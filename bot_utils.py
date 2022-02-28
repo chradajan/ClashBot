@@ -246,21 +246,37 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = 
     return usage_history
 
 
-def should_receive_strike(deck_usage: int, completed_saturday: bool) -> Tuple[bool, int, bool]:
+def should_receive_strike(deck_usage: int, completed_saturday: bool, tracked_since: datetime.datetime, reset_times: dict) -> Tuple[bool, int, bool]:
     """
     Based on deck usage and race completion date, determine whether user should receive strike.
 
     Args:
         deck_usage(int): Concatenated deck usage history value from database.
         completed_saturday(bool): Whether race completed early or not.
+        tracked_since(datetime.datetime): Time that bot started tracking user.
+        reset_times(dict{str: datetime.datetime}): Dict of river race reset times.
 
     Returns:
         Tuple[bool, int, bool]: Whether user should receive strike, how many decks were used in war, and whether any data was missing.
     """
     usage_history_list = break_down_usage_history(deck_usage)
-    decks_required = 12 if completed_saturday else 16
-    decks_used_in_race = 0
+    decks_required = 0
+    decks_used = 0
     missing_data = False
+
+    if tracked_since is None:
+        decks_required = 16
+    elif tracked_since <= reset_times["thursday"]:
+        decks_required = 16
+    elif tracked_since <= reset_times["friday"]:
+        decks_required = 12
+    elif tracked_since <= reset_times["saturday"]:
+        decks_required = 8
+    else:
+        decks_required = 4
+
+    if completed_saturday:
+        decks_required -= 4
 
     for i in range(1, 4):
         temp_usage = usage_history_list[i][0]
@@ -269,7 +285,7 @@ def should_receive_strike(deck_usage: int, completed_saturday: bool) -> Tuple[bo
             missing_data = True
             decks_required -= 4
         else:
-            decks_used_in_race += temp_usage
+            decks_used += temp_usage
 
     if not completed_saturday:
         temp_usage = usage_history_list[0][0]
@@ -278,9 +294,9 @@ def should_receive_strike(deck_usage: int, completed_saturday: bool) -> Tuple[bo
             missing_data = True
             decks_required -= 4
         else:
-            decks_used_in_race += temp_usage
+            decks_used += temp_usage
 
-    return (decks_used_in_race < decks_required, decks_used_in_race, missing_data)
+    return (decks_used < decks_required, decks_used, missing_data)
 
 
 def battletime_to_datetime(battle_time: str) -> datetime.datetime:
@@ -521,15 +537,15 @@ async def send_new_member_info(info_channel: discord.TextChannel, clash_data: di
     embed = discord.Embed(title=f"{clash_data['player_name']} just joined the server!", url=url)
 
     embed.add_field(name=f"About {clash_data['player_name']}",
-                    value="```Level: {expLevel}\nTrophies: {trophies}\nBest Trophies: {bestTrophies}```".format(**extended_clash_data),
+                    value="```Level: {expLevel}\nTrophies: {trophies}\nBest Trophies: {bestTrophies}\nCards Owned: {foundCards}/{totalCards}```".format(**extended_clash_data),
                     inline=False)
 
-    total_cards = extended_clash_data["totalCards"]
+    found_cards = extended_clash_data["foundCards"]
     card_level_string = ""
     percentile = 0
 
     for i in range(14, 0, -1):
-        percentile += extended_clash_data["cards"][i] / total_cards
+        percentile += extended_clash_data["cards"][i] / found_cards
         percentage = round(percentile * 100)
         card_level_string += f"{i:02d}: {(percentage // 5) * '■':<20}  {percentage:02d}%\n"
 

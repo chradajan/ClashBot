@@ -689,12 +689,19 @@ def get_extended_user_data(player_tag: str) -> dict:
         "trophies": json_obj["trophies"],
         "bestTrophies": json_obj["bestTrophies"],
         "cards": {i: 0 for i in range(1, 15)},
-        "totalCards": 0
+        "foundCards": 0,
+        "totalCards": "Unknown"
     }
 
     for card in json_obj["cards"]:
         card_level = 14 - (card["maxLevel"] - card["level"])
         clash_data["cards"][card_level] += 1
-        clash_data["totalCards"] += 1
+        clash_data["foundCards"] += 1
+
+    req = requests.get(f"https://api.clashroyale.com/v1/cards", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if req.status_code == 200:
+        json_obj = req.json()
+        clash_data["totalCards"] = len(json_obj["items"])
 
     return clash_data
