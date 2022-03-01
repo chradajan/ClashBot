@@ -211,7 +211,7 @@ CREATE TABLE `users` (
   `discord_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `discord_id` bigint unsigned DEFAULT NULL,
   `clan_role` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `US_time` tinyint(1) NOT NULL,
+  `time_zone` enum('US','EU') COLLATE utf8mb4_unicode_ci NOT NULL,
   `vacation` tinyint(1) NOT NULL,
   `strikes` int NOT NULL,
   `permanent_strikes` int NOT NULL,
@@ -236,4 +236,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-02-24  0:14:07
+-- Dump completed on 2022-03-01 20:44:56

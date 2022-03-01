@@ -101,7 +101,7 @@ def add_new_user(clash_data: dict) -> bool:
                             WHERE player_tag = %(player_tag)s"
             cursor.execute(update_query, clash_data)
     else:
-        insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(discord_id)s, %(clan_role)s, TRUE, FALSE, 0, 0, 0, %(status)s, %(clan_id)s)"
+        insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(discord_id)s, %(clan_role)s, 'US', FALSE, 0, 0, 0, %(status)s, %(clan_id)s)"
         cursor.execute(insert_user_query, clash_data)
 
     # Get id of newly inserted user.
@@ -177,7 +177,7 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     clash_data["discord_name"] = f"{clash_data['status']}{player_tag}"
 
     # Insert them
-    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, NULL, %(clan_role)s, TRUE, FALSE, 0, 0, 0, %(status)s, %(clan_id)s)"
+    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, NULL, %(clan_role)s, 'US', FALSE, 0, 0, 0, %(status)s, %(clan_id)s)"
     cursor.execute(insert_user_query, clash_data)
 
     # Create match_history entries.
@@ -919,41 +919,43 @@ def commit_roles(discord_id: int, roles: list):
     db.close()
 
 
-def update_time_zone(discord_id: int, US_time: bool):
+def update_time_zone(discord_id: int, time_zone):
     """
     Change a user's preferred time for receiving automated reminders.
 
     Args:
         discord_id(int): Unique Discord id of a member.
-        US_time(bool): Whether user should receive automated reminders on US time (True) or EU time (False).
+        time_zone(ReminderTime): Preferred time zone.
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("UPDATE users SET US_time = %s WHERE discord_id = %s", (US_time, discord_id))
+    cursor.execute("UPDATE users SET time_zone = %s WHERE discord_id = %s", (time_zone.value, discord_id))
 
     db.commit()
     db.close()
 
 
-def get_members_in_time_zone(US_time: bool) -> Set[str]:
+def get_members_in_time_zone(time_zone) -> Set[str]:
     """
     Get the members in the specified time zone.
+
+    Args:
+        time_zone(ReminderTime): Get members from this time zone.
 
     Returns:
         set[player_tag(str)]: Player tags of users in specified time zone.
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_tag FROM users WHERE US_time = %s", (US_time))
+    cursor.execute("SELECT player_tag FROM users WHERE time_zone = %s", (time_zone.value))
     query_result = cursor.fetchall()
+    db.close()
 
-    if query_result == None:
-        db.close()
-        return None
+    if query_result is None:
+        return set()
 
     members = { user["player_tag"] for user in query_result }
 
-    db.close()
     return members
 
 
@@ -1711,8 +1713,7 @@ def export(primary_clan_only: bool) -> str:
         # Get info
         clan_id = user["clan_id"]
         kicks = get_kicks(user["player_tag"])
-        info_row = [user["player_name"], user["player_tag"], user["discord_name"], user["clan_role"],
-                     "US" if user["US_time"] else "EU",
+        info_row = [user["player_name"], user["player_tag"], user["discord_name"], user["clan_role"], user["time_zone"],
                      "Yes" if user["vacation"] else "No",
                      user["strikes"], user["permanent_strikes"], len(kicks), user["status"],
                      clans_dict[clan_id]["clan_name"], clans_dict[clan_id]["clan_tag"],

@@ -6,3 +6,4 @@ kick_images/
 blacklist.py
 testing_tools.py
 .vscode/
+mysql/

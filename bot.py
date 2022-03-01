@@ -79,48 +79,32 @@ async def on_ready():
 #########################################################################################
 
 
-@aiocron.crontab('0 19 * * 4,5,6')
+@aiocron.crontab('0 19 * * 4,5,6,0')
 async def automated_reminder_eu():
     """
-    Send reminder every Thursday, Friday, and Saturday at 19:00 UTC (Monday and Tuesday at 7pm GMT).
+    Send reminder every Thursday, Friday, Saturday, and Sunday at 19:00 UTC.
     """
-    if db_utils.get_reminder_status():
-        await bot_utils.deck_usage_reminder(bot, US_time=False)
+    if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
+        await bot_utils.deck_usage_reminder(bot, time_zone=bot_utils.ReminderTime.EU)
 
 
-@aiocron.crontab('0 19 * * 0')
-async def automated_reminder_eu_sunday():
-    """
-    Send reminder every Sunday at 19:00 UTC if race not completed (Monday and Tuesday at 7pm GMT).
-    """
-    if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
-        await bot_utils.deck_usage_reminder(bot, US_time=False)
-
-
-@aiocron.crontab('0 2 * * 5,6,0')
+@aiocron.crontab('0 2 * * 5,6,0,1')
 async def automated_reminder_us():
     """
-    Send reminder every Friday, Saturday, and Sunday at 02:00 UTC (Thursday, Friday, and Saturday at 6pm PST).
+    Send reminder every Friday, Saturday, Sunday, and Monday at 02:00 UTC.
     """
-    if db_utils.get_reminder_status():
-        await bot_utils.deck_usage_reminder(bot, US_time=True)
+    if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
+        await bot_utils.deck_usage_reminder(bot, time_zone=bot_utils.ReminderTime.US)
 
-
-@aiocron.crontab('0 2 * * 1')
-async def automated_reminder_us_sunday():
-    """
-    Send reminder every Monday at 02:00 UTC if race not completed (Sunday at 6pm PST).
-    """
-    if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
-        await bot_utils.deck_usage_reminder(bot, US_time=True)
 
 @aiocron.crontab('0 8 * * 5,6,0,1')
 async def last_call_automated_reminder():
     """
-    Send a reminder every day ~1.5 hours before reset time.
+    Send a reminder every day ~1.5 hours before reset time (08:00 UTC).
     """
     if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
-        await bot_utils.deck_usage_reminder(bot, automated=False)
+        await bot_utils.deck_usage_reminder(bot)
+
 
 @aiocron.crontab('0 10 * * 0')
 async def record_race_completion_status():

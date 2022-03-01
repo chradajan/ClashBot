@@ -66,12 +66,16 @@ class MemberUtils(commands.Cog):
     @bot_utils.not_welcome_or_rules_check()
     async def set_reminder_time(self, ctx, reminder_time: str):
         """Set reminder time to either US or EU. US reminders go out at 01:00 UTC. EU reminders go out at 17:00 UTC."""
-        time_zone = None
-        if reminder_time == "US":
-            time_zone = True
-        elif reminder_time == "EU":
-            time_zone = False
-        else:
+
+        time_zone: bot_utils.ReminderTime
+
+        try:
+            time_zone = bot_utils.ReminderTime(reminder_time.upper())
+        except ValueError:
+            await ctx.send("Invalid time zone. Valid reminder times are US or EU")
+            return
+
+        if time_zone == bot_utils.ReminderTime.ALL:
             await ctx.send("Invalid time zone. Valid reminder times are US or EU")
             return
 

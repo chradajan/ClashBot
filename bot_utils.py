@@ -1,6 +1,7 @@
 from config import *
 from difflib import SequenceMatcher
 from discord.ext import commands
+from enum import Enum
 from typing import List, Tuple
 import blacklist
 import cv2
@@ -29,6 +30,10 @@ ONE_DAY_MASK = 0x7
 SPECIAL_ROLES = {}
 NORMAL_ROLES = {}
 
+class ReminderTime(Enum):
+    US = "US"
+    EU = "EU"
+    ALL = "ALL"
 
 #########################################
 #     _____ _               _           #
@@ -99,24 +104,19 @@ async def send_rules_message(ctx, user_to_purge: discord.ClientUser):
     await new_react_message.add_reaction(u"\u2705")
 
 
-async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMINDER_MESSAGE, automated: bool=True):
+async def deck_usage_reminder(bot, time_zone: ReminderTime=ReminderTime.ALL, message: str=DEFAULT_REMINDER_MESSAGE, automated: bool=True):
     reminder_list = clash_utils.get_remaining_decks_today()
     users_on_vacation = db_utils.get_users_on_vacation()
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
-
-    if len(reminder_list) == 0:
-        return
-
     member_string = ""
     non_member_string = ""
-
-    check_time_zones = (US_time != None)
+    check_time_zones = (time_zone != ReminderTime.ALL)
     time_zone_set = set()
 
     if check_time_zones:
-        time_zone_set = db_utils.get_members_in_time_zone(US_time)
-        if time_zone_set == None:
+        time_zone_set = db_utils.get_members_in_time_zone(time_zone)
+        if time_zone_set is None:
             check_time_zones = False
 
     for player_name, player_tag, decks_remaining in reminder_list:
@@ -132,15 +132,14 @@ async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMI
         if discord_id is not None:
             member = discord.utils.get(channel.members, id=discord_id)
 
-        if member == None:
+        if member is None:
             non_member_string += f"{player_name} - Decks left: {decks_remaining}" + "\n"
         else:
             member_string += f"{member.mention} - Decks left: {decks_remaining}" + "\n"
 
     if (len(member_string) == 0) and (len(non_member_string) == 0):
         if check_time_zones:
-            zone = "US" if US_time else "EU"
-            no_reminder_string = f"Everyone that receives {zone} reminders has already used all their decks today. Good job!"
+            no_reminder_string = f"Everyone that receives {time_zone.value} reminders has already used all their decks today. Good job!"
             await channel.send(no_reminder_string)
         else:
             await channel.send("Everyone has already used all their decks today. Good job!")
@@ -150,11 +149,13 @@ async def deck_usage_reminder(bot, US_time: bool=None, message: str=DEFAULT_REMI
 
     if automated:
         automated_message = ''
-        if US_time:
+        if time_zone == ReminderTime.US:
             automated_message = 'This is an automated reminder. If this reminder is in the middle of the night for you, consider switching your reminder time to 7PM GMT with command "!set_reminder_time EU"'
-        else:
+        elif time_zone == ReminderTime.EU:
             automated_message = 'This is an automated reminder. If this reminder is in the middle of the day for you, consider switching your reminder time to 6PM PDT with command "!set_reminder_time US"'
-        reminder_string += "\n\n" + automated_message
+        else:
+            automated_message = 'This is an automated reminder. All members with remaining decks are receiving this regardless of time zone preference.'
+        reminder_string += "\n" + automated_message
 
     await channel.send(reminder_string)
 
