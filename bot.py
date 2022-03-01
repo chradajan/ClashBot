@@ -114,6 +114,13 @@ async def automated_reminder_us_sunday():
     if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
         await bot_utils.deck_usage_reminder(bot, US_time=True)
 
+@aiocron.crontab('0 8 * * 5,6,0,1')
+async def last_call_automated_reminder():
+    """
+    Send a reminder every day ~1.5 hours before reset time.
+    """
+    if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
+        await bot_utils.deck_usage_reminder(bot, automated=False)
 
 @aiocron.crontab('0 10 * * 0')
 async def record_race_completion_status():
