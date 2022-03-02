@@ -116,7 +116,7 @@ async def deck_usage_reminder(bot, time_zone: ReminderTime=ReminderTime.ALL, mes
 
     if check_time_zones:
         time_zone_set = db_utils.get_members_in_time_zone(time_zone)
-        if time_zone_set is None:
+        if len(time_zone_set) == 0:
             check_time_zones = False
 
     for player_name, player_tag, decks_remaining in reminder_list:
