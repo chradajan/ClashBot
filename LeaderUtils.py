@@ -142,7 +142,7 @@ class LeaderUtils(commands.Cog):
         reminder_message = ' '.join(message)
         if len(reminder_message) == 0:
             reminder_message = DEFAULT_REMINDER_MESSAGE
-        await bot_utils.deck_usage_reminder(self.bot, None, reminder_message, False)
+        await bot_utils.deck_usage_reminder(self.bot, message=reminder_message, automated=False)
 
     @send_reminder.error
     async def send_reminder_error(self, ctx, error):
