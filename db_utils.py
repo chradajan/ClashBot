@@ -1815,10 +1815,8 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
 
                 for i in range(14, 0, -1):
                     percentile += card_level_data["cards"][i] / card_level_data["foundCards"]
-                    #percentage = f"{percentile:.2%}"
                     percentage = round(percentile * 100)
                     card_levels_quantity_row.append(card_level_data["cards"][i])
-                    #card_levels_percentiles_row.append(round(percentile, 2))
                     card_levels_percentiles_row.append(percentage)
 
         # Write data to spreadsheet

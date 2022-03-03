@@ -665,6 +665,30 @@ def get_clans_and_fame(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
     return clans_info
 
 
+def get_total_cards() -> int:
+    """
+    Used to retrieve a cached value for the number of the cards in the game. Gets updated total if 24 hours have passed since last
+    check.
+
+    Returns:
+        int: Total number of cards in the game.
+    """
+    if not all(hasattr(get_total_cards, attr) for attr in ["cached_total", "last_check_time"]):
+        get_total_cards.cached_total = 0
+        get_total_cards.last_check_time = None
+
+    now = datetime.datetime.utcnow()
+
+    if get_total_cards.last_check_time is None or (now - get_total_cards.last_check_time).days > 0:
+        req = requests.get(f"https://api.clashroyale.com/v1/cards", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+        if req.status_code == 200:
+            get_total_cards.cached_total = len(req.json()["items"])
+            get_total_cards.last_check_time = now
+
+    return get_total_cards.cached_total
+
+
 def get_extended_user_data(player_tag: str) -> dict:
     """
     Get extended dict containing info about specified player and card levels.
@@ -690,18 +714,12 @@ def get_extended_user_data(player_tag: str) -> dict:
         "bestTrophies": json_obj["bestTrophies"],
         "cards": {i: 0 for i in range(1, 15)},
         "foundCards": 0,
-        "totalCards": "Unknown"
+        "totalCards": get_total_cards()
     }
 
     for card in json_obj["cards"]:
         card_level = 14 - (card["maxLevel"] - card["level"])
         clash_data["cards"][card_level] += 1
         clash_data["foundCards"] += 1
-
-    req = requests.get(f"https://api.clashroyale.com/v1/cards", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
-
-    if req.status_code == 200:
-        json_obj = req.json()
-        clash_data["totalCards"] = len(json_obj["items"])
 
     return clash_data
