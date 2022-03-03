@@ -13,16 +13,16 @@ class LeaderUtils(commands.Cog):
         self.bot = bot
 
     """
-    Command: !export {false_logic_only}
+    Command: !export {false_logic_only} {include_card_levels}
 
     Export database information to spreadsheet.
     """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
-    async def export(self, ctx, false_logic_only: bool=True):
+    async def export(self, ctx, false_logic_only: bool=True, include_card_levels: bool=False):
         """Export database to Excel spreadsheet."""
-        path = db_utils.export(false_logic_only)
+        path = db_utils.export(false_logic_only, include_card_levels)
         await ctx.send(file=discord.File(path))
 
     @export.error

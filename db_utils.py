@@ -1599,7 +1599,7 @@ def get_file_path() -> str:
     return new_path
 
 
-def export(primary_clan_only: bool) -> str:
+def export(primary_clan_only: bool, include_card_levels: bool) -> str:
     """
     Create Excel spreadsheet containing relevant information from the database.
 
@@ -1655,6 +1655,12 @@ def export(primary_clan_only: bool) -> str:
     kicks_sheet = workbook.add_worksheet("Kicks")
     recent_stats_sheet = workbook.add_worksheet("Recent Stats")
     all_stats_sheet = workbook.add_worksheet("All Stats")
+    card_levels_quantity_sheet = None
+    card_levels_percentile_sheet = None
+
+    if include_card_levels:
+        card_levels_quantity_sheet = workbook.add_worksheet("Card Level Quantities")
+        card_levels_percentile_sheet = workbook.add_worksheet("Card Level Percentiles")
 
     # Info sheet headers
     info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes", "Permanent Strikes", "Kicks", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
@@ -1702,6 +1708,12 @@ def export(primary_clan_only: bool) -> str:
                          "Boat Attack Wins", "Boat Attack Losses", "Boat Attack Win Rate"]
 
     all_stats_sheet.write_row(0, 0, all_stats_headers)
+
+    # Card levels headers
+    if include_card_levels:
+        card_levels_headers = ["Player Name", "Player Tag"] + [x for x in range(14, 0, -1)]
+        card_levels_quantity_sheet.write_row(0, 0, card_levels_headers)
+        card_levels_percentile_sheet.write_row(0, 0, card_levels_headers)
 
     # Get data
     deck_usage_today = clash_utils.get_deck_usage_today(active_members=active_members)
@@ -1791,12 +1803,35 @@ def export(primary_clan_only: bool) -> str:
                          match_performance["all"]["boat_attacks"]["losses"],
                          (float(match_performance["all"]["boat_attacks"]["win_rate"][:-1]) / 100)]
 
+        # Card levels
+        card_levels_quantity_row = [user["player_name"], user["player_tag"]]
+        card_levels_percentiles_row = [user["player_name"], user["player_tag"]]
+
+        if include_card_levels:
+            card_level_data = clash_utils.get_extended_user_data(user["player_tag"])
+
+            if card_level_data is not None:
+                percentile = 0
+
+                for i in range(14, 0, -1):
+                    percentile += card_level_data["cards"][i] / card_level_data["foundCards"]
+                    #percentage = f"{percentile:.2%}"
+                    percentage = round(percentile * 100)
+                    card_levels_quantity_row.append(card_level_data["cards"][i])
+                    #card_levels_percentiles_row.append(round(percentile, 2))
+                    card_levels_percentiles_row.append(percentage)
+
         # Write data to spreadsheet
         info_sheet.write_row(row, 0, info_row)
         history_sheet.write_row(row, 0, history_row)
         kicks_sheet.write_row(row, 0, kicks_row)
         recent_stats_sheet.write_row(row, 0, recent_stats_row)
         all_stats_sheet.write_row(row, 0, all_stats_row)
+
+        if include_card_levels:
+            card_levels_quantity_sheet.write_row(row, 0, card_levels_quantity_row)
+            card_levels_percentile_sheet.write_row(row, 0, card_levels_percentiles_row)
+        
         row += 1
 
     workbook.close()
