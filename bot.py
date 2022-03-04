@@ -174,8 +174,7 @@ async def assign_strikes_and_clear_vacation():
             if tracked_since is None:
                 tracked_since = "Unknown"
             else:
-                tracked_since = (tracked_since.strftime("%a") + ", " +  tracked_since.strftime("%b") + " " + str(tracked_since.day).zfill(2) +
-                                " " + tracked_since.strftime("%H:%M") + " UTC")
+                tracked_since = tracked_since.strftime("%a, %b %d %H:%M UTC")
 
             if field_count < 25:
                 embed_one.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)

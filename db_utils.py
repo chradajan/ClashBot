@@ -1676,7 +1676,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
     else:
         now_date = now.date()
 
-    today_header = now_date.strftime("%a") + ", " +  now_date.strftime("%b") + " " + str(now_date.day).zfill(2)
+    today_header = now_date.strftime("%a, %b %d")
 
     for _, day in bot_utils.break_down_usage_history(users[0]["usage_history"], now)[::-1]:
         history_headers.append(day)
@@ -1760,8 +1760,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         if tracked_since == None:
             tracked_since = "N/A"
         else:
-            tracked_since = (tracked_since.strftime("%a") + ", " +  tracked_since.strftime("%b") + " " + str(tracked_since.day).zfill(2) +
-                             " " + tracked_since.strftime("%H:%M"))
+            tracked_since = tracked_since.strftime("%Y-%m-%d, %H:%M")
 
         recent_stats_row = [user["player_name"], user["player_tag"], match_performance["recent"]["fame"], decks_used, tracked_since,
                             match_performance["recent"]["regular"]["wins"],
