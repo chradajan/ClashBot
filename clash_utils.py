@@ -689,15 +689,25 @@ def get_total_cards() -> int:
     return get_total_cards.cached_total
 
 
-def get_extended_user_data(player_tag: str) -> dict:
+def get_card_levels(player_tag: str) -> dict:
     """
-    Get extended dict containing info about specified player and card levels.
+    Get dict containing info about a player's player/card levels.
 
     Args:
         player_tag(str): Player to get information about.
 
     Returns:
-        dict:
+        dict: Player level and card level information.
+                {
+                    "player_tag": str,
+                    "player_name": str,
+                    "expLevel": int,
+                    "trophies": int,
+                    "bestTrophies": int,
+                    "cards": dict {14: int, 13: int, 12: int, ..., 1: int},
+                    "foundCards": int,
+                    "totalCards": int
+                }
     """
     req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 

@@ -1808,7 +1808,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         card_levels_percentiles_row = [user["player_name"], user["player_tag"]]
 
         if include_card_levels:
-            card_level_data = clash_utils.get_extended_user_data(user["player_tag"])
+            card_level_data = clash_utils.get_card_levels(user["player_tag"])
 
             if card_level_data is not None:
                 percentile = 0

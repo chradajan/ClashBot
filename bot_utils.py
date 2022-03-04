@@ -529,24 +529,24 @@ async def send_new_member_info(info_channel: discord.TextChannel, clash_data: di
         info_channel(discord.TextChannel): Channel to send message to.
         clash_data(dict): Dict containing info about new member.
     """
-    extended_clash_data = clash_utils.get_extended_user_data(clash_data['player_tag'])
+    card_level_data = clash_utils.get_card_levels(clash_data['player_tag'])
 
-    if extended_clash_data is None:
+    if card_level_data is None:
         return
 
     url = f"https://royaleapi.com/player/{clash_data['player_tag'][1:]}"
     embed = discord.Embed(title=f"{clash_data['player_name']} just joined the server!", url=url)
 
     embed.add_field(name=f"About {clash_data['player_name']}",
-                    value="```Level: {expLevel}\nTrophies: {trophies}\nBest Trophies: {bestTrophies}\nCards Owned: {foundCards}/{totalCards}```".format(**extended_clash_data),
+                    value="```Level: {expLevel}\nTrophies: {trophies}\nBest Trophies: {bestTrophies}\nCards Owned: {foundCards}/{totalCards}```".format(**card_level_data),
                     inline=False)
 
-    found_cards = extended_clash_data["foundCards"]
+    found_cards = card_level_data["foundCards"]
     card_level_string = ""
     percentile = 0
 
     for i in range(14, 0, -1):
-        percentile += extended_clash_data["cards"][i] / found_cards
+        percentile += card_level_data["cards"][i] / found_cards
         percentage = round(percentile * 100)
         card_level_string += f"{i:02d}: {(percentage // 5) * '■':<20}  {percentage:02d}%\n"
 
