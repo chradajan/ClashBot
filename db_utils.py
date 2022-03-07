@@ -430,6 +430,26 @@ def get_users_with_strikes() -> List[Tuple[str, str, int]]:
     return strikes_list
 
 
+def get_users_with_strikes_dict() -> dict:
+    """
+    Get all users in the database that have non-permanent strikes.
+
+    Returns:
+        dict{player_tag(str): strikes(int)}: Dict of players and strikes.
+    """
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT player_tag, strikes FROM users WHERE strikes > 0")
+    query_result = cursor.fetchall()
+    db.close()
+
+    if query_result is None:
+        return {}
+
+    strikes_dict = {user["player_tag"]: user["strikes"] for user in query_result}
+    return strikes_dict
+
+
 def set_completed_saturday_status(status: bool):
     """
     Update database to indicate whether the primary clan has crossed the finish line early.

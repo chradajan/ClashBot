@@ -300,6 +300,97 @@ def should_receive_strike(deck_usage: int, completed_saturday: bool, tracked_sin
     return (decks_used < decks_required, decks_used, missing_data)
 
 
+def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, int, int]]:
+    """
+    Get a list of all users who will receive strike or who would have received strikes in the previous war.
+    
+    Args:
+        use_race_reset_times(bool): If true, decide the number of required decks for users individually based on when they joined
+                                    the river race. Otherwise, expect max decks possible regardless of join time.
+
+    Returns:
+        List[Tuple[player_name(str), player_tag(str), decks_used(int), decks_required(int), current_strikes(int)]]
+    """
+    deck_usage_list = db_utils.get_all_user_deck_usage_history()
+    strikes_dict = db_utils.get_users_with_strikes_dict()
+    active_members = clash_utils.get_active_members_in_clan()
+    is_war_time = db_utils.is_war_time()
+    completed_saturday = db_utils.is_completed_saturday()
+    last_reset_time = db_utils.get_reset_time()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    upcoming_strikes = []
+    race_reset_times: dict
+    war_days_to_check: int
+    starting_index: int
+
+    if len(active_members) == 0:
+        return []
+
+    if use_race_reset_times:
+        race_reset_times = db_utils.get_river_race_reset_times()
+
+    if not is_war_time:
+        if now.time() < last_reset_time.time():
+            starting_index = now.weekday() - 1
+        else:
+            starting_index = now.weekday()
+
+        if completed_saturday:
+            starting_index += 1
+            war_days_to_check = 3
+        else:
+            war_days_to_check = 4
+    else:
+        starting_index = 0
+
+        if now.weekday() == 0:
+            war_days_to_check = 3
+        elif now.time() > last_reset_time.time():
+            war_days_to_check = now.weekday() - 3
+        else:
+            war_days_to_check = now.weekday() - 4
+
+    if war_days_to_check == 0:
+        return []
+
+    for player_name, player_tag, _, history, tracked_since in deck_usage_list:
+        if player_tag not in active_members:
+            continue
+
+        usage_history = break_down_usage_history(history, now)
+        decks_required: int
+        decks_used: int
+
+        if not use_race_reset_times or tracked_since is None:
+            decks_required = 4 * war_days_to_check
+        elif is_war_time:
+            decks_required = 4 * (now - tracked_since).days
+        else:
+            if tracked_since <= race_reset_times["thursday"]:
+                decks_required = 16
+            elif tracked_since <= race_reset_times["friday"]:
+                decks_required = 12
+            elif tracked_since <= race_reset_times["saturday"]:
+                decks_required = 8
+            else:
+                decks_required = 4
+
+        decks_used = 0
+
+        for i in range(starting_index, starting_index + war_days_to_check):
+            temp_usage = usage_history[i][0]
+
+            if temp_usage == 7:
+                decks_required -= 4
+            else:
+                decks_used += temp_usage
+
+        if decks_used < decks_required:
+            upcoming_strikes.append((player_name, player_tag, decks_used, decks_required, strikes_dict.get(player_tag, 0)))
+
+    return upcoming_strikes
+
+
 def battletime_to_datetime(battle_time: str) -> datetime.datetime:
     """
     Convert a Clash Royale API battleTime string to a datetime object.
