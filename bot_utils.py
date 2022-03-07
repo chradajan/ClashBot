@@ -83,6 +83,8 @@ def not_welcome_or_rules_check():
 #                                         #
 ###########################################
 
+strike_messages = {}
+
 
 def full_name(member: discord.Member) -> str:
     """
@@ -247,7 +249,7 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = 
     return usage_history
 
 
-def should_receive_strike(deck_usage: int, completed_saturday: bool, tracked_since: datetime.datetime, reset_times: dict) -> Tuple[bool, int, bool]:
+def should_receive_strike(deck_usage: int, completed_saturday: bool, tracked_since: datetime.datetime, reset_times: dict) -> Tuple[bool, int, int, bool]:
     """
     Based on deck usage and race completion date, determine whether user should receive strike.
 
@@ -258,7 +260,7 @@ def should_receive_strike(deck_usage: int, completed_saturday: bool, tracked_sin
         reset_times(dict{str: datetime.datetime}): Dict of river race reset times.
 
     Returns:
-        Tuple[bool, int, bool]: Whether user should receive strike, how many decks were used in war, and whether any data was missing.
+        Tuple[should_receive_strike(bool), decks_used(int), decks_required(int), missing_data(bool)]
     """
     usage_history_list = break_down_usage_history(deck_usage)
     decks_required = 0
@@ -297,7 +299,7 @@ def should_receive_strike(deck_usage: int, completed_saturday: bool, tracked_sin
         else:
             decks_used += temp_usage
 
-    return (decks_used < decks_required, decks_used, missing_data)
+    return (decks_used < decks_required, decks_used, decks_required, missing_data)
 
 
 def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, int, int]]:
@@ -650,3 +652,35 @@ async def send_new_member_info(info_channel: discord.TextChannel, clash_data: di
         await info_channel.send(embed=embed)
     except:
         return
+
+
+async def strike_former_participant(player_name: str,
+                                    player_tag: str,
+                                    decks_used: int,
+                                    decks_required: int,
+                                    tracked_since: str,
+                                    strikes_channel: discord.TextChannel,
+                                    commands_channel: discord.TextChannel):
+    """
+    Send an embed to the commands channel that can be used to assign a strike to members who participated in the most recent river
+    race, did not participate fully, and are no longer an active member of the clan.
+
+    Args:
+        player_name(str): Player name of user to potentially strike.
+        player_tag(str): Player tag of user to potentially strike.
+        decks_used(int): How many decks the user used in the river race.
+        decks_required(int): How many decks were expected from the user to not get a strike.
+        tracked_since(str): Human readable string of time that bot started tracking the user.
+        strikes_channel(discord.TextChannel): Channel to send strike message to if a strike is given.
+        commands_channel(discord.TextChannel): Channel to send this embed to.
+    """
+    global strike_messages
+
+    embed = discord.Embed()
+    embed.add_field(name=f"Should {player_name} receive a strike?",
+                    value=f"```Decks: {decks_used}/{decks_required}\nDate: {tracked_since}```")
+
+    strike_message = await commands_channel.send(embed=embed)
+    await strike_message.add_reaction('✅')
+    await strike_message.add_reaction('❌')
+    strike_messages[strike_message.id] = (player_tag, player_name, decks_used, decks_required, tracked_since, strikes_channel)

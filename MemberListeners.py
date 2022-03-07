@@ -74,21 +74,48 @@ class MemberListeners(commands.Cog):
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
-        """Monitor reacts to kick messages."""
+        """Monitor reacts to kick and strike messages."""
         kick_info = self.kick_messages.get(reaction.message.id)
+        strike_info = bot_utils.strike_messages.get(reaction.message.id)
 
-        if kick_info is None or user.bot:
+        if (kick_info is None and strike_info is None) or user.bot:
             return
 
-        player_tag, player_name = kick_info
-        self.kick_messages.pop(reaction.message.id, None)
+        if kick_info is not None:
+            player_tag, player_name = kick_info
+            self.kick_messages.pop(reaction.message.id, None)
 
-        if reaction.emoji == '✅':
-            embed = bot_utils.kick(player_name, player_tag)
-            await reaction.message.channel.send(embed=embed)
-            await reaction.message.delete()
-        elif reaction.emoji == '❌':
-            await reaction.message.delete()
+            if reaction.emoji == '✅':
+                embed = bot_utils.kick(player_name, player_tag)
+                await reaction.message.channel.send(embed=embed)
+                await reaction.message.delete()
+            elif reaction.emoji == '❌':
+                await reaction.message.delete()
+
+        elif strike_info is not None:
+            player_tag, player_name, decks_used, decks_required, tracked_since, channel = strike_info
+            bot_utils.strike_messages.pop(reaction.message.id, None)
+
+            if reaction.emoji == '✅':
+                _, strikes, _, _ = db_utils.give_strike(player_tag, 1)
+                embed = discord.Embed()
+                embed.add_field(name=player_name,
+                                value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```")
+
+                discord_id = db_utils.get_member_id(player_tag)
+                member = None
+
+                if discord_id is not None:
+                    member = discord.utils.get(channel.members, id=discord_id)
+
+                if member is not None:
+                    await channel.send(content=f"{member.mention}", embed=embed)
+                else:
+                    await channel.send(embed=embed)
+
+                await reaction.message.delete()
+            elif reaction.emoji == '❌':
+                await reaction.message.delete()
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):

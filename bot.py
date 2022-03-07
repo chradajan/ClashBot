@@ -102,7 +102,7 @@ async def last_call_automated_reminder():
     """
     Send a reminder every day ~1.5 hours before reset time (08:00 UTC).
     """
-    if db_utils.get_reminder_status() and (not clash_utils.river_race_completed()):
+    if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
         await bot_utils.deck_usage_reminder(bot)
 
 
@@ -122,6 +122,7 @@ async def assign_strikes_and_clear_vacation():
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     vacation_channel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
     strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
+    commands_channel = discord.utils.get(guild.channels, name=COMMANDS_CHANNEL)
     completed_saturday = db_utils.is_completed_saturday()
     message = ""
     send_missing_data_message = False
@@ -135,6 +136,7 @@ async def assign_strikes_and_clear_vacation():
         users_on_vacation = db_utils.get_users_on_vacation()
         deck_usage_list = db_utils.get_all_user_deck_usage_history()
         active_members = clash_utils.get_active_members_in_clan()
+        former_participants = db_utils.get_non_active_participants()
         mention_string = ""
         perfect_week = True
         embed_one = discord.Embed(title="The following users have received strikes:")
@@ -143,18 +145,33 @@ async def assign_strikes_and_clear_vacation():
         reset_times = db_utils.get_river_race_reset_times()
 
         for player_name, player_tag, discord_id, deck_usage_history, tracked_since in deck_usage_list:
-            if (player_tag not in active_members) or (player_tag in users_on_vacation):
+            if (player_tag not in active_members and player_tag not in former_participants) or (player_tag in users_on_vacation):
                 continue
 
-            should_receive_strike, decks_used_in_race, missing_data = bot_utils.should_receive_strike(deck_usage_history,
-                                                                                                      completed_saturday,
-                                                                                                      tracked_since,
-                                                                                                      reset_times)
+            should_receive_strike, decks_used, decks_required, missing_data = bot_utils.should_receive_strike(deck_usage_history,
+                                                                                                              completed_saturday,
+                                                                                                              tracked_since,
+                                                                                                              reset_times)
 
             if missing_data:
                 send_missing_data_message = True
 
             if not should_receive_strike:
+                continue
+
+            if tracked_since is None:
+                tracked_since = "Unknown"
+            else:
+                tracked_since = tracked_since.strftime("%a, %b %d %H:%M UTC")
+
+            if player_tag in former_participants:
+                await bot_utils.strike_former_participant(player_name,
+                                                          player_tag,
+                                                          decks_used,
+                                                          decks_required,
+                                                          tracked_since,
+                                                          strikes_channel,
+                                                          commands_channel)
                 continue
 
             perfect_week = False
@@ -171,16 +188,11 @@ async def assign_strikes_and_clear_vacation():
             if strikes is None:
                 continue
 
-            if tracked_since is None:
-                tracked_since = "Unknown"
-            else:
-                tracked_since = tracked_since.strftime("%a, %b %d %H:%M UTC")
-
             if field_count < 25:
-                embed_one.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
+                embed_one.add_field(name=player_name, value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
                 field_count += 1
             else:
-                embed_two.add_field(name=player_name, value=f"```Decks: {decks_used_in_race}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
+                embed_two.add_field(name=player_name, value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
 
         if perfect_week:
             message += "Everyone completed their battles this week. Good job!"

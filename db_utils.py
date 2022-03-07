@@ -1469,6 +1469,37 @@ def get_match_performance_dict(player_tag: str) -> dict:
     return match_performance_dict
 
 
+def get_non_active_participants(active_members: dict=None) -> Set[str]:
+    """
+    Get a set of player tags of users who were tracked in the most recent river race but are not currently active members.
+
+    Args:
+        active_members(dict, optional): Active members to cross reference.
+
+    Returns:
+        set(str): Set of player tags.
+    """
+    if active_members is None:
+        active_members = clash_utils.get_active_members_in_clan(PRIMARY_CLAN_TAG)
+
+    if len(active_members) == 0:
+        return set()
+
+    db, cursor = connect_to_db()
+
+    cursor.execute("SELECT player_tag FROM users WHERE id IN (SELECT user_id FROM match_history_recent WHERE tracked_since IS NOT NULL)")
+    query_result = cursor.fetchall()
+    db.close()
+
+    former_participants = set()
+
+    for user in query_result:
+        if user["player_tag"] not in active_members:
+            former_participants.add(user["player_tag"])
+
+    return former_participants
+
+
 def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
     """
     Add any active members not in the database as UNREGISTERED users.
