@@ -641,7 +641,11 @@ async def send_new_member_info(info_channel: discord.TextChannel, clash_data: di
     for i in range(14, 0, -1):
         percentile += card_level_data["cards"][i] / found_cards
         percentage = round(percentile * 100)
-        card_level_string += f"{i:02d}: {(percentage // 5) * '■':<20}  {percentage:02d}%\n"
+
+        if 0 < percentage < 5:
+            card_level_string += f"{i:02d}: {'▪':<20}  {percentage:02d}%\n"
+        else:
+            card_level_string += f"{i:02d}: {(percentage // 5) * '■':<20}  {percentage:02d}%\n"
 
         if percentage == 100:
             break
