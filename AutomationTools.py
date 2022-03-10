@@ -34,16 +34,6 @@ class AutomationTools(commands.Cog):
         await ctx.send(embed=embed)
 
 
-    @automation_status.error
-    async def automation_status_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!automation_status command can only be sent in {channel.mention} by Leaders/Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !automation_status")
-            raise error
-
-
     """
     Command: !set_automated_reminders {status}
 
@@ -56,19 +46,6 @@ class AutomationTools(commands.Cog):
         """Set whether automated reminders should be sent."""
         db_utils.set_reminder_status(status)
         await ctx.channel.send("Automated deck usage reminders are now " + ("ENABLED" if status else "DISABLED") + ".")
-
-    @set_automated_reminders.error
-    async def set_automated_reminders_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!set_automated_reminders command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.BadBoolArgument):
-            await ctx.send("Invalid argument. Valid statuses are: on or off")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing arguments. Command should be formatted as:  !set_automated_reminders <status>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !set_automated_reminders <status>")
-            raise error
 
 
     """
@@ -83,16 +60,3 @@ class AutomationTools(commands.Cog):
         """Set whether automated strikes should be given."""
         db_utils.set_strike_status(status)
         await ctx.channel.send("Automated strikes for low deck usage are now " + ("ENABLED" if status else "DISABLED") + ".")
-
-    @set_automated_strikes.error
-    async def set_automated_strikes_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!set_automated_strikes command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.BadBoolArgument):
-            await ctx.send("Invalid argument. Valid statuses are: on or off")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing arguments. Command should be formatted as:  !set_automated_strikes <status>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !set_automated_strikes <status>")
-            raise error

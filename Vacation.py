@@ -26,20 +26,6 @@ class Vacation(commands.Cog):
         vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
         await channel.send(f"Updated vacation status of {member.mention} to: {vacation_status_string}.")
 
-    @set_vacation.error
-    async def set_vacation_error(self, ctx, error):
-        if isinstance(error, commands.errors.MemberNotFound):
-            await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
-        elif isinstance(error, commands.errors.CheckFailure):
-            await ctx.send(f"!set_vacation command can only be sent by Leaders/Admins.")
-        elif isinstance(error, commands.errors.BadBoolArgument):
-            await ctx.send(f"Invalid second argument. Valid statuses: on or off")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing arguments. Command should be formatted as:  !set_vacation <member> <status>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !set_vacation <member> <status>")
-            raise error
-
 
     """
     Command: !vacation_list
@@ -65,11 +51,3 @@ class Vacation(commands.Cog):
             await ctx.send(embed=embed)
         except:
             await ctx.send("Vacation List\n" + "```\n" + table.get_string() + "```")
-
-    @vacation_list.error
-    async def vacation_list_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            await ctx.send(f"!vacation_list command can only be sent by Leaders/Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !vacation_list")
-            raise error

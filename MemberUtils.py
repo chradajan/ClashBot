@@ -50,12 +50,6 @@ class MemberUtils(commands.Cog):
 
             await ctx.send(embed=embed)
 
-    @river_race_status.error
-    async def river_race_status_error(self, ctx, error):
-        if not isinstance(error, commands.errors.CheckFailure):
-            await ctx.send("Something went wrong. Command should be formatted as:  !river_race_status")
-            raise error
-
 
     """
     Command: !set_reminder_time {reminder_time}
@@ -68,31 +62,25 @@ class MemberUtils(commands.Cog):
         """Set reminder time to either US or EU. US reminders go out at 01:00 UTC. EU reminders go out at 17:00 UTC."""
 
         time_zone: bot_utils.ReminderTime
+        invalid_embed = discord.Embed(color=discord.Color.red())
+        invalid_embed.add_field(name="Invalid time zone", value="Valid reminder times are `US` or `EU`")
 
         try:
             time_zone = bot_utils.ReminderTime(reminder_time.upper())
         except ValueError:
-            await ctx.send("Invalid time zone. Valid reminder times are US or EU")
+            await ctx.send(embed=invalid_embed)
             return
 
         if time_zone == bot_utils.ReminderTime.ALL:
-            await ctx.send("Invalid time zone. Valid reminder times are US or EU")
+            await ctx.send(embed=invalid_embed)
             return
 
         db_utils.update_time_zone(ctx.author.id, time_zone)
-        await ctx.send("Your reminder time preference has been updated.")
+        success_embed = discord.Embed(color=discord.Color.green())
+        success_embed.add_field(name="Your reminder time has updated", value=f"You will now receive {reminder_time} reminders")
+        await ctx.send(embed=success_embed)
 
-    @set_reminder_time.error
-    async def set_reminder_time_error(self, ctx, error):
-        if isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("You need to specify a reminder time. Valid reminder times are US or EU")
-        elif isinstance(error, commands.errors.CheckFailure):
-            return
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !set_reminder_time <reminder_time>")
-            raise error
 
-    
     """
     Command: !vacation
 
@@ -105,15 +93,6 @@ class MemberUtils(commands.Cog):
         vacation_status = db_utils.update_vacation_for_user(ctx.author.id)
         vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
         await ctx.send(f"New vacation status for {ctx.author.mention}: {vacation_status_string}.")
-
-    @vacation.error
-    async def vacation_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
-            await ctx.send(f"!vacation command can only be sent in {channel.mention}.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !vacation")
-            raise error
 
 
     """
@@ -134,13 +113,7 @@ class MemberUtils(commands.Cog):
         else:
             await ctx.send("Your information has been updated.")
 
-    @update.error
-    async def update_error(self, ctx, error):
-        if not isinstance(error, commands.errors.CheckFailure):
-            await ctx.send("Something went wrong. You should have gone through the new user and check rules channels before using this command. Command should be formatted as:  !update")
-            raise error
 
-    
     """
     Command: !strikes
 
@@ -160,13 +133,7 @@ class MemberUtils(commands.Cog):
 
         await ctx.send(message)
 
-    @strikes.error
-    async def strikes_error(self, ctx, error):
-        if not isinstance(error, commands.errors.CheckFailure):
-            await ctx.send("Something went wrong. Command should be formatted as:  !strikes")
-            raise error
 
-    
     """
     Command: !stats
 
@@ -179,9 +146,3 @@ class MemberUtils(commands.Cog):
         player_tag = db_utils.get_player_tag(ctx.author.id)
         embed = bot_utils.create_match_performance_embed(ctx.author.display_name, player_tag)
         await ctx.send(embed=embed)
-
-    @stats.error
-    async def stats_error(self, ctx, error):
-        if not isinstance(error, commands.errors.CheckFailure):
-            await ctx.send("Something went wrong. Command should be formatted as:  !stats")
-            raise error

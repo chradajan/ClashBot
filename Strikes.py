@@ -5,6 +5,7 @@ import bot_utils
 import clash_utils
 import db_utils
 import discord
+import ErrorHandler
 
 class Strikes(commands.Cog):
     """Commands for updating strike counts."""
@@ -62,21 +63,14 @@ class Strikes(commands.Cog):
 
     @give_strike.error
     async def give_strike_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!mention_users command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("You did not specify a user. Command should be formatted as:  !give_strike <member>")
-        elif isinstance(error, commands.errors.MemberNotFound):
+        if isinstance(error, commands.errors.MemberNotFound):
             player_tag = db_utils.get_player_tag(error.argument)
 
-            if player_tag is None:
-                await ctx.send(f"{error.argument} is not a member of the Discord server and their player name could not be found in the database.")
-            else:
+            if player_tag is not None:
                 await self.strike_helper(ctx, error.argument, player_tag, 1)
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !give_strike <member>")
-            raise error
+            else:
+                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)
 
 
     """
@@ -99,21 +93,14 @@ class Strikes(commands.Cog):
 
     @remove_strike.error
     async def remove_strike_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!mention_users command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("You did not specify a user. Command should be formatted as:  !remove_strike <member>")
-        elif isinstance(error, commands.errors.MemberNotFound):
+        if isinstance(error, commands.errors.MemberNotFound):
             player_tag = db_utils.get_player_tag(error.argument)
 
-            if player_tag is None:
-                await ctx.send(f"{error.argument} is not a member of the Discord server and their player name could not be found in the database.")
-            else:
+            if player_tag is not None:
                 await self.strike_helper(ctx, error.argument, player_tag, -1)
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !remove_strike <member>")
-            raise error
+            else:
+                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)
 
 
     """
@@ -131,16 +118,6 @@ class Strikes(commands.Cog):
         embed = discord.Embed()
         embed.add_field(name="Strikes Reset", value="All users have been set to 0 strikes")
         await channel.send(embed=embed)
-
-
-    @reset_all_strikes.error
-    async def reset_all_strikes_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!send_reminder command can only be sent in {channel.mention} by Leaders/Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !reset_all_strikes")
-            raise error
 
 
     """
@@ -195,13 +172,3 @@ class Strikes(commands.Cog):
             embed = discord.Embed()
             embed.add_field(name="Strikes Report", value="No users currently have strikes")
             await ctx.send(embed=embed)
-
-
-    @strikes_report.error
-    async def strikes_report_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!strikes_report command can only be sent in {channel.mention} by Leaders/Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !strikes_report")
-            raise error

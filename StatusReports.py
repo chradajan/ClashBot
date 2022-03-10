@@ -6,6 +6,7 @@ import clash_utils
 import datetime
 import db_utils
 import discord
+import ErrorHandler
 
 class StatusReports(commands.Cog):
     """Commands to get different status reports."""
@@ -102,16 +103,6 @@ class StatusReports(commands.Cog):
                 await ctx.send("Members currently on vacation\n" + "```\n" + table.get_string() + "```")
 
 
-    @decks_report.error
-    async def decks_report_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!decks_report command can only be sent in {channel.mention} by Leaders/Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !decks_report")
-            raise error
-
-
     """
     Command: !fame_report {threshold}
 
@@ -140,17 +131,6 @@ class StatusReports(commands.Cog):
             await ctx.send(embed=embed)
         except:
             await ctx.send("Players below fame threshold\n" + "```\n" + table.get_string() + "```")
-
-    @fame_report.error
-    async def fame_report_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!fame_report command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing arguments. Command should be formatted as:  !fame_report <threshold>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !fame_report <threshold>")
-            raise error
 
 
     async def player_report_helper(self, ctx, user_data: dict):
@@ -232,20 +212,14 @@ class StatusReports(commands.Cog):
 
     @player_report.error
     async def player_report_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!player_report command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.MemberNotFound):
+        if isinstance(error, commands.errors.MemberNotFound):
             user_data = db_utils.get_user_data(error.argument)
-            if user_data != None:
+            if user_data is not None:
                 await self.player_report_helper(ctx, user_data)
             else:
-                await ctx.send("Member not found. This could be because there are multiple UNREGISTERED users with identical player names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("You did not specify a user. Command should be formatted as:  !player_report <member>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !player_report <member>")
-            raise error
+                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)
+
 
     """
     Command: !stats_report {member}
@@ -268,18 +242,11 @@ class StatusReports(commands.Cog):
 
     @stats_report.error
     async def stats_report_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!stats_report command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.MemberNotFound):
+        if isinstance(error, commands.errors.MemberNotFound):
             player_tag = db_utils.get_player_tag(error.argument)
             if player_tag is not None:
                 embed = bot_utils.create_match_performance_embed(error.argument, player_tag)
                 await ctx.send(embed=embed)
             else:
-                await ctx.send("Member not found. This could be because there are multiple UNREGISTERED users with identical player names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("You did not specify a user. Command should be formatted as:  !stats_report <member>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !stats_report <member>")
-            raise error
+                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)

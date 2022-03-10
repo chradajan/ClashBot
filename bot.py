@@ -12,6 +12,7 @@ import discord
 
 #Cogs
 import AutomationTools
+import ErrorHandler
 import LeaderUtils
 import MemberListeners
 import MemberUtils
@@ -48,6 +49,7 @@ bot.add_cog(StatusReports.StatusReports(bot))
 bot.add_cog(Strikes.Strikes(bot))
 bot.add_cog(UserUpdates.UserUpdates(bot))
 bot.add_cog(Vacation.Vacation(bot))
+bot.add_cog(ErrorHandler.ErrorHandler(bot))
 
 
 @bot.event

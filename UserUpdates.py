@@ -4,6 +4,7 @@ from prettytable import PrettyTable
 import bot_utils
 import db_utils
 import discord
+import ErrorHandler
 
 class UserUpdates(commands.Cog):
     """Commands for updating/resetting users."""
@@ -44,18 +45,9 @@ class UserUpdates(commands.Cog):
 
     @update_user.error
     async def update_user_error(self, ctx, error):
-        if isinstance(error, commands.errors.MemberNotFound):
-            await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
-        elif isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!update_user command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing arguments. Command should be formatted as:  !update_user <member> <player_tag>")
-        elif isinstance(error, commands.errors.CommandInvokeError):
-            await ctx.send("Something went wrong. Make sure the player tag you entered doesn't belong to another user in this server. Command should be formatted as:  !update <player_tag>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !update_user <member> <player_tag>")
-            raise error
+        if isinstance(error, commands.errors.CommandInvokeError):
+            embed = ErrorHandler.ErrorHandler.invoke_error_embed("Another player on this server is already associated with the player tag you entered.")
+            await ctx.send(embed=embed)
 
 
     """
@@ -70,19 +62,6 @@ class UserUpdates(commands.Cog):
         """Admin only. Delete selected user from database. Set their role to New."""
         await self.reset_user_helper(member)
         await ctx.send(f"{member.display_name} has been reset.")
-
-    @reset_user.error
-    async def reset_user_error(self, ctx, error):
-        if isinstance(error, commands.errors.MemberNotFound):
-            await ctx.send("Member not found. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
-        elif isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!reset_user command can only be sent in {channel.mention} by Admins.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing arguments. Command should be formatted as:  !reset_user <member>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !reset_user <member>")
-            raise error
 
 
     """
@@ -112,14 +91,3 @@ class UserUpdates(commands.Cog):
 
         admin_role = bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME]
         await ctx.send(f"All users have been reset. If you are a {admin_role.mention}, please send your player tag in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back. Finally, update your Discord nickname to match your in-game username.")
-
-    @reset_all_users.error
-    async def reset_all_users_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!reset_all_users command can only be sent in {channel.mention} by Admins.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing confirmation. Command should be formatted as:  !reset_all_users <confirmation>. Make sure to enclose the confirmation message in quotes.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !reset_all_users <confirmation>. Make sure to enclose the confirmation message in quotes.")
-            raise error

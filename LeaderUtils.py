@@ -5,6 +5,7 @@ import bot_utils
 import clash_utils
 import db_utils
 import discord
+import ErrorHandler
 
 class LeaderUtils(commands.Cog):
     """Miscellaneous utilities for leaders/admins."""
@@ -25,17 +26,6 @@ class LeaderUtils(commands.Cog):
         path = db_utils.export(false_logic_only, include_card_levels)
         await ctx.send(file=discord.File(path))
 
-    @export.error
-    async def export_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!export command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.BadBoolArgument):
-            await ctx.send(f"Invalid argument. Valid arguments: yes or no")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !export <false_logic_only (optional)>")
-            raise error
-
 
     """
     Command: !update_all_members
@@ -50,15 +40,6 @@ class LeaderUtils(commands.Cog):
         await ctx.send("Starting update on all members. This could take a few minutes.")
         await bot_utils.update_all_members(ctx.guild)
         await ctx.send("Update complete")
-
-    @update_all_members.error
-    async def update_all_members_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!update_all_members command can only be sent in {channel.mention} by Leaders/Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !update_all_members")
-            raise error
 
 
     """
@@ -88,15 +69,6 @@ class LeaderUtils(commands.Cog):
         leader_role = bot_utils.NORMAL_ROLES[LEADER_ROLE_NAME]
         await ctx.send(f"Force rules check complete. If you are a {admin_role.mention} or {leader_role.mention}, don't forget to acknowledge the rules too.")
 
-    @force_rules_check.error
-    async def force_rules_check_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!force_rules_check command can only be sent in {channel.mention} by Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !force_rules_check")
-            raise error
-
 
     """
     Command: !mention_users {members} {channel} {message}
@@ -119,14 +91,11 @@ class LeaderUtils(commands.Cog):
 
     @mention_users.error
     async def mention_users_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!mention_users command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.CommandInvokeError):
-            await ctx.send("Clash bot needs permission to send messages to the specified channel.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !mention_users <members> <channel> <message>")
-            raise error
+        if isinstance(error, commands.errors.CommandInvokeError):
+            err_msg = f"ClashBot does not have permission to send messages in the specified channel."
+            embed = ErrorHandler.ErrorHandler.invoke_error_embed(err_msg)
+            await ctx.send(embed=embed)
+            return
 
 
     """
@@ -143,15 +112,6 @@ class LeaderUtils(commands.Cog):
         if len(reminder_message) == 0:
             reminder_message = DEFAULT_REMINDER_MESSAGE
         await bot_utils.deck_usage_reminder(self.bot, message=reminder_message, automated=False)
-
-    @send_reminder.error
-    async def send_reminder_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!send_reminder command can only be sent in {channel.mention} by Leaders/Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !send_reminder <message (optional)>")
-            raise error
 
 
     """
@@ -179,15 +139,6 @@ class LeaderUtils(commands.Cog):
             await fame_channel.send(embed=embed)
         except:
             await fame_channel.send("Top members by medals\n" + "```\n" + table.get_string() + "```")
-
-    @top_medals.error
-    async def top_medals_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!top_medals command can only be sent in {channel.mention} by Leaders/Admins.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !top_medals")
-            raise error
 
 
     """
@@ -229,19 +180,6 @@ class LeaderUtils(commands.Cog):
         fame_string = f"The following members are below {threshold} medals:" + "\n" + member_string + non_member_string
         await fame_channel.send(fame_string)
 
-    @medals_check.error
-    async def medals_check_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!medals_check command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.BadArgument):
-            await ctx.send("Invalid medals threshold. Threshold must be an integer value.")
-        elif isinstance(error, commands.errors.MissingRequiredArgument):
-            await ctx.send("Missing arguments. Command should be formatted as:  !medals_check <threshold>")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !medals_check <threshold>")
-            raise error
-
 
     """
     Command: !kick {player_name}
@@ -259,19 +197,14 @@ class LeaderUtils(commands.Cog):
 
     @kick.error
     async def kick_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!kick command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.MemberNotFound):
+        if isinstance(error, commands.errors.MemberNotFound):
             player_tag = db_utils.get_player_tag(error.argument)
-            if player_tag != None:
+            if player_tag is not None:
                 embed = bot_utils.kick(error.argument, player_tag)
                 await ctx.send(embed=embed)
             else:
-                await ctx.send("Member not found. This could be because there are multiple UNREGISTERED users with identical player names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !kick <member>")
-            raise error
+                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)
 
 
     async def undo_kick_helper(self, ctx, player_name: str, player_tag: str):
@@ -307,15 +240,10 @@ class LeaderUtils(commands.Cog):
 
     @undo_kick.error
     async def undo_kick_error(self, ctx, error):
-        if isinstance(error, commands.errors.CheckFailure):
-            channel = discord.utils.get(ctx.guild.channels, name=COMMANDS_CHANNEL)
-            await ctx.send(f"!undo_kick command can only be sent in {channel.mention} by Leaders/Admins.")
-        elif isinstance(error, commands.errors.MemberNotFound):
+        if isinstance(error, commands.errors.MemberNotFound):
             player_tag = db_utils.get_player_tag(error.argument)
-            if player_tag != None:
+            if player_tag is not None:
                 await self.undo_kick_helper(ctx, error.argument, player_tag)
             else:
-                await ctx.send("Member not found. This could be because there are multiple UNREGISTERED users with identical player names. Member names are case sensitive. If member name includes spaces, place quotes around name when issuing command.")
-        else:
-            await ctx.send("Something went wrong. Command should be formatted as:  !undo_kick <member>")
-            raise error
+                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)

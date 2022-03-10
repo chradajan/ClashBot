@@ -152,9 +152,9 @@ async def deck_usage_reminder(bot, time_zone: ReminderTime=ReminderTime.ALL, mes
     if automated:
         automated_message = ''
         if time_zone == ReminderTime.US:
-            automated_message = 'This is an automated reminder. If this reminder is in the middle of the night for you, consider switching your reminder time to 7PM GMT with command "!set_reminder_time EU"'
+            automated_message = 'This is an automated reminder. If this reminder is in the middle of the night for you, consider switching your reminder time to 19:00 UTC with command `!set_reminder_time EU`'
         elif time_zone == ReminderTime.EU:
-            automated_message = 'This is an automated reminder. If this reminder is in the middle of the day for you, consider switching your reminder time to 6PM PDT with command "!set_reminder_time US"'
+            automated_message = 'This is an automated reminder. If this reminder is in the middle of the day for you, consider switching your reminder time to 02:00 UTC with command `!set_reminder_time US`'
         else:
             automated_message = 'This is an automated reminder. All members with remaining decks are receiving this regardless of time zone preference.'
         reminder_string += "\n" + automated_message
