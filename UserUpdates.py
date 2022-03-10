@@ -77,6 +77,7 @@ class UserUpdates(commands.Cog):
     """
     @commands.command()
     @bot_utils.is_admin_command_check()
+    @bot_utils.disallowed_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def reset_all_users(self, ctx, confirmation: str):
         """Deletes all users from database, removes roles, and assigns New role. Leaders retain Leader role. Leaders must still resend player tag in welcome channel and react to rules message."""

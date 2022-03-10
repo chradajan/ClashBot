@@ -69,6 +69,11 @@ def not_welcome_or_rules_check():
         return (ctx.message.channel.name != NEW_CHANNEL) and (ctx.message.channel.name != RULES_CHANNEL)
     return commands.check(predicate)
 
+def disallowed_command_check():
+    async def predicate(ctx):
+        return False
+    return commands.check(predicate)
+
 
 ###########################################
 #                                         #

@@ -53,6 +53,7 @@ class ErrorHandler(commands.Cog):
             is_leader_or_admin_only = False
             is_channel_check = False
             is_welcome_or_rules_check = False
+            is_disallowed_command = False
 
             for check in ctx.command.checks:
                 check_str = repr(check)
@@ -65,11 +66,13 @@ class ErrorHandler(commands.Cog):
                     is_channel_check = True
                 elif bot_utils.not_welcome_or_rules_check.__name__ in check_str and not check_outcome:
                     is_welcome_or_rules_check = True
+                elif bot_utils.disallowed_command_check.__name__ in check_str and not check_outcome:
+                    is_disallowed_command = True
 
             if is_welcome_or_rules_check:
                 return
 
-            embed = self.check_failure_embed(is_admin_only, is_leader_or_admin_only, is_channel_check)
+            embed = self.check_failure_embed(is_admin_only, is_leader_or_admin_only, is_channel_check, is_disallowed_command)
             await ctx.send(embed=embed)
 
         elif isinstance(error, commands.errors.ChannelNotFound):
@@ -189,7 +192,11 @@ class ErrorHandler(commands.Cog):
         return embed
 
 
-    def check_failure_embed(self, is_admin_only: bool, is_leader_or_admin_only: bool, is_channel_check: bool) -> discord.Embed:
+    def check_failure_embed(self,
+                            is_admin_only: bool,
+                            is_leader_or_admin_only: bool,
+                            is_channel_check: bool,
+                            is_disallowed_command: bool) -> discord.Embed:
         """
         Creates an embed for when a command cannot be issued due to a check failure.
 
@@ -197,6 +204,7 @@ class ErrorHandler(commands.Cog):
             is_admin_only(bool): If command failed because a non-admin issued it.
             is_leader_or_admin_only(bool): If command failed because a non-leader/non-admin issued it.
             is_channel_check(bool): If command failed because it was sent in an illegal channel.
+            is_disallowed_command(bool): If the command is currently disallowed.
 
         Returns:
             discord.Embed: Embedded message with information about why the command could not be issued.
@@ -206,11 +214,13 @@ class ErrorHandler(commands.Cog):
         fail_reason = ""
 
         if is_leader_or_admin_only:
-            fail_reason += "\t•You must be a leader/admin to issue this command\n"
+            fail_reason += "\t•You must be a leader/admin to use this command\n"
         if is_admin_only:
-            fail_reason += "\t•You must be an admin to issue this command\n"
+            fail_reason += "\t•You must be an admin to use this command\n"
         if is_channel_check:
-            fail_reason += "\t•That command cannot be issue in this channel"
+            fail_reason += "\t•That command cannot be used in this channel\n"
+        if is_disallowed_command:
+            fail_reason += "\t•That command is currently disabled"
 
         embed.add_field(name="Permissions error", value=fail_reason)
         return embed
