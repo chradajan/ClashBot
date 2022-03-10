@@ -35,13 +35,18 @@ class UserUpdates(commands.Cog):
     async def update_user(self, ctx, member: discord.Member, player_tag: str=None):
         """Update a member. Specify a player_tag if they need a new one, or leave it blank to update with their current player tag. Updates player name, clan role/affiliation, Discord server role, and Discord nickname."""
         if not await bot_utils.update_member(member, player_tag):
-            await ctx.send(f"Something went wrong. {member.display_name}'s information has not been updated.")
-            return
-
-        if await bot_utils.is_admin(member):
-            await ctx.send(f"{member.display_name}'s information has been updated. As an Admin, they must manually update their Discord nickname if it no longer matches their in-game player name.")
+            embed = discord.Embed(color=discord.Color.red())
+            embed.add_field(name="An unexpected error has occurred",
+                            value=f"This is likely due to the Clash Royale API being down. {member.display_name}'s information has not been updated.")
+        elif await bot_utils.is_admin(member):
+            embed = discord.Embed(color=discord.Color.green())
+            embed.add_field(name=f"{member.display_name}'s information has been updated",
+                            value=f"ClashBot does not have permission to modify Admin nicknames. {member.display_name} must do this themself if their player name has changed.")
         else:
-            await ctx.send(f"{member.display_name}'s information has been updated.")
+            embed = discord.Embed(title=f"{member.display_name}'s information has been updated",
+                                  color=discord.Color.green())
+
+        await ctx.send(embed=embed)
 
     @update_user.error
     async def update_user_error(self, ctx, error):
@@ -61,7 +66,8 @@ class UserUpdates(commands.Cog):
     async def reset_user(self, ctx, member: discord.Member):
         """Admin only. Delete selected user from database. Set their role to New."""
         await self.reset_user_helper(member)
-        await ctx.send(f"{member.display_name} has been reset.")
+        embed = discord.Embed(title=f"{member.display_name} has been reset", color=discord.Color.green())
+        await ctx.send(embed=embed)
 
 
     """

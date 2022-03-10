@@ -1,3 +1,4 @@
+from cgitb import text
 from config import *
 from discord.ext import commands
 from prettytable import PrettyTable
@@ -37,9 +38,9 @@ class LeaderUtils(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def update_all_members(self, ctx: commands.Context):
         """Update all members in the server and apply any necessary Discord role updates."""
-        await ctx.send("Starting update on all members. This could take a few minutes.")
         await bot_utils.update_all_members(ctx.guild)
-        await ctx.send("Update complete")
+        embed = discord.Embed(title="Update complete", color=discord.Color.green())
+        await ctx.send(embed=embed)
 
 
     """
@@ -55,7 +56,8 @@ class LeaderUtils(commands.Cog):
         # Get a list of members in guild without any special roles (New, Check Rules, or Admin) and that aren't bots.
         members = [member for member in ctx.guild.members if ((len(set(bot_utils.SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
         roles_to_remove = list(bot_utils.NORMAL_ROLES.values())
-        await ctx.send("Starting to update user roles. This might take a minute...")
+        starting_embed = discord.Embed(title="Beginning to update roles. This will take a few minutes.", color=0xFFFF00)
+        await ctx.send(embed=starting_embed)
 
         for member in members:
             # Get a list of normal roles (Visitor, Member, Elder, or Leader) that a member current has. These will be restored after reacting to rules message.
@@ -67,7 +69,10 @@ class LeaderUtils(commands.Cog):
         await bot_utils.send_rules_message(ctx, self.bot.user)
         admin_role = bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME]
         leader_role = bot_utils.NORMAL_ROLES[LEADER_ROLE_NAME]
-        await ctx.send(f"Force rules check complete. If you are a {admin_role.mention} or {leader_role.mention}, don't forget to acknowledge the rules too.")
+        completed_embed = discord.Embed(color=discord.Color.green())
+        completed_embed.add_field(name="Force rules check complete",
+                                  value="Don't forget to react to the new rules too if you are an Admin or Leader.")
+        await ctx.send(content=f"{admin_role.mention} {leader_role.mention}", embed=completed_embed)
 
 
     """

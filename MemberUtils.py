@@ -91,8 +91,16 @@ class MemberUtils(commands.Cog):
     async def vacation(self, ctx):
         """Toggles vacation status."""
         vacation_status = db_utils.update_vacation_for_user(ctx.author.id)
-        vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
-        await ctx.send(f"New vacation status for {ctx.author.mention}: {vacation_status_string}.")
+
+        if vacation_status:
+            embed = discord.Embed(color=discord.Color.green())
+        else:
+            embed = discord.Embed(color=discord.Color.red())
+        
+        embed.add_field(name="Vacation status updated",
+                        value=f"You are now {'NOT ' if not vacation_status else ''} ON VACATION")
+
+        await ctx.send(embed=embed)
 
 
     """
@@ -105,13 +113,18 @@ class MemberUtils(commands.Cog):
     async def update(self, ctx):
         """Update your player name, clan role/affiliation, Discord server role, and Discord nickname."""
         if not await bot_utils.update_member(ctx.author):
-            await ctx.send("Something went wrong. Your information has not been updated.")
-            return
-
-        if await bot_utils.is_admin(ctx.author):
-            await ctx.send("Your information has been updated. As an Admin, you must manually update your Discord nickname if it no longer matches your in-game player name.")
+            embed = discord.Embed(color=discord.Color.red())
+            embed.add_field(name="An unexpected error has occurred",
+                            value="This is likely due to the Clash Royale API being down. Your information has not been updated.")
+        elif await bot_utils.is_admin(ctx.author):
+            embed = discord.Embed(color=discord.Color.green())
+            embed.add_field(name="Your information has been updated",
+                            value="ClashBot does not have permission to modify Admin nicknames. You must do this yourself if your player name has changed.")
         else:
-            await ctx.send("Your information has been updated.")
+            embed = discord.Embed(title="Your information has been updated",
+                                  color=discord.Color.green())
+
+        await ctx.send(embed=embed)
 
 
     """
@@ -124,14 +137,23 @@ class MemberUtils(commands.Cog):
     async def strikes(self, ctx):
         """Get your current strike count."""
         strikes = db_utils.get_strikes(ctx.author.id)
-        message = ""
 
-        if strikes == None:
-            message = "Error, you were not found in the database."
+        if strikes is None:
+            embed = discord.Embed(color=discord.Color.red())
+            embed.add_field(name="An unexpected error has occurred",
+                            value="You were not found in the database.")
         else:
-            message = f"You currently have {strikes} strikes."
+            if strikes == 0:
+                color = discord.Color.green()
+            elif strikes == 1:
+                color = 0xFFFF00
+            else:
+                color = discord.Color.red()
 
-        await ctx.send(message)
+            embed = discord.Embed(title=f"You have {strikes} strikes",
+                                  color=color)
+
+        await ctx.send(embed=embed)
 
 
     """

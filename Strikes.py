@@ -56,7 +56,10 @@ class Strikes(commands.Cog):
         player_tag = db_utils.get_player_tag(member.id)
 
         if player_tag is None:
-            await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
+            embed = discord.Embed(color=discord.Color.red())
+            embed.add_field(name="An unexpected error has occurred",
+                            value=f"{member.display_name} is on Discord but is not in the database. Make sure they've entered their player tag in the welcome channel.")
+            await ctx.send(embed=embed)
             return
 
         await self.strike_helper(ctx, member.display_name, player_tag, 1, member)
@@ -86,7 +89,10 @@ class Strikes(commands.Cog):
         player_tag = db_utils.get_player_tag(member.id)
 
         if player_tag is None:
-            await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
+            embed = discord.Embed(color=discord.Color.red())
+            embed.add_field(name="An unexpected error has occurred",
+                            value=f"{member.display_name} is on Discord but is not in the database. Make sure they've entered their player tag in the welcome channel.")
+            await ctx.send(embed=embed)
             return
 
         await self.strike_helper(ctx, member.display_name, player_tag, -1, member)
