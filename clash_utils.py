@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from config import PRIMARY_CLAN_TAG
 from credentials import CLASH_API_KEY
 from typing import List, Tuple
@@ -472,7 +473,11 @@ def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
     return json_obj["clan"]["fame"] >= 10000
 
 
-def calculate_player_win_rate(player_tag: str, fame: int, current_check_time: datetime.datetime) -> dict:
+def calculate_player_win_rate(player_tag: str,
+                              fame: int,
+                              current_check_time: datetime.datetime,
+                              last_check_time: datetime.datetime=None,
+                              clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
     """
     Look at a player's battle log and break down their performance in recent river race battles.
 
@@ -480,6 +485,8 @@ def calculate_player_win_rate(player_tag: str, fame: int, current_check_time: da
         player_tag(str): Player to check match history of.
         fame(int): Total fame they've accumulated in the current river race.
         current_check_time(datetime.datetime): Time to set last_check_time after this check.
+        last_check_time(datetime.datetime): Ignore battles before his time.
+        clan_tag(str): Only consider battles performed for this clan.
 
     Returns:
         dict{str: int}: Number of wins and losses in each river race battle type for the specified player.
@@ -496,31 +503,35 @@ def calculate_player_win_rate(player_tag: str, fame: int, current_check_time: da
                 "duel_series_losses": int
             }
     """
-    prev_fame, last_check_time = db_utils.get_and_update_match_history_info(player_tag, fame, current_check_time)
+    is_automated = False
 
-    # This should only happen when an unregistered user is added but their information can't be retrieved from the API.
-    if prev_fame == None:
-        return {}
+    if last_check_time is None:
+        is_automated = True
+        prev_fame, last_check_time = db_utils.get_and_update_match_history_info(player_tag, fame, current_check_time)
 
-    # If no fame has been acquired since last check, no point in grabbing battlelog.
-    if fame - prev_fame == 0:
-        return {}
+        # This should only happen when an unregistered user is added but their information can't be retrieved from the API.
+        if prev_fame is None:
+            return {}
+
+        # If no fame has been acquired since last check, no point in grabbing battlelog.
+        if fame - prev_fame == 0:
+            return {}
 
     req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}/battlelog", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
-    if (req.status_code != 200):
-        db_utils.set_users_last_check_time(player_tag, last_check_time)
+    if req.status_code != 200:
+        if is_automated:
+            db_utils.set_users_last_check_time(player_tag, last_check_time)
         return {}
 
-    json_dump = json.dumps(req.json())
-    battles = json.loads(json_dump)
+    battles = req.json()
     river_race_battle_list = []
 
     for battle in battles:
         battle_time = bot_utils.battletime_to_datetime(battle["battleTime"])
         if (((battle["type"].startswith("riverRace")) or (battle["type"] == "boatBattle")) and
             (battle_time >= last_check_time) and (battle_time < current_check_time) and
-            (battle["team"][0]["clan"]["tag"] == PRIMARY_CLAN_TAG)):
+            (battle["team"][0]["clan"]["tag"] == clan_tag)):
             river_race_battle_list.append(battle)
 
     player_dict = {"player_tag": player_tag}
@@ -559,7 +570,7 @@ def calculate_player_win_rate(player_tag: str, fame: int, current_check_time: da
 
         elif battle["type"].startswith("riverRaceDuel"):
             # During colosseum week, clan fame will exceed 10,000 so this ensures that strikes/reminders go out correctly.
-            if battle["type"] == "riverRaceDuelColosseum":
+            if is_automated and battle["type"] == "riverRaceDuelColosseum":
                 db_utils.set_colosseum_week_status(True)
 
             # Determine duel series outcome by result of final game
@@ -569,13 +580,13 @@ def calculate_player_win_rate(player_tag: str, fame: int, current_check_time: da
             opponent_princess_list = battle["opponent"][0].get("princessTowersHitPoints")
             team_won = None
 
-            if team_king_hit_points == None:
+            if team_king_hit_points is None:
                 team_won = False
-            elif opponent_king_hit_points == None:
+            elif opponent_king_hit_points is None:
                 team_won = True
-            elif (team_princess_list == None) and (opponent_princess_list != None):
+            elif (team_princess_list is None) and (opponent_princess_list is not None):
                 team_won = False
-            elif (team_princess_list != None) and (opponent_princess_list == None):
+            elif (team_princess_list is not None) and (opponent_princess_list is None):
                 team_won = True
             elif len(team_princess_list) < len(opponent_princess_list):
                 team_won = False
@@ -583,9 +594,7 @@ def calculate_player_win_rate(player_tag: str, fame: int, current_check_time: da
                 team_won = True
 
             # Determine how many individual matches were won/lost by number of cards used
-            if team_won == None:
-                print("Can't determine duel outcome. Player tag: ", player_tag)
-            elif team_won:
+            if team_won:
                 player_dict["duel_series_wins"] += 1
                 player_dict["duel_match_wins"] += 2
 
@@ -634,6 +643,56 @@ def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG,
 
     db_utils.update_match_history(performance_list)
     db_utils.set_last_check_time(check_time)
+
+
+def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> dict:
+    """
+    Calculate win rate of clans in current river race based on river race matches played since last_check_time.
+
+    Args:
+        last_check_time(datetime.datetime): Only consider battles that have occurred after this time.
+    
+    Returns:
+        dict: {clan_tag(str): win_rate(float)}
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+    clan_tag = ""
+
+    def win_rate_helper(tag: str) -> dict:
+        return calculate_player_win_rate(tag, 0, now, last_check_time, clan_tag)
+
+    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{PRIMARY_CLAN_TAG[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+
+    if req.status_code != 200:
+        return {}
+
+    json_obj = req.json()
+    clan_averages = {}
+
+    for clan in json_obj["clans"]:
+        wins = 0
+        total = 0
+        clan_tag = clan["tag"]
+        active_members = get_active_members_in_clan(clan_tag)
+        print(clan["name"])
+
+        if len(active_members) == 0:
+            return {}
+
+        args_list = [participant["tag"] for participant in clan["participants"] if participant["tag"] in active_members]
+
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            results = list(pool.map(win_rate_helper, args_list))
+
+        for result in results:
+            temp_wins = result["battle_wins"] + result["special_battle_wins"] + result["duel_match_wins"]
+            temp_losses = result["battle_losses"] + result["special_battle_losses"] + result["duel_match_losses"]
+            wins += temp_wins
+            total += temp_wins + temp_losses
+
+        clan_averages[clan_tag] = wins/total
+
+    return clan_averages
 
 
 def get_clans_and_fame(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
