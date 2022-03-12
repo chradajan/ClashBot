@@ -487,13 +487,15 @@ def get_predicted_race_outcome(remaining_decks_list: list=None) -> List[Tuple[st
     for clan, decks_remaining in remaining_decks_list:
         remaining_decks_dict[clan[0]] = decks_remaining
 
-    current_clan_info = clash_utils.get_clans_and_fame()
-    saved_clan_info = db_utils.get_saved_clans_and_fame()
+    current_clan_info = clash_utils.get_clans_in_race(False)
+    saved_clan_info = db_utils.get_saved_clans_in_race_info()
     predicted_outcomes = []
 
-    for clan_tag in current_clan_info:
-        clan_name, current_fame = current_clan_info[clan_tag]
-        _, saved_fame = saved_clan_info.get(clan_tag, ("", 0))
+    for clan in current_clan_info:
+        clan_tag = clan["tag"]
+        clan_name = clan["name"]
+        current_fame = clan["fame"]
+        saved_fame = saved_clan_info.get(clan_tag, {"fame": 0})["fame"]
         fame_earned_today = current_fame - saved_fame
         decks_remaining = remaining_decks_dict[clan_tag]
         predicted_fame = 50 * round((fame_earned_today + (decks_remaining * 165.625)) / 50)

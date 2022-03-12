@@ -1251,7 +1251,6 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
         last_check_time(datetime.datetime): When match performance is next calculated, do not look at games before this time.
     """
     set_completed_saturday_status(False)
-    set_colosseum_week_status(False)
     set_war_time_status(True)
     set_last_check_time(last_check_time)
 
@@ -1277,45 +1276,63 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
                     user_id IN (SELECT id FROM users WHERE status = 'ACTIVE' OR status = 'UNREGISTERED')",
                     (last_check_time))
 
-    clans_in_race = clash_utils.get_clans_and_fame()
-    cursor.execute("DELETE FROM river_race_clans")
+    clans = clash_utils.get_clans_in_race(False)
 
-    for clan_tag in clans_in_race:
-        clan_name, _ = clans_in_race[clan_tag]
-        cursor.execute("INSERT INTO river_race_clans VALUES (%s, %s, 0)", (clan_tag, clan_name))
+    if is_colosseum_week():
+        cursor.execute("DELETE FROM river_race_clans")
+
+        for clan in clans:
+            cursor.execute("INSERT INTO river_race_clans VALUES (%(tag)s, %(name)s, 0, %(total_decks_used)s, 0, 0)", clan)
+    else:
+        for clan in clans:
+            cursor.execute("UPDATE river_race_clans SET fame = 0, total_decks_used = %(total_decks_used)s WHERE clan_tag = %(clan_tag)s", clan)
 
     db.commit()
     db.close()
+    set_colosseum_week_status(False)
 
 
-def save_clans_fame():
+def save_clans_in_race_info(post_race: bool):
     """
-    Update river_race_clans table with clans' current accumulated fames.
+    Update river_race_clans table with clans' current fame and deck usage.
+
+    Args:
+        post_race(bool): Whether this info is being saved after the river race has concluded.
     """
     db, cursor = connect_to_db()
-    clans_in_race = clash_utils.get_clans_and_fame()
+    clans = clash_utils.get_clans_in_race(post_race)
+    saved_clan_info = get_saved_clans_in_race_info()
 
-    for clan_tag in clans_in_race:
-        _, fame = clans_in_race[clan_tag]
-        cursor.execute("UPDATE river_race_clans SET fame = %s WHERE clan_tag = %s", (fame, clan_tag))
+    for clan in clans:
+        tag = clan["tag"]
+        current_fame = clan["fame"]
+        total_decks_used = clan["total_decks_used"]
+        war_decks_used_today = total_decks_used - saved_clan_info[tag]["total_decks_used"]
+
+        if is_colosseum_week():
+            cursor.execute("UPDATE river_race_clans SET total_decks_used = %s, war_decks_used = war_decks_used + %s, num_days = num_days + 1 WHERE clan_tag = %s",
+                           (total_decks_used, war_decks_used_today, tag))
+        else:
+            cursor.execute("UPDATE river_race_clans SET fame = %s, total_decks_used = %s, war_decks_used = war_decks_used + %s, num_days = num_days + 1 WHERE clan_tag = %s",
+                           (current_fame, total_decks_used, war_decks_used_today, tag))
 
     db.commit()
     db.close()
 
 
-def get_saved_clans_and_fame() -> dict:
+def get_saved_clans_in_race_info() -> dict:
     """
-    Get the clans and their saved fame values from river_race_clans.
+    Get saved clans fame and decks used.
 
     Returns:
-        dict{clan_tag: Tuple[clan_name, fame]}: Clans and their saved fame.
+        dict{clan_tag(str): {"clan_tag": str, "clan_name": str, "fame": int, "total_decks_used": int, "war_decks_used": int, "num_days": int}}
     """
     db, cursor = connect_to_db()
 
     cursor.execute("SELECT * FROM river_race_clans")
     query_result = cursor.fetchall()
 
-    clans_info = {clan["clan_tag"]: (clan["clan_name"], clan["fame"]) for clan in query_result}
+    clans_info = {clan["clan_tag"]: clan for clan in query_result}
 
     db.close()
     return clans_info

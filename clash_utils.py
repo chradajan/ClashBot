@@ -695,31 +695,45 @@ def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> dict:
     return clan_averages
 
 
-def get_clans_and_fame(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:
+def get_clans_in_race(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG) -> List[dict]:
     """
-    Get a dict containing the clans and their current fame from the river race of the specified clan.
+    Get a list of clans in the specified clan's river race along with their current fame and decks used.
 
     Args:
+        post_race(bool): Whether this check is happening during or after river race.
         clan_tag(str, optional): Clan tag of clan to get river race info for.
 
     Returns:
-        dict{clan_tag: Tuple[clan_name, fame]}: Clans and their current fame.
+        List[{"tag": str, "name": str, "fame": int, "total_decks_used": int}]
     """
-    req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
+    if post_race:
+        req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/riverracelog?limit=1", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
-    if req.status_code != 200:
-        return {}
+        if req.status_code != 200:
+            return []
 
-    json_obj = req.json()
-    clans_info = {}
+        json_obj = req.json()
+        clans = [clan["clan"] for clan in json_obj["items"][0]["standings"]]
+    else:
+        req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
 
-    for clan in json_obj["clans"]:
+        if req.status_code != 200:
+            return []
+
+        json_obj = req.json()
+        clans = json_obj["clans"]
+
+    clans_info = []
+
+    for clan in clans:
         fame = 0
+        decks_used = 0
 
         for participant in clan["participants"]:
             fame += participant["fame"]
+            decks_used += participant["decksUsed"]
 
-        clans_info[clan["tag"]] = (clan["name"], fame)
+        clans_info.append({"tag": clan["tag"], "name": clan["name"], "fame": fame, "total_decks_used": decks_used})
 
     return clans_info
 

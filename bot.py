@@ -260,9 +260,7 @@ async def determine_reset_time():
             db_utils.prepare_for_river_race(datetime.datetime.now(datetime.timezone.utc))
         elif weekday in {4, 5, 6}:
             clash_utils.calculate_match_performance(False)
-
-            if not db_utils.is_colosseum_week():
-                db_utils.save_clans_fame()
+            db_utils.save_clans_in_race_info(False)
 
         db_utils.set_reset_time(datetime.datetime.now(datetime.timezone.utc))
     else:
@@ -289,9 +287,7 @@ async def reset_globals():
             db_utils.prepare_for_river_race(datetime.datetime.now(datetime.timezone.utc))
         elif weekday in {4, 5, 6}:
             clash_utils.calculate_match_performance(False)
-
-            if not db_utils.is_colosseum_week():
-                db_utils.save_clans_fame()
+            db_utils.save_clans_in_race_info(False)
 
         db_utils.set_reset_time(datetime.datetime.now(datetime.timezone.utc))
 
@@ -325,12 +321,13 @@ async def morning_match_performance_tracker():
     clash_utils.calculate_match_performance(False)
 
 
-@aiocron.crontab('0 10 * * 1')
+@aiocron.crontab('05 10 * * 1')
 async def final_match_performance_check():
     """
     Calculate match performance after the war concludes on Monday.
     """
     clash_utils.calculate_match_performance(True)
+    db_utils.save_clans_in_race_info(True)
     db_utils.set_war_time_status(False)
 
 
