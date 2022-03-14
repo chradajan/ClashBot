@@ -321,7 +321,7 @@ async def morning_match_performance_tracker():
     clash_utils.calculate_match_performance(False)
 
 
-@aiocron.crontab('05 10 * * 1')
+@aiocron.crontab('02 10 * * 1')
 async def final_match_performance_check():
     """
     Calculate match performance after the war concludes on Monday.

@@ -674,7 +674,6 @@ def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> dict:
         total = 0
         clan_tag = clan["tag"]
         active_members = get_active_members_in_clan(clan_tag)
-        print(clan["name"])
 
         if len(active_members) == 0:
             return {}
@@ -690,7 +689,10 @@ def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> dict:
             wins += temp_wins
             total += temp_wins + temp_losses
 
-        clan_averages[clan_tag] = wins/total
+        if total == 0:
+            clan_averages[clan_tag] = 0
+        else:
+            clan_averages[clan_tag] = wins/total
 
     return clan_averages
 
@@ -704,7 +706,7 @@ def get_clans_in_race(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG) -> List[d
         clan_tag(str, optional): Clan tag of clan to get river race info for.
 
     Returns:
-        List[{"tag": str, "name": str, "fame": int, "total_decks_used": int}]
+        List[{"tag": str, "name": str, "fame": int, "total_decks_used": int, "decks_used_today": int, "completed": bool}]
     """
     if post_race:
         req = requests.get(f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/riverracelog?limit=1", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})
@@ -727,13 +729,20 @@ def get_clans_in_race(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG) -> List[d
 
     for clan in clans:
         fame = 0
-        decks_used = 0
+        decks_used_total = 0
+        decks_used_today = 0
 
         for participant in clan["participants"]:
             fame += participant["fame"]
-            decks_used += participant["decksUsed"]
+            decks_used_total += participant["decksUsed"]
+            decks_used_today += participant["decksUsedToday"]
 
-        clans_info.append({"tag": clan["tag"], "name": clan["name"], "fame": fame, "total_decks_used": decks_used})
+        clans_info.append({"tag": clan["tag"],
+                           "name": clan["name"],
+                           "fame": fame,
+                           "total_decks_used": decks_used_total,
+                           "decks_used_today": decks_used_today,
+                           "completed": clan["fame"] >= 10000})
 
     return clans_info
 

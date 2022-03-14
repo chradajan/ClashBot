@@ -37,18 +37,39 @@ class MemberUtils(commands.Cog):
         await ctx.send(embed=embed)
 
         if show_predictions and db_utils.is_war_time():
-            predicted_outcomes = bot_utils.get_predicted_race_outcome(clans)
-            embed = discord.Embed()
-            table = PrettyTable()
-            table.field_names = ["Clan", "Score"]
-
-            for clan_name, fame in predicted_outcomes:
-                table.add_row([clan_name, fame])
-
-            embed.add_field(name="Predicted outcome for today", value="```\n" + table.get_string() + "```")
-            embed.set_footer(text="Assuming each clan uses all remaining decks at a 50% winrate")
-
+            predicted_outcomes, completed_clans, _ = bot_utils.predict_race_outcome(False, False)
+            embed, _, _ = bot_utils.create_prediction_embeds(predicted_outcomes, completed_clans, {}, True)
             await ctx.send(embed=embed)
+
+
+    @commands.command()
+    @bot_utils.not_welcome_or_rules_check()
+    async def predict(self, ctx, use_historical_win_rates: bool, use_historical_deck_usage: bool):
+        """
+Predict today's river race outcome. If use_historical_win_rates is true, predicted scores will be based on each clan's \
+average win rate in this river race, otherwise it will use a win rate of 50% for each clan. If use_historical_deck_usage is \
+true, predicted scores will be based on each clan's historical deck usage per day, otherwise it will assume each clan uses \
+all possible remaining decks."""
+        if not db_utils.is_war_time():
+            embed = discord.Embed(title="Predictions can only be made on battle days.", color=discord.Color.red())
+            await ctx.send(embed=embed)
+            return
+
+        predicted_outcomes, completed_clans, catch_up_info = bot_utils.predict_race_outcome(use_historical_win_rates,
+                                                                                            use_historical_deck_usage)
+
+        predicted_embed, completed_embed, catch_up_embed = bot_utils.create_prediction_embeds(predicted_outcomes,
+                                                                                              completed_clans,
+                                                                                              catch_up_info,
+                                                                                              False)
+
+        await ctx.send(embed=predicted_embed)
+
+        if completed_embed is not None:
+            await ctx.send(embed=completed_embed)
+
+        if catch_up_embed is not None:
+            await ctx.send(embed=catch_up_embed)
 
 
     """

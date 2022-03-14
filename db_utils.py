@@ -1285,7 +1285,7 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
             cursor.execute("INSERT INTO river_race_clans VALUES (%(tag)s, %(name)s, 0, %(total_decks_used)s, 0, 0)", clan)
     else:
         for clan in clans:
-            cursor.execute("UPDATE river_race_clans SET fame = 0, total_decks_used = %(total_decks_used)s WHERE clan_tag = %(clan_tag)s", clan)
+            cursor.execute("UPDATE river_race_clans SET fame = 0, total_decks_used = %(total_decks_used)s WHERE clan_tag = %(tag)s", clan)
 
     db.commit()
     db.close()
@@ -1302,6 +1302,7 @@ def save_clans_in_race_info(post_race: bool):
     db, cursor = connect_to_db()
     clans = clash_utils.get_clans_in_race(post_race)
     saved_clan_info = get_saved_clans_in_race_info()
+    colosseum_week = is_colosseum_week()
 
     for clan in clans:
         tag = clan["tag"]
@@ -1309,10 +1310,13 @@ def save_clans_in_race_info(post_race: bool):
         total_decks_used = clan["total_decks_used"]
         war_decks_used_today = total_decks_used - saved_clan_info[tag]["total_decks_used"]
 
-        if is_colosseum_week():
+        if colosseum_week:
             cursor.execute("UPDATE river_race_clans SET total_decks_used = %s, war_decks_used = war_decks_used + %s, num_days = num_days + 1 WHERE clan_tag = %s",
                            (total_decks_used, war_decks_used_today, tag))
         else:
+            if clan["completed"]:
+                continue
+
             cursor.execute("UPDATE river_race_clans SET fame = %s, total_decks_used = %s, war_decks_used = war_decks_used + %s, num_days = num_days + 1 WHERE clan_tag = %s",
                            (current_fame, total_decks_used, war_decks_used_today, tag))
 

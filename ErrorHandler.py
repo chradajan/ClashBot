@@ -184,10 +184,10 @@ class ErrorHandler(commands.Cog):
         embed = discord.Embed(color=discord.Color.red())
 
         if isinstance(error, commands.errors.BadBoolArgument):
-            embed.add_field(name="Invalid Boolean parameter",
+            embed.add_field(name=f"Invalid Boolean parameter: `{error.argument}`",
                             value="Valid Boolean parameters are `true` and `false`.")
         else:
-            embed.add_field(name="Invalid parameter type",
+            embed.add_field(name=f"Invalid parameter type: `{error.argument}`",
                             value=self.command_usage(command))
         return embed
 

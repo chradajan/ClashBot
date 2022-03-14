@@ -2,6 +2,7 @@ from config import *
 from difflib import SequenceMatcher
 from discord.ext import commands
 from enum import Enum
+from prettytable import PrettyTable
 from typing import List, Tuple
 import blacklist
 import cv2
@@ -9,6 +10,7 @@ import discord
 import clash_utils
 import datetime
 import db_utils
+import numpy
 import os
 import pytesseract
 import re
@@ -473,37 +475,219 @@ def create_match_performance_embed(player_name: str, player_tag: str) -> discord
     return embed
 
 
-def get_predicted_race_outcome(remaining_decks_list: list=None) -> List[Tuple[str, int]]:
+def average_fame_per_deck(win_rate: float) -> float:
     """
-    Get the predicted clan placement outcome for today.
+    Get the average fame per deck value at the specified win rate. Assumes the player always plays 4 battles by playing a duel
+    followed by normal matches (no boat battles). It's also assumed that win rate is the same in duels and normal matches.
+
+    Fame per deck of a player that completes 4 battles with these assumptions can be calculated as
+    F(p) = -25p^3 + 25p^2 + 125p + 100 where F(p) is fame per deck and p is probability of winning any given match (win rate). This
+    was determined by calculating the expected number of duel matches played in a Bo3 at a given win rate, then subtracting that
+    from 4 to determine how many normal matches are played. These quantities are then multiplied by the average amount of fame a
+    deck is worth in each game mode. This is equal to f = 250p + 100(1-p) for duels and f = 200p + 100(1-p) for normal matches.
+
+    Args:
+        win_rate(float): Player win rate in PvP matches.
+    
+    Returns:
+        float: Average fame per deck used.
+    """
+    return (-25 * win_rate**3) + (25 * win_rate**2) + (125 * win_rate) + 100
+
+
+def calculate_win_rate_from_average_fame(avg_fame_per_deck: float) -> float:
+    """
+    Solve the polynomial described in average_fame_per_deck in order to calculate the win rate needed to achieve the specified fame
+    per deck. All assumptions made in calculating average fame per deck are relevant to this calculation too.
+
+    Args:
+        avg_fame_per_deck(float): Average fame per deck to calculate win rate for.
 
     Returns:
-        List[Tuple[str, int]]: Sorted list of clans and their predicted placement based on remaining decks with 50% winrate.
+        float: Win rate needed to achieve the specified average fame per deck.
     """
-    if remaining_decks_list is None:
-        remaining_decks_list = clash_utils.get_clan_decks_remaining()
+    roots = numpy.roots([-25, 25, 125, (100 - avg_fame_per_deck)])
+    win_rate = None
 
-    remaining_decks_dict = {}
-    for clan, decks_remaining in remaining_decks_list:
-        remaining_decks_dict[clan[0]] = decks_remaining
+    for root in roots:
+        if 0 <= root <= 1:
+            win_rate = root
 
-    current_clan_info = clash_utils.get_clans_in_race(False)
+    return win_rate
+
+
+def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usage: bool) -> Tuple[List[tuple], dict, dict]:
+    """
+    Predict the final standings at the end of the day.
+
+    Args:
+        use_historical_win_rates(bool): Calculate each clan's win rate based on performance since start of war, otherwise assume 50%.
+        use_historical_deck_usage(bool): Made predictions based off average number of decks each clan uses per day, otherwise assume
+                                         each clan uses all remaining decks.
+
+    Returns:
+        Tuple[List[tuple], dict, dict]: (predicted_outcomes, completed_clans, catch_up_requirements)
+            predicted_outcomes = [ Tuple[clan_name(str), clan_tag(str), predicted_score(int), win_rate(float), expected_decks_to_use(int)], ... ]
+            completed_clans = {clan_tag(str): clan_name(str)}
+            catch_up_requirements = {"decks": int, "win_rate": float}
+    """
+    clans = clash_utils.get_clans_in_race(False)
     saved_clan_info = db_utils.get_saved_clans_in_race_info()
+
+    if use_historical_win_rates:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        race_reset_times = db_utils.get_river_race_reset_times()
+
+        if (now - race_reset_times["thursday"]).days > 5:
+            win_rates = clash_utils.calculate_river_race_win_rates(db_utils.get_reset_time())
+        else:
+            win_rates = clash_utils.calculate_river_race_win_rates(race_reset_times["thursday"])
+
+        if len(win_rates) == 0:
+            win_rates = {clan["tag"]: 0.50 for clan in clans}
+    else:
+        win_rates = {clan["tag"]: 0.50 for clan in clans}
+
+    expected_deck_usage = {}
+
+    if use_historical_deck_usage:
+        for clan in clans:
+            tag = clan["tag"]
+
+            if saved_clan_info[tag]["num_days"] == 0:
+                expected_decks_to_use = 200 - clan["decks_used_today"]
+            else:
+                avg_deck_usage = round(saved_clan_info[tag]["war_decks_used"] / saved_clan_info[tag]["num_days"])
+                current_deck_usage = clan["decks_used_today"]
+
+                if current_deck_usage > avg_deck_usage:
+                    expected_decks_to_use = round((200 - current_deck_usage) * 0.25)
+                else:
+                    expected_decks_to_use = avg_deck_usage - current_deck_usage
+
+            expected_deck_usage[tag] = expected_decks_to_use
+    else:
+        for clan in clans:
+            tag = clan["tag"]
+            expected_decks_to_use = 200 - clan["decks_used_today"]
+            expected_deck_usage[tag] = expected_decks_to_use
+
     predicted_outcomes = []
+    completed_clans = {}
+    catch_up_requirements = {}
 
-    for clan in current_clan_info:
-        clan_tag = clan["tag"]
-        clan_name = clan["name"]
-        current_fame = clan["fame"]
-        saved_fame = saved_clan_info.get(clan_tag, {"fame": 0})["fame"]
-        fame_earned_today = current_fame - saved_fame
-        decks_remaining = remaining_decks_dict[clan_tag]
-        predicted_fame = 50 * round((fame_earned_today + (decks_remaining * 165.625)) / 50)
-        predicted_outcomes.append((clan_name, predicted_fame))
+    for clan in clans:
+        tag = clan["tag"]
 
-    predicted_outcomes.sort(key = lambda x : x[1], reverse=True)
+        if clan["completed"]:
+            completed_clans[tag] = clan["name"]
 
-    return predicted_outcomes
+        win_rate = win_rates[tag]
+        saved_fame = saved_clan_info.get(tag, {"fame": 0})["fame"]
+        fame_earned_today = clan["fame"] - saved_fame
+        fame_per_deck = average_fame_per_deck(win_rate)
+        expected_decks_to_use = expected_deck_usage[tag]
+        predicted_score = 50 * round((fame_earned_today + (expected_decks_to_use * fame_per_deck)) / 50)
+        predicted_outcomes.append((clan["name"], tag, predicted_score, win_rate, expected_decks_to_use))
+
+    predicted_outcomes.sort(key = lambda x : x[2], reverse=True)
+
+    if len(predicted_outcomes) > 0 and predicted_outcomes[0][1] != PRIMARY_CLAN_TAG:
+        for clan in clans:
+            if clan["tag"] == PRIMARY_CLAN_TAG:
+                decks_available = 200 - clan["decks_used_today"]
+                current_fame = clan["fame"] - saved_clan_info.get(clan["tag"], {"fame": 0})["fame"]
+                break
+
+        fame_to_catch_up = predicted_outcomes[0][2] - current_fame
+        avg_fame_needed_per_deck = fame_to_catch_up / decks_available
+        needed_win_rate = calculate_win_rate_from_average_fame(avg_fame_needed_per_deck)
+
+        if needed_win_rate is not None:
+            needed_win_rate = round(needed_win_rate * 100, 2)
+
+        catch_up_requirements = {"decks": decks_available, "win_rate": needed_win_rate}
+
+    return (predicted_outcomes, completed_clans, catch_up_requirements)
+
+
+def create_prediction_embeds(predicted_outcomes: List[tuple], completed_clans: dict, catch_up_requirements: dict, use_table: bool)\
+    -> Tuple[discord.Embed, discord.Embed, discord.Embed]:
+    """
+    Create 3 embeds from the prediction data.
+
+    Args:
+        predicted_outcomes(List[tuple]): Predicted outcomes in order for today.
+        completed_clans(dict): Dict of clans that have already crossed the finish line.
+        catch_up_requirements(dict): Requirements to match predicted score of first place if primary clan is not predicted to win.
+        use_table(bool): Display predicted standings in table instead of embed fields.
+
+    Returns:
+        Tuple[discord.Embed, discord.Embed, discord.Embed]: (predictions_embed, completed_clans_embed, catch_up_embed)
+    """
+    primary_clan_placement = 1
+
+    for _, tag, _, _, _ in predicted_outcomes:
+        if tag == PRIMARY_CLAN_TAG:
+            break
+        primary_clan_placement += 1
+
+    if PRIMARY_CLAN_TAG in completed_clans and not db_utils.is_colosseum_week() or primary_clan_placement == 1:
+        predictions_color = discord.Color.green()
+    elif primary_clan_placement == 2:
+        predictions_color = 0xFFFF00
+    elif primary_clan_placement == 3:
+        predictions_color = discord.Color.orange()
+    elif primary_clan_placement == 4:
+        predictions_color = discord.Color.red()
+    elif primary_clan_placement == 5:
+        predictions_color = discord.Color.dark_red()
+
+    if use_table:
+        table = PrettyTable()
+        table.field_names = ["Clan", "Score"]
+        predictions_embed = discord.Embed(color=predictions_color)
+    else:
+        predictions_embed = discord.Embed(title="Predicted Outcomes Today", color = predictions_color)
+
+    placement = 1
+
+    for name, tag, score, win_rate, decks_to_use in predicted_outcomes:
+        if tag in completed_clans and not db_utils.is_colosseum_week():
+            continue
+
+        if use_table:
+            table.add_row([name, score])
+        else:
+            predictions_embed.add_field(name=f"{placement}. {name}",
+                                        value=f"```Score: {score}\nWin Rate: {round(win_rate * 100, 2)}%\nDecks: {decks_to_use}```",
+                                        inline=False)
+        
+        placement += 1
+
+    if use_table:
+        predictions_embed.add_field(name="Predicted outcomes today", value="```\n" + table.get_string() + "```")
+        predictions_embed.set_footer(text="Assuming each clan uses all remaining decks at a 50% winrate")
+
+    completed_clans_embed = None
+    catch_up_embed = None
+
+    if len(completed_clans) > 0:
+        clans_str = "\n".join(clan_name for clan_name in completed_clans.values())
+        completed_clans_embed = discord.Embed(title=f"{clans_str} has already crossed the finish line and is excluded from the predicted standings.",
+                                              color=discord.Color.blue())
+
+    if len(catch_up_requirements) > 0:
+        win_rate = catch_up_requirements["win_rate"]
+        decks = catch_up_requirements["decks"]
+        if win_rate is not None:
+            catch_up_embed = discord.Embed(title=f"{PRIMARY_CLAN_NAME} needs to use all {decks} remaining decks at a {win_rate}% win rate to catch up to the predicted score of first place.",
+                                           color=discord.Color.blue())
+        else:
+            catch_up_embed = discord.Embed(title=f"{PRIMARY_CLAN_NAME} cannot reach the predicted score of first place.",
+                                            color=discord.Color.red())
+
+    return (predictions_embed, completed_clans_embed, catch_up_embed)
 
 
 def kick(player_name: str, player_tag: str) -> discord.Embed:
