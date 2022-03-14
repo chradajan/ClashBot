@@ -214,6 +214,7 @@ async def update_all_members(guild: discord.Guild):
         guild(discord.Guild): Guild to update members in.
     """
     active_members = clash_utils.get_active_members_in_clan()
+    db_utils.clean_up_db(active_members)
     db_info = db_utils.get_server_members_info()
 
     for member in guild.members:
