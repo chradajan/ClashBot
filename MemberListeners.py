@@ -35,7 +35,7 @@ class MemberListeners(commands.Cog):
             if not message.content.startswith("#"):
                 await message.channel.send(content="You forgot to include the # symbol at the start of your player tag. Try again with that included.", delete_after=10)
             elif message.content == PRIMARY_CLAN_TAG:
-                await message.channel.send(content="You sent False Logic's clan tag. Please send your player tag instead.", delete_after=10)
+                await message.channel.send(content=f"You sent {PRIMARY_CLAN_NAME}'s clan tag. Please send your player tag instead.", delete_after=10)
             else:
                 discord_name = bot_utils.full_name(message.author)
                 clash_data = clash_utils.get_clash_user_data(message.content, discord_name, message.author.id)
