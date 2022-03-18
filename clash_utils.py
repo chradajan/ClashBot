@@ -210,6 +210,9 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
     active_members = get_active_members_in_clan(clan_tag)
     decks_remaining_list = []
 
+    if len(active_members) == 0:
+        return []
+
     for participant in participants:
         player_tag = participant["tag"]
         remaining_decks = 4 - participant["decksUsedToday"]
@@ -373,6 +376,10 @@ def get_top_medal_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
         participants = get_last_river_race_participants(clan_tag)
 
     active_members = get_active_members_in_clan(clan_tag)
+
+    if len(active_members) == 0:
+        return []
+
     fame_list = [ (active_members[participant["tag"]]["name"], participant["fame"]) for participant in participants if participant["tag"] in active_members ]
     fame_list.sort(key = lambda x : x[1], reverse = True)
 
@@ -621,6 +628,9 @@ def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG,
     """
     if active_members is None:
         active_members = get_active_members_in_clan(clan_tag)
+
+    if len(active_members) == 0:
+        return
 
     db_utils.clean_up_db(active_members)
     db_utils.add_unregistered_users(clan_tag, active_members)
