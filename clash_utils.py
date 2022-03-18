@@ -686,7 +686,8 @@ def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> dict:
         active_members = get_active_members_in_clan(clan_tag)
 
         if len(active_members) == 0:
-            return {}
+            clan_averages[clan_tag] = 0
+            continue
 
         args_list = [participant["tag"] for participant in clan["participants"] if participant["tag"] in active_members]
 
