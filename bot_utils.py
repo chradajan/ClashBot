@@ -542,7 +542,7 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
         if (now - race_reset_times["thursday"]).days > 5:
             win_rates = clash_utils.calculate_river_race_win_rates(db_utils.get_reset_time())
         else:
-            win_rates = clash_utils.calculate_river_race_win_rates(race_reset_times["thursday"])
+            win_rates = clash_utils.calculate_river_race_win_rates(race_reset_times["thursday"]  - datetime.timedelta(days=1))
 
         if len(win_rates) == 0:
             win_rates = {clan["tag"]: 0.50 for clan in clans}
