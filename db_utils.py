@@ -1277,8 +1277,15 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
                     (last_check_time))
 
     clans = clash_utils.get_clans_in_race(False)
+    reset_clans = False
 
-    if is_colosseum_week():
+    for clan in clans:
+        cursor.execute("SELECT clan_tag FROM river_race_clans WHERE clan_tag = %s", (clan["tag"]))
+        if cursor.fetchone() is None:
+            reset_clans = True
+            break
+
+    if is_colosseum_week() or reset_clans:
         cursor.execute("DELETE FROM river_race_clans")
 
         for clan in clans:
