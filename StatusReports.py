@@ -104,20 +104,20 @@ class StatusReports(commands.Cog):
 
 
     """
-    Command: !fame_report {threshold}
+    Command: !medals_report {threshold}
 
     Get a list of users below a specified fame threshold.
     """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
-    async def fame_report(self, ctx, threshold: int):
-        """Get a report of players below specific fame threshold. Ignores users on vacation."""
+    async def medals_report(self, ctx, threshold: int):
+        """Get a report of players below the specified medal count. Ignores users on vacation."""
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)
         users_on_vacation = db_utils.get_users_on_vacation()
         table = PrettyTable()
-        table.field_names = ["Member", "Fame"]
-        embed = discord.Embed(title="Fame Report")
+        table.field_names = ["Member", "Medals"]
+        embed = discord.Embed(title="Medals Report")
 
         for player_name, player_tag, fame in hall_of_shame:
             if player_tag in users_on_vacation:
@@ -125,12 +125,12 @@ class StatusReports(commands.Cog):
 
             table.add_row([player_name, fame])
 
-        embed.add_field(name="Players below fame threshold", value = "```\n" + table.get_string() + "```")
+        embed.add_field(name="Players below medals threshold", value = "```\n" + table.get_string() + "```")
 
         try:
             await ctx.send(embed=embed)
         except:
-            await ctx.send("Players below fame threshold\n" + "```\n" + table.get_string() + "```")
+            await ctx.send("Players below medals threshold\n" + "```\n" + table.get_string() + "```")
 
 
     async def player_report_helper(self, ctx, user_data: dict):
