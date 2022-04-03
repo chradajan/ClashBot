@@ -178,3 +178,51 @@ class Strikes(commands.Cog):
             embed = discord.Embed()
             embed.add_field(name="Strikes Report", value="No users currently have strikes")
             await ctx.send(embed=embed)
+
+    """
+    Command: !upcoming_strikes
+
+    Get a list of users who will be receiving a strike.
+    """
+    @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    async def upcoming_strikes(self, ctx):
+        """Get a list of users who will receive strikes for lack of participation in the current river race."""
+        upcoming_strikes_list = bot_utils.upcoming_strikes(True)
+        embed_one = discord.Embed(title="Upcoming Strikes", color=discord.Color.green())
+        embed_two = discord.Embed(title="Upcoming Strikes", color=discord.Color.green())
+        send_second_embed = False
+        field_count = 0
+        strikes_enabled = db_utils.get_strike_status()
+
+        if not strikes_enabled:
+            embed_one.set_footer(text="Automated strikes are currently disabled.")
+            embed_two.set_footer(text="Automated strikes are currently disabled.")
+
+        if len(upcoming_strikes_list) == 0:
+            embed = discord.Embed(title="No players are currently set to receive strikes.", color=discord.Color.green())
+
+            if not strikes_enabled:
+                embed.set_footer(text="Automated strikes are currently disabled.")
+
+            await ctx.send(embed=embed)
+            return
+
+        for player_name, _, decks_used, decks_required, strikes in upcoming_strikes_list:
+            if field_count < 25:
+                embed_one.add_field(name=player_name,
+                                    value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes} -> {strikes+1}```",
+                                    inline=False)
+                field_count += 1
+            else:
+                embed_two.add_field(name=player_name,
+                                    value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes} -> {strikes+1}```",
+                                    inline=False)
+                send_second_embed = True
+
+        await ctx.send(embed=embed_one)
+
+        if send_second_embed:
+            await ctx.send(embed=embed_two)
+
