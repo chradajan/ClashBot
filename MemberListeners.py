@@ -113,9 +113,11 @@ class MemberListeners(commands.Cog):
                 else:
                     await channel.send(embed=embed)
 
-                await reaction.message.delete()
+                edited_embed = discord.Embed(title=f"{player_name} received a strike.")
+                await reaction.message.edit(embed=edited_embed)
             elif reaction.emoji == '❌':
-                await reaction.message.delete()
+                edited_embed = discord.Embed(title=f"{player_name} did not receive a strike.")
+                await reaction.message.edit(embed=edited_embed)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
