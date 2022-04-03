@@ -20,7 +20,7 @@ class LeaderUtils(commands.Cog):
     Export database information to spreadsheet.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def export(self, ctx, false_logic_only: bool=True, include_card_levels: bool=False):
         """Export database to Excel spreadsheet."""
@@ -192,7 +192,7 @@ class LeaderUtils(commands.Cog):
     Add a kick entry to the database with the current time for specified user.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def kick(self, ctx, member: discord.Member):
         """Log that the specified user was kicked from the clan."""
@@ -236,7 +236,7 @@ class LeaderUtils(commands.Cog):
     Undo the latest kick for specified user.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def undo_kick(self, ctx, member: discord.Member):
         """Undo the latest kick of the specified user."""

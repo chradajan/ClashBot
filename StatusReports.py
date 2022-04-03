@@ -21,7 +21,7 @@ class StatusReports(commands.Cog):
     Get a list of users and their number of decks remaining today.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def decks_report(self, ctx):
         """Get a report of players with decks remaining today."""
@@ -109,7 +109,7 @@ class StatusReports(commands.Cog):
     Get a list of users below a specified fame threshold.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def fame_report(self, ctx, threshold: int):
         """Get a report of players below specific fame threshold. Ignores users on vacation."""
@@ -192,7 +192,7 @@ class StatusReports(commands.Cog):
     Get information about a member in the server.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def player_report(self, ctx, member: discord.Member):
         """Get information about a member."""
@@ -227,7 +227,7 @@ class StatusReports(commands.Cog):
     Get war stats of specified user.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def stats_report(self, ctx, member: discord.Member):
         """Get war stats of specified user."""

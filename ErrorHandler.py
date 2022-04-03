@@ -50,7 +50,8 @@ class ErrorHandler(commands.Cog):
 
         elif isinstance(error, commands.errors.CheckFailure):
             is_admin_only = False
-            is_leader_or_admin_only = False
+            is_leader_only = False
+            is_elder_only = False
             is_channel_check = False
             is_welcome_or_rules_check = False
             is_disallowed_command = False
@@ -61,7 +62,9 @@ class ErrorHandler(commands.Cog):
                 if bot_utils.is_admin_command_check.__name__ in check_str and not check_outcome:
                     is_admin_only = True
                 elif bot_utils.is_leader_command_check.__name__ in check_str and not check_outcome:
-                    is_leader_or_admin_only = True
+                    is_leader_only = True
+                elif bot_utils.is_elder_command_check.__name__ in check_str and not check_outcome:
+                    is_elder_only = True
                 elif bot_utils.channel_check.__name__ in check_str and not check_outcome:
                     is_channel_check = True
                 elif bot_utils.not_welcome_or_rules_check.__name__ in check_str and not check_outcome:
@@ -72,7 +75,7 @@ class ErrorHandler(commands.Cog):
             if is_welcome_or_rules_check:
                 return
 
-            embed = self.check_failure_embed(is_admin_only, is_leader_or_admin_only, is_channel_check, is_disallowed_command)
+            embed = self.check_failure_embed(is_admin_only, is_leader_only, is_elder_only, is_channel_check, is_disallowed_command)
             await ctx.send(embed=embed)
 
         elif isinstance(error, commands.errors.ChannelNotFound):
@@ -194,7 +197,8 @@ class ErrorHandler(commands.Cog):
 
     def check_failure_embed(self,
                             is_admin_only: bool,
-                            is_leader_or_admin_only: bool,
+                            is_leader_only: bool,
+                            is_elder_only: bool,
                             is_channel_check: bool,
                             is_disallowed_command: bool) -> discord.Embed:
         """
@@ -202,7 +206,8 @@ class ErrorHandler(commands.Cog):
 
         Args:
             is_admin_only(bool): If command failed because a non-admin issued it.
-            is_leader_or_admin_only(bool): If command failed because a non-leader/non-admin issued it.
+            is_leader_only(bool): If command failed because a non-leader/non-admin issued it.
+            is_elder_only(bool): If command failed because a non-elder/non-leader/non-admin issued it.
             is_channel_check(bool): If command failed because it was sent in an illegal channel.
             is_disallowed_command(bool): If the command is currently disallowed.
 
@@ -213,7 +218,9 @@ class ErrorHandler(commands.Cog):
 
         fail_reason = ""
 
-        if is_leader_or_admin_only:
+        if is_elder_only:
+            fail_reason += "\t•You must be a elder/leader/admin to use this command\n"
+        if is_leader_only:
             fail_reason += "\t•You must be a leader/admin to use this command\n"
         if is_admin_only:
             fail_reason += "\t•You must be an admin to use this command\n"

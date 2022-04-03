@@ -51,6 +51,11 @@ class ReminderTime(Enum):
 async def is_admin(member: discord.Member) -> bool:
     return (SPECIAL_ROLES[ADMIN_ROLE_NAME] in member.roles) or member.guild_permissions.administrator
 
+def is_elder_command_check():
+    async def predicate(ctx):
+        return (NORMAL_ROLES[ELDER_ROLE_NAME] in ctx.author.roles) or (NORMAL_ROLES[LEADER_ROLE_NAME] in ctx.author.roles) or (SPECIAL_ROLES[ADMIN_ROLE_NAME] in ctx.author.roles)
+    return commands.check(predicate)
+
 def is_leader_command_check():
     async def predicate(ctx):
         return (NORMAL_ROLES[LEADER_ROLE_NAME] in ctx.author.roles) or (SPECIAL_ROLES[ADMIN_ROLE_NAME] in ctx.author.roles)

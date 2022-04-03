@@ -17,7 +17,7 @@ class Vacation(commands.Cog):
     Toggle the vacation status of the specified user.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def set_vacation(self, ctx, member: discord.Member, status: bool):
         """Set vacation status for the specified member."""
@@ -33,7 +33,7 @@ class Vacation(commands.Cog):
     Print a list of all users currently on vacation.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def vacation_list(self, ctx):
         """Get a list of all users currently on vacation."""

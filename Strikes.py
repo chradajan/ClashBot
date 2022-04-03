@@ -132,7 +132,7 @@ class Strikes(commands.Cog):
     Get a list of users with at least 1 strike.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def strikes_report(self, ctx):
         """Get a report of players with strikes."""
@@ -185,7 +185,7 @@ class Strikes(commands.Cog):
     Get a list of users who will be receiving a strike.
     """
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def upcoming_strikes(self, ctx):
         """Get a list of users who will receive strikes for lack of participation in the current river race."""
