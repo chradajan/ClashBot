@@ -193,7 +193,7 @@ class LeaderUtils(commands.Cog):
     """
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.channel_check({COMMANDS_CHANNEL, KICKS_CHANNEL})
     async def kick(self, ctx, member: discord.Member):
         """Log that the specified user was kicked from the clan."""
         player_tag = db_utils.get_player_tag(member.id)
@@ -237,7 +237,7 @@ class LeaderUtils(commands.Cog):
     """
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.channel_check({COMMANDS_CHANNEL, KICKS_CHANNEL})
     async def undo_kick(self, ctx, member: discord.Member):
         """Undo the latest kick of the specified user."""
         player_tag = db_utils.get_player_tag(member.id)

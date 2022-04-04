@@ -68,7 +68,10 @@ def is_admin_command_check():
 
 def channel_check(CHANNEL_NAME):
     async def predicate(ctx):
-        return ctx.message.channel.name == CHANNEL_NAME
+        if type(CHANNEL_NAME) is set:
+            return ctx.message.channel.name in CHANNEL_NAME
+        else:
+            return ctx.message.channel.name == CHANNEL_NAME
     return commands.check(predicate)
 
 def not_welcome_or_rules_check():
