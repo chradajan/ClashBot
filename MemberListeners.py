@@ -86,13 +86,20 @@ class MemberListeners(commands.Cog):
             self.kick_messages.pop(reaction.message.id, None)
 
             if reaction.emoji == '✅':
-                embed = bot_utils.kick(player_name, player_tag)
-                await reaction.message.channel.send(embed=embed)
-                await reaction.message.delete()
+                edited_embed = bot_utils.kick(player_name, player_tag)
+                await reaction.message.edit(embed=edited_embed)
+                await reaction.message.clear_reaction('✅')
+                await reaction.message.clear_reaction('❌')
             elif reaction.emoji == '❌':
-                await reaction.message.delete()
+                edited_embed = discord.Embed(title=f"A kick was not logged for {player_name}.")
+                await reaction.message.edit(embed=edited_embed)
+                await reaction.message.clear_reaction('✅')
+                await reaction.message.clear_reaction('❌')
 
         elif strike_info is not None:
+            if (bot_utils.NORMAL_ROLES[LEADER_ROLE_NAME] not in user.roles) or (bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME] not in user.roles):
+                return
+
             player_tag, player_name, decks_used, decks_required, tracked_since, channel = strike_info
             bot_utils.strike_messages.pop(reaction.message.id, None)
 
@@ -115,9 +122,13 @@ class MemberListeners(commands.Cog):
 
                 edited_embed = discord.Embed(title=f"{player_name} received a strike.")
                 await reaction.message.edit(embed=edited_embed)
+                await reaction.message.clear_reaction('✅')
+                await reaction.message.clear_reaction('❌')
             elif reaction.emoji == '❌':
                 edited_embed = discord.Embed(title=f"{player_name} did not receive a strike.")
                 await reaction.message.edit(embed=edited_embed)
+                await reaction.message.clear_reaction('✅')
+                await reaction.message.clear_reaction('❌')
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
