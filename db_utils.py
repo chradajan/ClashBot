@@ -217,7 +217,7 @@ def update_user(clash_data: dict) -> str:
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
     query_result = cursor.fetchone()
 
-    if query_result == None:
+    if query_result is None:
         insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
         cursor.execute(insert_clan_query, clash_data)
         cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
@@ -225,12 +225,12 @@ def update_user(clash_data: dict) -> str:
 
     clash_data["clan_id"] = query_result["id"]
 
-    if clash_data.get("status") == None:
+    if clash_data.get("status") is None:
         clash_data["status"] = "ACTIVE" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "INACTIVE"
 
     update_query = ""
 
-    if clash_data["discord_id"] == None:
+    if clash_data["discord_id"] is None:
         update_query = "UPDATE users SET player_tag = %(player_tag)s,\
                         player_name = %(player_name)s,\
                         discord_name = %(discord_name)s,\
@@ -248,6 +248,15 @@ def update_user(clash_data: dict) -> str:
                         WHERE discord_id = %(discord_id)s"
 
     cursor.execute(update_query, clash_data)
+
+    if clash_data["status"] in {"ACTIVE", "UNREGISTERED"} and is_war_time():
+        last_check_time = get_last_check_time()
+        tracked_since = bot_utils.get_current_battletime()
+        cursor.execute("UPDATE match_history_recent SET\
+                        last_check_time = %s,\
+                        tracked_since = %s\
+                        WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s) AND tracked_since IS NULL",
+                        (last_check_time, tracked_since, clash_data["player_tag"]))
 
     db.commit()
     db.close()
@@ -1065,7 +1074,7 @@ def clean_up_db(active_members: dict=None):
     """
     db, cursor = connect_to_db()
 
-    if active_members == None:
+    if active_members is None:
         active_members = clash_utils.get_active_members_in_clan()
 
     if len(active_members) == 0:
@@ -1084,7 +1093,7 @@ def clean_up_db(active_members: dict=None):
         if player_tag in active_members:
             if status in {'INACTIVE', 'DEPARTED'}:
                 clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
-                if clash_data == None:
+                if clash_data is None:
                     continue
 
                 if status == 'DEPARTED':
@@ -1092,19 +1101,10 @@ def clean_up_db(active_members: dict=None):
                     clash_data["status"] = 'UNREGISTERED'
 
                 update_user(clash_data)
-
-                if is_war_time():
-                    cursor.execute("SELECT tracked_since FROM match_history_recent WHERE user_id = %s", (id))
-                    query_result = cursor.fetchone()
-                    if query_result["tracked_since"] == None:
-                        last_check_time = get_last_check_time()
-                        tracked_since = bot_utils.get_current_battletime()
-                        cursor.execute("UPDATE match_history_recent SET last_check_time = %s, tracked_since = %s WHERE user_id = %s",
-                                       (last_check_time, tracked_since, id))
         else:
             if status in {'ACTIVE', 'UNREGISTERED'}:
                 clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
-                if clash_data == None:
+                if clash_data is None:
                     continue
 
                 if status == 'UNREGISTERED':
