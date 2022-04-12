@@ -62,7 +62,7 @@ def add_new_user(clash_data: dict) -> bool:
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
     query_result = cursor.fetchone()
 
-    if query_result == None:
+    if query_result is None:
         insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
         cursor.execute(insert_clan_query, clash_data)
         cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
@@ -79,7 +79,7 @@ def add_new_user(clash_data: dict) -> bool:
     cursor.execute("SELECT * FROM users WHERE discord_id = %(discord_id)s", clash_data)
     query_result = cursor.fetchone()
 
-    if query_result != None:
+    if query_result is not None:
         cursor.execute("UPDATE users SET discord_id = NULL WHERE discord_id = %(discord_id)s", clash_data)
 
     # Check if player already exists in table.
@@ -113,7 +113,7 @@ def add_new_user(clash_data: dict) -> bool:
     cursor.execute("SELECT user_id FROM match_history_all WHERE user_id = %s", (user_id))
     query_result = cursor.fetchone()
 
-    if query_result == None:
+    if query_result is None:
         last_check_time = get_last_check_time()
         tracked_since = bot_utils.get_current_battletime() if (is_war_time() and (clash_data["status"] == 'ACTIVE')) else None
         cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (user_id, last_check_time, tracked_since))
@@ -156,14 +156,14 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     # Get their data
     clash_data = clash_utils.get_clash_user_data(player_tag, player_tag, None)
 
-    if clash_data == None:
+    if clash_data is None:
         return False
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
     query_result = cursor.fetchone()
 
-    if query_result == None:
+    if query_result is None:
         insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
         cursor.execute(insert_clan_query, clash_data)
         cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
@@ -293,7 +293,7 @@ def get_user_data(search_key: str) -> dict:
     cursor.execute("SELECT * FROM users WHERE player_tag = %s", (search_key))
     query_result = cursor.fetchone()
 
-    if query_result == None:
+    if query_result is None:
         cursor.execute("SELECT * FROM users WHERE player_name = %s", (search_key))
         query_result = cursor.fetchall()
 
@@ -318,7 +318,7 @@ def get_user_data(search_key: str) -> dict:
     cursor.execute("SELECT * FROM clans WHERE id = %s", (clan_id))
     query_result = cursor.fetchone()
 
-    if query_result == None:
+    if query_result is None:
         db.close()
         return None
 
@@ -404,7 +404,7 @@ def get_strikes(discord_id: int) -> int:
 
     db.close()
 
-    if query_result == None:
+    if query_result is None:
         return None
 
     return query_result["strikes"]
@@ -711,7 +711,7 @@ def remove_user(discord_id: int):
     cursor.execute("SELECT id, player_tag FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
-    if (query_result == None):
+    if (query_result is None):
         db.close()
         return
 
@@ -772,7 +772,7 @@ def update_vacation_for_user(discord_id: int, status: bool=None) -> bool:
     cursor.execute("SELECT vacation FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
-    if (query_result == None):
+    if (query_result is None):
         db.close()
         return False
 
@@ -830,7 +830,7 @@ def get_reminder_status() -> bool:
     cursor.execute("SELECT * FROM automation_status")
     query_result = cursor.fetchone()
 
-    if query_result == None:
+    if query_result is None:
         db.close()
         return False
 
@@ -877,7 +877,7 @@ def get_roles(discord_id: int) -> list:
     cursor.execute("SELECT id FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
-    if (query_result == None):
+    if (query_result is None):
         db.close()
         return []
 
@@ -887,7 +887,7 @@ def get_roles(discord_id: int) -> list:
     cursor.execute("SELECT discord_role_id FROM assigned_roles WHERE user_id = %s", (user_id))
     query_result = cursor.fetchall()
 
-    if (query_result == None):
+    if (query_result is None):
         db.close()
         return []
 
@@ -903,7 +903,7 @@ def get_roles(discord_id: int) -> list:
         cursor.execute("SELECT role_name FROM discord_roles WHERE id = %s", (discord_role_id))
         query_result = cursor.fetchone()
 
-        if (query_result == None):
+        if (query_result is None):
             continue
 
         roles.append(query_result["role_name"])
@@ -925,7 +925,7 @@ def commit_roles(discord_id: int, roles: list):
     cursor.execute("SELECT id FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
-    if (query_result == None):
+    if (query_result is None):
         db.close()
         return
 
@@ -937,7 +937,7 @@ def commit_roles(discord_id: int, roles: list):
         cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role))
         query_result = cursor.fetchone()
 
-        if (query_result == None):
+        if (query_result is None):
             continue
 
         discord_role_id = query_result["id"]
@@ -1017,7 +1017,7 @@ def record_deck_usage_today(deck_usage: dict):
         cursor.execute("SELECT player_tag, usage_history FROM users WHERE player_tag = %s", (player_tag))
         query_result = cursor.fetchone()
 
-        if query_result == None:
+        if query_result is None:
             if not add_new_unregistered_user(player_tag):
                 continue
             query_result = {"usage_history": 0}
@@ -1139,7 +1139,7 @@ def get_server_members_info() -> dict:
     query_result = cursor.fetchall()
     db.close()
 
-    if query_result == None:
+    if query_result is None:
         return {}
 
     player_info = {user["discord_id"]: user for user in query_result}
@@ -1419,14 +1419,14 @@ def get_match_performance_dict(player_tag: str) -> dict:
 
     match_performance_all = cursor.fetchone()
 
-    if (match_performance_recent == None) or (match_performance_all == None):
+    if (match_performance_recent is None) or (match_performance_all is None):
         db.close()
         return None
 
     db_info_dict = {"recent": match_performance_recent, "all": match_performance_all}
     tracked_since = match_performance_recent["tracked_since"]
 
-    if tracked_since != None:
+    if tracked_since is not None:
         tracked_since = bot_utils.battletime_to_datetime(tracked_since)
 
     match_performance_dict = {"recent": {"fame": match_performance_recent["fame"], "tracked_since": tracked_since},
@@ -1705,7 +1705,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         cursor.execute("SELECT * FROM clans")
         clans = cursor.fetchall()
 
-    if clans == None:
+    if clans is None:
         return None
 
     clans_dict = {}
@@ -1721,7 +1721,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
 
     users = cursor.fetchall()
 
-    if users == None:
+    if users is None:
         return None
 
     db.close()
@@ -1819,7 +1819,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
 
         usage_today = deck_usage_today.get(user["player_tag"])
 
-        if usage_today == None:
+        if usage_today is None:
             usage_today = 0
 
         history_row.append(usage_today)
@@ -1836,7 +1836,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
 
         tracked_since = match_performance["recent"]["tracked_since"]
 
-        if tracked_since == None:
+        if tracked_since is None:
             tracked_since = "N/A"
         else:
             tracked_since = tracked_since.strftime("%Y-%m-%d, %H:%M")

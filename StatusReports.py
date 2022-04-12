@@ -164,7 +164,7 @@ class StatusReports(commands.Cog):
             await ctx.send(f"{user_data['player_name']}'s general info" + "\n" + "```\n" + general_info_table.get_string(header=False) + "```")
 
         decks_used_today = clash_utils.get_user_decks_used_today(user_data["player_tag"])
-        if decks_used_today == None:
+        if decks_used_today is None:
             decks_used_today = 0
 
         usage_history_list = bot_utils.break_down_usage_history(user_data["usage_history"], datetime.datetime.now(datetime.timezone.utc))
@@ -198,13 +198,13 @@ class StatusReports(commands.Cog):
         """Get information about a member."""
         player_tag = db_utils.get_player_tag(member.id)
 
-        if player_tag == None:
+        if player_tag is None:
             await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
             return
 
         user_data = db_utils.get_user_data(player_tag)
 
-        if user_data == None:
+        if user_data is None:
             await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
             return
         

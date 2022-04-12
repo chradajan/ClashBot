@@ -181,7 +181,7 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
     if member.bot or (SPECIAL_ROLES[NEW_ROLE_NAME] in member.roles) or (SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] in member.roles):
         return False
 
-    if player_tag == None:
+    if player_tag is None:
         player_tag = db_utils.get_player_tag(member.id)
 
     if player_tag is None:

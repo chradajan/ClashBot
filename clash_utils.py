@@ -137,7 +137,7 @@ def parse_player_tag(message: str) -> str:
         str: A valid player tag, or None if one can't be found.
     """
     found_pattern = re.search(r"(#[A-Z0-9]+)", message)
-    if found_pattern != None:
+    if found_pattern is not None:
         return found_pattern.group(1)
     return None
 
@@ -165,7 +165,7 @@ def get_clash_user_data(message: str, discord_name: str, discord_id: int) -> dic
     """
     player_tag = parse_player_tag(message)
 
-    if player_tag == None:
+    if player_tag is None:
         return None
 
     req = requests.get(f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}", headers={"Accept":"application/json", "authorization":f"Bearer {CLASH_API_KEY}"})

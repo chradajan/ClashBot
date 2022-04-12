@@ -173,7 +173,7 @@ class LeaderUtils(commands.Cog):
             if discord_id is not None:
                 member = discord.utils.get(fame_channel.members, id=discord_id)
 
-            if member == None:
+            if member is None:
                 non_member_string += f"{player_name} - Fame: {fame}" + "\n"
             else:
                 member_string += f"{member.mention} - Fame: {fame}" + "\n"
