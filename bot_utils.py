@@ -182,10 +182,12 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
         return False
 
     if player_tag is None:
-        player_tag = db_utils.get_player_tag(member.id)
+        player_info = db_utils.find_user_in_db(member.id)
 
-    if player_tag is None:
-        return False
+        if len(player_info) != 1:
+            return False
+        else:
+            _, player_tag, _ = player_info[0]
 
     discord_name = full_name(member)
     clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, member.id)
@@ -711,8 +713,30 @@ def kick(player_name: str, player_tag: str) -> discord.Embed:
         discord.Embed: Embed object with details about the kick.
     """
     total_kicks, last_kick_date = db_utils.kick_user(player_tag)
-    embed = discord.Embed(title="Kick Logged")
+    embed = discord.Embed(title="Kick Logged", color=discord.Color.green())
     embed.add_field(name=player_name, value=f"```Times kicked: {total_kicks}\nLast kicked: {last_kick_date}```")
+
+    return embed
+
+
+def undo_kick(player_name: str, player_tag: str) -> discord.Embed:
+    """
+    Undo the latest kick of the specified user and return an embed with details about the kick.
+
+    Args:
+        player_name(str): Name of player to undo kick for.
+        player_tag(str): Tag of player to undo kick for.
+
+    Returns:
+        discord.Embed: Embed with info about the kick that was undone.
+    """
+    removed_kick = db_utils.undo_kick(player_tag)
+    embed = discord.Embed(title="Kick Undone", color=discord.Color.green())
+
+    if removed_kick is None:
+        embed.add_field(name=player_name, value="This user has no kicks to undo.")
+    else:
+        embed.add_field(name=player_name, value=f"```Undid kick from: {removed_kick}```")
 
     return embed
 
@@ -888,3 +912,27 @@ async def strike_former_participant(player_name: str,
     await strike_message.add_reaction('✅')
     await strike_message.add_reaction('❌')
     strike_messages[strike_message.id] = (player_tag, player_name, decks_used, decks_required, tracked_since, strikes_channel)
+
+
+def duplicate_names_embed(users: List[Tuple[str, str, str]], command_name: str) -> discord.Embed:
+    """
+    Create an embedded message listing out users with identical names.
+
+    Args:
+        users(List[Tuple[str, str, str]]): List of users with same player name.
+        command_name(str): Name of command that led to this error.
+
+    Returns:
+        discord.Embed: Embed listing out users and info about how to proceed.
+    """
+    embed = discord.Embed(title="Duplicate names detected", color=0xFFFF00)
+    embed.add_field(name="Which user did you mean?",
+                    value=f"Try reissuing the command with a player tag (e.g., `!{command_name} #ABC123`)",
+                    inline=False)
+
+    for player_name, player_tag, clan_name in users:
+        embed.add_field(name=f"{player_name}",
+                        value=f"```Tag: {player_tag}\nClan: {clan_name}```",
+                        inline=False)
+
+    return embed

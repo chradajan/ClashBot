@@ -33,7 +33,7 @@ class Strikes(commands.Cog):
         channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
         message = "has received a strike" if delta > 0 else "has had a strike removed"
 
-        embed = discord.Embed(title="Strikes Updated")
+        embed = discord.Embed(title="Strikes Updated", color=discord.Color.green())
         embed.add_field(name=player_name, value=f"```Strikes: {old_strike_count} -> {new_strike_count}\nPermanent Strikes: {old_permanent_strikes} -> {new_permanent_strikes}```")
         await ctx.send(embed=embed)
 
@@ -53,26 +53,30 @@ class Strikes(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def give_strike(self, ctx, member: discord.Member):
         """Increment specified user's strikes by 1."""
-        player_tag = db_utils.get_player_tag(member.id)
+        player_info = db_utils.find_user_in_db(member.id)
 
-        if player_tag is None:
-            embed = discord.Embed(color=discord.Color.red())
-            embed.add_field(name="An unexpected error has occurred",
-                            value=f"{member.display_name} is on Discord but is not in the database. Make sure they've entered their player tag in the welcome channel.")
+        if len(player_info) == 0:
+            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
+        else:
+            _, player_tag, _ = player_info[0]
 
         await self.strike_helper(ctx, member.display_name, player_tag, 1, member)
 
     @give_strike.error
     async def give_strike_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            player_tag = db_utils.get_player_tag(error.argument)
+            player_info = db_utils.find_user_in_db(error.argument)
 
-            if player_tag is not None:
-                await self.strike_helper(ctx, error.argument, player_tag, 1)
-            else:
+            if len(player_info) == 0:
                 embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)
+            elif len(player_info) == 1:
+                player_name, player_tag, _ = player_info[0]
+                await self.strike_helper(ctx, player_name, player_tag, 1)
+            else:
+                embed = bot_utils.duplicate_names_embed(player_info, "give_strike")
                 await ctx.send(embed=embed)
 
 
@@ -86,26 +90,30 @@ class Strikes(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def remove_strike(self, ctx, member: discord.Member):
         """Decrement specified user's strikes by 1."""
-        player_tag = db_utils.get_player_tag(member.id)
+        player_info = db_utils.find_user_in_db(member.id)
 
-        if player_tag is None:
-            embed = discord.Embed(color=discord.Color.red())
-            embed.add_field(name="An unexpected error has occurred",
-                            value=f"{member.display_name} is on Discord but is not in the database. Make sure they've entered their player tag in the welcome channel.")
+        if len(player_info) == 0:
+            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
+        else:
+            _, player_tag, _ = player_info[0]
 
         await self.strike_helper(ctx, member.display_name, player_tag, -1, member)
 
     @remove_strike.error
     async def remove_strike_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            player_tag = db_utils.get_player_tag(error.argument)
+            player_info = db_utils.find_user_in_db(error.argument)
 
-            if player_tag is not None:
-                await self.strike_helper(ctx, error.argument, player_tag, -1)
-            else:
+            if len(player_info) == 0:
                 embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)
+            elif len(player_info) == 1:
+                player_name, player_tag, _ = player_info[0]
+                await self.strike_helper(ctx, player_name, player_tag, -1)
+            else:
+                embed = bot_utils.duplicate_names_embed(player_info, "remove_strike")
                 await ctx.send(embed=embed)
 
 
@@ -120,10 +128,14 @@ class Strikes(commands.Cog):
     async def reset_all_strikes(self, ctx):
         """Reset each member's strikes to 0. Permanent strikes are not affected."""
         db_utils.reset_strikes()
+
         channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
-        embed = discord.Embed()
-        embed.add_field(name="Strikes Reset", value="All users have been set to 0 strikes")
-        await channel.send(embed=embed)
+        strikes_channel_embed = discord.Embed(color=discord.Color.green())
+        strikes_channel_embed.add_field(name="Strikes Reset", value="All users have been reset to 0 strikes")
+        await channel.send(embed=strikes_channel_embed)
+
+        commands_channel_embed = discord.Embed(title="Strikes successfully reset to 0.", color=discord.Color.green())
+        await ctx.send(embed=commands_channel_embed)
 
 
     """

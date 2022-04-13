@@ -1,7 +1,7 @@
 from discord import player
 from config import PRIMARY_CLAN_TAG
 from credentials import IP, USERNAME, PASSWORD, DB_NAME
-from typing import List, Set, Tuple
+from typing import List, Set, Tuple, Union
 import blacklist
 import bot_utils
 import clash_utils
@@ -264,12 +264,12 @@ def update_user(clash_data: dict) -> str:
     return "Member" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "Visitor"
 
 
-def get_user_data(search_key: str) -> dict:
+def get_user_data(player_tag: str) -> dict:
     """
     Get a user's information from the users table.
 
     Args:
-        search_key(str): Key to search for in database. First try using as a player tag. If no results, then try as a player name.
+        player_tag(str): Player tag of user to get info about.
 
     Returns:
         dict: Dict of user's info.
@@ -290,18 +290,11 @@ def get_user_data(search_key: str) -> dict:
     db, cursor = connect_to_db()
 
     user_data = {}
-    cursor.execute("SELECT * FROM users WHERE player_tag = %s", (search_key))
+    cursor.execute("SELECT * FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
 
     if query_result is None:
-        cursor.execute("SELECT * FROM users WHERE player_name = %s", (search_key))
-        query_result = cursor.fetchall()
-
-        if len(query_result) != 1:
-            db.close()
-            return None
-        else:
-            query_result = query_result[0]
+        return None
 
     user_data["player_name"] = query_result["player_name"]
     user_data["player_tag"] = query_result["player_tag"]
@@ -644,35 +637,40 @@ def get_river_race_reset_times() -> dict:
     return reset_times
 
 
-def get_player_tag(search_key) -> str:
+def find_user_in_db(search_key: Union[int, str]) -> List[Tuple[str, str, str]]:
     """
-    Return the player tag corresponding to a Discord member.
+    Find a list player names, player tags, and clan names of users in the database corresponding to a discord id, player tag, or
+    player name. First try searching for key as a discord id or player tag. If no results are found, try searching as a player name.
 
     Args:
-        search_key: Key to search for in database. First try using as a unique Discord id. If no results, then try as a player name.
+        search_key: Key to search for in database. Can be discord id, player tag, or player name.
 
     Returns:
-        str: Specified member's player tag.
+        List[Tuple[str, str, str]]: List of tuples of (player_name, player_tag, clan_name)
     """
     db, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_tag FROM users WHERE discord_id = %s", (search_key))
-    query_result = cursor.fetchone()
-
-    if query_result is None:
-        cursor.execute("SELECT player_tag FROM users WHERE player_name = %s", (search_key))
+    if type(search_key) == int:
+        cursor.execute("SELECT users.player_name, users.player_tag, clans.clan_name FROM users\
+                        INNER JOIN clans ON users.clan_id = clans.id WHERE discord_id = %s",
+                        (search_key))
+        query_result = cursor.fetchall()
+    else:
+        cursor.execute("SELECT users.player_name, users.player_tag, clans.clan_name FROM users\
+                        INNER JOIN clans ON users.clan_id = clans.id WHERE player_tag = %s",
+                        (search_key))
         query_result = cursor.fetchall()
 
-        if len(query_result) != 1:
-            db.close()
-            return None
-        else:
-            query_result = query_result[0]
+    if len(query_result) == 0:
+        cursor.execute("SELECT users.player_name, users.player_tag, clans.clan_name FROM users\
+                        INNER JOIN clans ON users.clan_id = clans.id WHERE player_name = %s",
+                        (search_key))
+        query_result = cursor.fetchall()
 
-    player_tag = query_result["player_tag"]
+    search_results = [(user["player_name"], user["player_tag"], user["clan_name"]) for user in query_result]
 
     db.close()
-    return player_tag
+    return search_results
 
 
 def get_member_id(player_tag: str) -> int:

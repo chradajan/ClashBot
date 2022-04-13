@@ -186,6 +186,16 @@ all possible remaining decks."""
     @bot_utils.not_welcome_or_rules_check()
     async def stats(self, ctx):
         """Get your river race performance stats."""
-        player_tag = db_utils.get_player_tag(ctx.author.id)
+        player_info = db_utils.find_user_in_db(ctx.author.id)
+
+        if len(player_info) == 0:
+            embed = discord.Embed(color=discord.Color.red())
+            embed.add_field(name="An unexpected error has occurred",
+                            value="Your Discord ID is not in the database. This should not happen. Contact a leader if you see this error.")
+            await ctx.send(embed=embed)
+            return
+        else:
+            _, player_tag, _ = player_info[0]
+
         embed = bot_utils.create_match_performance_embed(ctx.author.display_name, player_tag)
         await ctx.send(embed=embed)

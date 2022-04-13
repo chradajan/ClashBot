@@ -196,28 +196,44 @@ class StatusReports(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def player_report(self, ctx, member: discord.Member):
         """Get information about a member."""
-        player_tag = db_utils.get_player_tag(member.id)
+        player_info = db_utils.find_user_in_db(member.id)
 
-        if player_tag is None:
-            await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
+        if len(player_info) == 0:
+            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            await ctx.send(embed=embed)
             return
+        else:
+            _, player_tag, _ = player_info[0]
 
         user_data = db_utils.get_user_data(player_tag)
 
         if user_data is None:
-            await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
+            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            await ctx.send(embed=embed)
             return
-        
+
         await self.player_report_helper(ctx, user_data)
 
     @player_report.error
     async def player_report_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            user_data = db_utils.get_user_data(error.argument)
-            if user_data is not None:
+            player_info = db_utils.find_user_in_db(error.argument)
+
+            if len(player_info) == 0:
+                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                await ctx.send(embed=embed)
+            elif len(player_info) == 1:
+                player_name, player_tag, _ = player_info[0]
+                user_data = db_utils.get_user_data(player_tag)
+
+                if user_data is None:
+                    embed = ErrorHandler.ErrorHandler.missing_db_info(player_name)
+                    await ctx.send(embed=embed)
+                    return
+
                 await self.player_report_helper(ctx, user_data)
             else:
-                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                embed = bot_utils.duplicate_names_embed(player_info, "player_report")
                 await ctx.send(embed=embed)
 
 
@@ -231,11 +247,14 @@ class StatusReports(commands.Cog):
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def stats_report(self, ctx, member: discord.Member):
         """Get war stats of specified user."""
-        player_tag = db_utils.get_player_tag(member.id)
+        player_info = db_utils.find_user_in_db(member.id)
 
-        if player_tag is None:
-            await ctx.send(f"{member.display_name} was found on Discord but not in the database. Make sure they've entered their player tag in the welcome channel.")
+        if len(player_info) == 0:
+            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            await ctx.send(embed=embed)
             return
+        else:
+            _, player_tag, _ = player_info[0]
 
         embed = bot_utils.create_match_performance_embed(member.display_name, player_tag)
         await ctx.send(embed=embed)
@@ -243,10 +262,14 @@ class StatusReports(commands.Cog):
     @stats_report.error
     async def stats_report_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            player_tag = db_utils.get_player_tag(error.argument)
-            if player_tag is not None:
-                embed = bot_utils.create_match_performance_embed(error.argument, player_tag)
-                await ctx.send(embed=embed)
-            else:
+            player_info = db_utils.find_user_in_db(error.argument)
+
+            if len(player_info) == 0:
                 embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
-                await ctx.send(embed=embed)
+            elif len(player_info) == 1:
+                player_name, player_tag, _ = player_info[0]
+                embed = bot_utils.create_match_performance_embed(player_name, player_tag)
+            else:
+                embed = bot_utils.duplicate_names_embed(player_info, "stats_report")
+
+            await ctx.send(embed=embed)

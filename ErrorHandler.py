@@ -254,6 +254,24 @@ class ErrorHandler(commands.Cog):
                             value="The specified member either doesn't exist or there are multiple people with the same player name. If their name includes spaces, place quotes around their name.")
         return embed
 
+    
+    @staticmethod
+    def missing_db_info(display_name: str) -> discord.Embed:
+        """
+        Creates an embed for when a member exists but they do not yet exist in the database.
+
+        Args:
+            display_name(str): Display name of Discord user.
+
+        Returns:
+            discord.Embed: Embedded message with information about why command failed.
+        """
+        embed = discord.Embed(color=discord.Color.red())
+        embed.add_field(name="An unexpected error has occurred",
+                        value=f"{display_name} is on Discord but is not in the database. Make sure they've entered their player tag in the welcome channel.")
+        return embed
+
+
     @staticmethod
     def invoke_error_embed(msg: str) -> discord.Embed:
         """

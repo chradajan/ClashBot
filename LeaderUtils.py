@@ -196,39 +196,33 @@ class LeaderUtils(commands.Cog):
     @bot_utils.channel_check({COMMANDS_CHANNEL, KICKS_CHANNEL})
     async def kick(self, ctx, member: discord.Member):
         """Log that the specified user was kicked from the clan."""
-        player_tag = db_utils.get_player_tag(member.id)
+        player_info = db_utils.find_user_in_db(member.id)
+
+        if len(player_info) == 0:
+            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            await ctx.send(embed=embed)
+            return
+        else:
+            _, player_tag, _ = player_info[0]
+
         embed = bot_utils.kick(member.display_name, player_tag)
         await ctx.send(embed=embed)
 
     @kick.error
     async def kick_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            player_tag = db_utils.get_player_tag(error.argument)
-            if player_tag is not None:
-                embed = bot_utils.kick(error.argument, player_tag)
-                await ctx.send(embed=embed)
-            else:
+            player_info = db_utils.find_user_in_db(error.argument)
+
+            if len(player_info) == 0:
                 embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
-                await ctx.send(embed=embed)
+            elif len(player_info) == 1:
+                player_name, player_tag, _ = player_info[0]
+                embed = bot_utils.kick(player_name, player_tag)
+            else:
+                embed = bot_utils.duplicate_names_embed(player_info, "kick")
 
+            await ctx.send(embed=embed)
 
-    async def undo_kick_helper(self, ctx, player_name: str, player_tag: str):
-        """
-        Undo the latest kick of the specified user and send an embed with details about the kick.
-
-        Args:
-            player_name(str): Name of player to undo kick for.
-            player_tag(str): Tag of player to undo kick for.
-        """
-        removed_kick = db_utils.undo_kick(player_tag)
-        embed = discord.Embed(title="Kick Undone")
-
-        if removed_kick is None:
-            embed.add_field(name=player_name, value="This user has no kicks to undo.")
-        else:
-            embed.add_field(name=player_name, value=f"```Undid kick from: {removed_kick}```")
-
-        await ctx.send(embed=embed)
 
     """
     Command: !undo_kick {player_name}
@@ -240,15 +234,29 @@ class LeaderUtils(commands.Cog):
     @bot_utils.channel_check({COMMANDS_CHANNEL, KICKS_CHANNEL})
     async def undo_kick(self, ctx, member: discord.Member):
         """Undo the latest kick of the specified user."""
-        player_tag = db_utils.get_player_tag(member.id)
-        await self.undo_kick_helper(ctx, member.display_name, player_tag)
+        player_info = db_utils.find_user_in_db(member.id)
+
+        if len(player_info) == 0:
+            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            await ctx.send(embed=embed)
+            return
+        else:
+            _, player_tag, _ = player_info[0]
+
+        embed = bot_utils.undo_kick(member.display_name, player_tag)
+        await ctx.send(embed=embed)
 
     @undo_kick.error
     async def undo_kick_error(self, ctx, error):
         if isinstance(error, commands.errors.MemberNotFound):
-            player_tag = db_utils.get_player_tag(error.argument)
-            if player_tag is not None:
-                await self.undo_kick_helper(ctx, error.argument, player_tag)
-            else:
+            player_info = db_utils.find_user_in_db(error.argument)
+
+            if len(player_info) == 0:
                 embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
-                await ctx.send(embed=embed)
+            elif len(player_info) == 1:
+                player_name, player_tag, _ = player_info[0]
+                embed = bot_utils.undo_kick(player_name, player_tag)
+            else:
+                embed = bot_utils.duplicate_names_embed(player_info, "undo_kick")
+
+            await ctx.send(embed=embed)
