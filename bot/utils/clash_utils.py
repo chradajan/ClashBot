@@ -1,13 +1,21 @@
+"""
+Miscellaneous utility functions that get data from the Clash Royale API.
+"""
+
 from concurrent.futures import ThreadPoolExecutor
-from config import PRIMARY_CLAN_TAG
-from credentials import CLASH_API_KEY
 from typing import List, Tuple
-import bot_utils
 import datetime
-import db_utils
 import json
 import re
 import requests
+
+# Config
+from config.config import PRIMARY_CLAN_TAG
+from config.credentials import CLASH_API_KEY
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.db_utils as db_utils
 
 
 def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> dict:

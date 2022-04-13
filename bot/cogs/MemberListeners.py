@@ -1,11 +1,33 @@
-from config import *
+"""
+Listener functions. Handles members joining/leaving, sending welcome messages, and reacting to specific messages.
+"""
+
 from discord.ext import commands
-import bot_utils
-import clash_utils
-import db_utils
 import discord
 
+# Config
+from config.config import (
+    ADMIN_ROLE_NAME,
+    LEADER_ROLE_NAME,
+    VISITOR_ROLE_NAME,
+    CHECK_RULES_ROLE_NAME,
+    NEW_ROLE_NAME,
+    RULES_CHANNEL,
+    NEW_CHANNEL,
+    KICKS_CHANNEL,
+    LEADER_INFO_CHANNEL,
+    PRIMARY_CLAN_TAG,
+    PRIMARY_CLAN_NAME
+)
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.clash_utils as clash_utils
+import utils.db_utils as db_utils
+
+
 class MemberListeners(commands.Cog):
+    """Various listener functions."""
     def __init__(self, bot):
         self.bot = bot
         self.kick_messages = {}

@@ -1,25 +1,44 @@
-from config import *
-from credentials import BOT_TOKEN
+"""
+Creates/starts the bot and handles automated routines.
+"""
+
 from discord.ext import commands
 from pretty_help import DefaultMenu, PrettyHelp
 import aiocron
-import asyncio
-import bot_utils
-import clash_utils
 import datetime
-import db_utils
 import discord
 
-#Cogs
-import AutomationTools
-import ErrorHandler
-import LeaderUtils
-import MemberListeners
-import MemberUtils
-import StatusReports
-import Strikes
-import UserUpdates
-import Vacation
+# Cogs
+from cogs.AutomationTools import AutomationTools
+from cogs.ErrorHandler import ErrorHandler
+from cogs.LeaderUtils import LeaderUtils
+from cogs.MemberListeners import MemberListeners
+from cogs.MemberUtils import MemberUtils
+from cogs.StatusReports import StatusReports
+from cogs.Strikes import Strikes
+from cogs.UserUpdates import UserUpdates
+from cogs.Vacation import Vacation
+
+# Config
+from config.config import (
+    GUILD_NAME,
+    ADMIN_ROLE_NAME,
+    LEADER_ROLE_NAME,
+    ELDER_ROLE_NAME,
+    MEMBER_ROLE_NAME,
+    VISITOR_ROLE_NAME,
+    CHECK_RULES_ROLE_NAME,
+    NEW_ROLE_NAME,
+    TIME_OFF_CHANNEL,
+    COMMANDS_CHANNEL,
+    STRIKES_CHANNEL
+)
+from config.credentials import BOT_TOKEN
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.clash_utils as clash_utils
+import utils.db_utils as db_utils
 
 
 ########################################################
@@ -41,15 +60,15 @@ intents.members = True
 activity = discord.Game(name="Clash Royale")
 bot = commands.Bot(command_prefix='!', activity=activity, help_command=PrettyHelp(navigation=menu, color=discord.Colour.green()), intents=intents)
 
-bot.add_cog(AutomationTools.AutomationTools(bot))
-bot.add_cog(LeaderUtils.LeaderUtils(bot))
-bot.add_cog(MemberListeners.MemberListeners(bot))
-bot.add_cog(MemberUtils.MemberUtils(bot))
-bot.add_cog(StatusReports.StatusReports(bot))
-bot.add_cog(Strikes.Strikes(bot))
-bot.add_cog(UserUpdates.UserUpdates(bot))
-bot.add_cog(Vacation.Vacation(bot))
-bot.add_cog(ErrorHandler.ErrorHandler(bot))
+bot.add_cog(AutomationTools(bot))
+bot.add_cog(LeaderUtils(bot))
+bot.add_cog(MemberListeners(bot))
+bot.add_cog(MemberUtils(bot))
+bot.add_cog(StatusReports(bot))
+bot.add_cog(Strikes(bot))
+bot.add_cog(UserUpdates(bot))
+bot.add_cog(Vacation(bot))
+bot.add_cog(ErrorHandler(bot))
 
 
 @bot.event

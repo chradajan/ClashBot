@@ -1,11 +1,20 @@
-from config import *
+"""Strikes cog. Various commands to update strike counts."""
+
 from discord.ext import commands
 from prettytable import PrettyTable
-import bot_utils
-import clash_utils
-import db_utils
 import discord
-import ErrorHandler
+
+# Cogs
+from cogs.ErrorHandler import ErrorHandler
+
+# Config
+from config.config import COMMANDS_CHANNEL, STRIKES_CHANNEL
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.clash_utils as clash_utils
+import utils.db_utils as db_utils
+
 
 class Strikes(commands.Cog):
     """Commands for updating strike counts."""
@@ -51,7 +60,7 @@ class Strikes(commands.Cog):
         player_info = db_utils.find_user_in_db(member.id)
 
         if len(player_info) == 0:
-            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
         else:
@@ -65,7 +74,7 @@ class Strikes(commands.Cog):
             player_info = db_utils.find_user_in_db(error.argument)
 
             if len(player_info) == 0:
-                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                embed = ErrorHandler.member_not_found_embed(False)
                 await ctx.send(embed=embed)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
@@ -83,7 +92,7 @@ class Strikes(commands.Cog):
         player_info = db_utils.find_user_in_db(member.id)
 
         if len(player_info) == 0:
-            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
         else:
@@ -97,7 +106,7 @@ class Strikes(commands.Cog):
             player_info = db_utils.find_user_in_db(error.argument)
 
             if len(player_info) == 0:
-                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                embed = ErrorHandler.member_not_found_embed(False)
                 await ctx.send(embed=embed)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]

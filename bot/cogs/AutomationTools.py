@@ -1,9 +1,18 @@
-from config import *
+"""
+Automation cog. Handles getting/setting the status of automated strikes/reminders.
+"""
+
 from discord.ext import commands
 from prettytable import PrettyTable
-import bot_utils
-import db_utils
 import discord
+
+# Config
+from config.config import COMMANDS_CHANNEL
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.db_utils as db_utils
+
 
 class AutomationTools(commands.Cog):
     """Commands to view/set automation status"""

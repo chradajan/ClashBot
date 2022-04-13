@@ -1,10 +1,17 @@
-from config import *
+"""
+Global error handler.
+"""
+
 from difflib import SequenceMatcher
 from discord.ext import commands
-import bot_utils
 import discord
 
-special_member_not_found_handling_commands = {"kick", "undo_kick", "player_report", "stats_report", "give_strike", "remove_strike"}
+# Config
+from config.config import NEW_CHANNEL
+
+# Utils
+import utils.bot_utils as bot_utils
+
 
 class ErrorHandler(commands.Cog):
     """Error handling cog."""
@@ -12,6 +19,14 @@ class ErrorHandler(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.prefix = '!'
+        self.special_member_not_found_handling_commands = {
+            "kick",
+            "undo_kick",
+            "player_report",
+            "stats_report",
+            "give_strike",
+            "remove_strike"
+        }
 
     def command_usage(self, command: commands.Command, msg: str="Command should be formatted as:\n") -> str:
         """
@@ -83,7 +98,7 @@ class ErrorHandler(commands.Cog):
             await ctx.send(embed=embed)
 
         elif isinstance(error, commands.errors.MemberNotFound):
-            if ctx.command.name in special_member_not_found_handling_commands:
+            if ctx.command.name in self.special_member_not_found_handling_commands:
                 return
             embed = self.member_not_found_embed(True)
             await ctx.send(embed=embed)

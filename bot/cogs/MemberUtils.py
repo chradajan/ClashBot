@@ -1,10 +1,17 @@
-from config import *
+"""Member Utils cog. Various commands available to all users."""
+
 from discord.ext import commands
 from prettytable import PrettyTable
-import bot_utils
-import clash_utils
-import db_utils
 import discord
+
+# Config
+from config.config import TIME_OFF_CHANNEL
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.clash_utils as clash_utils
+import utils.db_utils as db_utils
+
 
 class MemberUtils(commands.Cog):
     """Miscellaneous utilities for everyone."""

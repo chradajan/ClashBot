@@ -1,12 +1,31 @@
-from cgitb import text
-from config import *
+"""
+Leader utils cog. Various leadership only commands.
+"""
+
 from discord.ext import commands
 from prettytable import PrettyTable
-import bot_utils
-import clash_utils
-import db_utils
 import discord
-import ErrorHandler
+
+# Cogs
+from cogs.ErrorHandler import ErrorHandler
+
+# Config
+from config.config import (
+    ADMIN_ROLE_NAME,
+    LEADER_ROLE_NAME,
+    CHECK_RULES_ROLE_NAME,
+    COMMANDS_CHANNEL,
+    REMINDER_CHANNEL,
+    FAME_CHANNEL,
+    KICKS_CHANNEL,
+    DEFAULT_REMINDER_MESSAGE
+)
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.clash_utils as clash_utils
+import utils.db_utils as db_utils
+
 
 class LeaderUtils(commands.Cog):
     """Miscellaneous utilities for leaders/admins."""
@@ -79,7 +98,7 @@ class LeaderUtils(commands.Cog):
     async def mention_users_error(self, ctx, error):
         if isinstance(error, commands.errors.CommandInvokeError):
             err_msg = f"ClashBot does not have permission to send messages in the specified channel."
-            embed = ErrorHandler.ErrorHandler.invoke_error_embed(err_msg)
+            embed = ErrorHandler.invoke_error_embed(err_msg)
             await ctx.send(embed=embed)
             return
 
@@ -160,7 +179,7 @@ class LeaderUtils(commands.Cog):
         player_info = db_utils.find_user_in_db(member.id)
 
         if len(player_info) == 0:
-            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
         else:
@@ -175,7 +194,7 @@ class LeaderUtils(commands.Cog):
             player_info = db_utils.find_user_in_db(error.argument)
 
             if len(player_info) == 0:
-                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                embed = ErrorHandler.member_not_found_embed(False)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
                 embed = bot_utils.kick(player_name, player_tag)
@@ -193,7 +212,7 @@ class LeaderUtils(commands.Cog):
         player_info = db_utils.find_user_in_db(member.id)
 
         if len(player_info) == 0:
-            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
         else:
@@ -208,7 +227,7 @@ class LeaderUtils(commands.Cog):
             player_info = db_utils.find_user_in_db(error.argument)
 
             if len(player_info) == 0:
-                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                embed = ErrorHandler.member_not_found_embed(False)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
                 embed = bot_utils.undo_kick(player_name, player_tag)

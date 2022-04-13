@@ -1,19 +1,43 @@
-from config import *
+"""
+Miscellaneous bot utility functions.
+"""
+
 from difflib import SequenceMatcher
 from discord.ext import commands
 from enum import Enum
 from prettytable import PrettyTable
 from typing import List, Tuple
-import blacklist
 import cv2
 import discord
-import clash_utils
 import datetime
-import db_utils
 import numpy
 import os
 import pytesseract
 import re
+
+# Config
+from config.blacklist import BLACKLIST
+from config.config import (
+    GUILD_NAME,
+    ADMIN_ROLE_NAME,
+    LEADER_ROLE_NAME,
+    ELDER_ROLE_NAME,
+    MEMBER_ROLE_NAME,
+    VISITOR_ROLE_NAME,
+    CHECK_RULES_ROLE_NAME,
+    NEW_ROLE_NAME,
+    RULES_CHANNEL,
+    REMINDER_CHANNEL,
+    NEW_CHANNEL,
+    PRIMARY_CLAN_NAME,
+    PRIMARY_CLAN_TAG,
+    DEFAULT_REMINDER_MESSAGE
+)
+
+# Utils
+import utils.clash_utils as clash_utils
+import utils.db_utils as db_utils
+
 
 ######################################################
 #                                                    #
@@ -204,7 +228,7 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
         current_roles = set(member.roles).intersection({NORMAL_ROLES[MEMBER_ROLE_NAME], NORMAL_ROLES[VISITOR_ROLE_NAME], NORMAL_ROLES[ELDER_ROLE_NAME]})
         correct_roles = { NORMAL_ROLES[member_status] }
 
-        if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in blacklist.blacklist):
+        if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in BLACKLIST):
             correct_roles.add(NORMAL_ROLES[ELDER_ROLE_NAME])
 
         if correct_roles != current_roles:

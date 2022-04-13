@@ -1,12 +1,21 @@
-from config import *
+"""Status Report cog. Various report commands available to leadership."""
+
 from discord.ext import commands
 from prettytable import PrettyTable
-import bot_utils
-import clash_utils
 import datetime
-import db_utils
 import discord
-import ErrorHandler
+
+# Cogs
+from cogs.ErrorHandler import ErrorHandler
+
+# Config
+from config.config import COMMANDS_CHANNEL
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.clash_utils as clash_utils
+import utils.db_utils as db_utils
+
 
 class StatusReports(commands.Cog):
     """Commands to get different status reports."""
@@ -184,7 +193,7 @@ class StatusReports(commands.Cog):
         player_info = db_utils.find_user_in_db(member.id)
 
         if len(player_info) == 0:
-            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
         else:
@@ -193,7 +202,7 @@ class StatusReports(commands.Cog):
         user_data = db_utils.get_user_data(player_tag)
 
         if user_data is None:
-            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
 
@@ -205,14 +214,14 @@ class StatusReports(commands.Cog):
             player_info = db_utils.find_user_in_db(error.argument)
 
             if len(player_info) == 0:
-                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                embed = ErrorHandler.member_not_found_embed(False)
                 await ctx.send(embed=embed)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
                 user_data = db_utils.get_user_data(player_tag)
 
                 if user_data is None:
-                    embed = ErrorHandler.ErrorHandler.missing_db_info(player_name)
+                    embed = ErrorHandler.missing_db_info(player_name)
                     await ctx.send(embed=embed)
                     return
 
@@ -230,7 +239,7 @@ class StatusReports(commands.Cog):
         player_info = db_utils.find_user_in_db(member.id)
 
         if len(player_info) == 0:
-            embed = ErrorHandler.ErrorHandler.missing_db_info(member.display_name)
+            embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
         else:
@@ -245,7 +254,7 @@ class StatusReports(commands.Cog):
             player_info = db_utils.find_user_in_db(error.argument)
 
             if len(player_info) == 0:
-                embed = ErrorHandler.ErrorHandler.member_not_found_embed(False)
+                embed = ErrorHandler.member_not_found_embed(False)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
                 embed = bot_utils.create_match_performance_embed(player_name, player_tag)

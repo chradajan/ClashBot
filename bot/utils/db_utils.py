@@ -1,14 +1,28 @@
+"""
+Miscellanous utility functions that interface with the database.
+"""
+
 from discord import player
-from config import PRIMARY_CLAN_TAG
-from credentials import IP, USERNAME, PASSWORD, DB_NAME
 from typing import List, Set, Tuple, Union
-import blacklist
-import bot_utils
-import clash_utils
 import datetime
 import os
 import pymysql
 import xlsxwriter
+
+# Config
+from config.blacklist import BLACKLIST
+from config.config import PRIMARY_CLAN_TAG
+from config.credentials import (
+    IP,
+    USERNAME,
+    PASSWORD,
+    DB_NAME
+)
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.clash_utils as clash_utils
+
 
 ######################################################
 #                                                    #
@@ -129,7 +143,7 @@ def add_new_user(clash_data: dict) -> bool:
     insert_assigned_roles_query = "INSERT INTO assigned_roles VALUES (%s, %s)"
     cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
 
-    if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in blacklist.blacklist):
+    if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in BLACKLIST):
         role_string = "Elder"
         cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role_string))
         query_result = cursor.fetchone()

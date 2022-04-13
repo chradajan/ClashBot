@@ -1,10 +1,22 @@
-from config import *
+"""User updates cog. Various commands for leadership to update Discord members."""
+
 from discord.ext import commands
-from prettytable import PrettyTable
-import bot_utils
-import db_utils
 import discord
-import ErrorHandler
+
+# Cogs
+from cogs.ErrorHandler import ErrorHandler
+
+# Config
+from config.config import (
+    ADMIN_ROLE_NAME,
+    CHECK_RULES_ROLE_NAME,
+    NEW_ROLE_NAME,
+    COMMANDS_CHANNEL
+)
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.db_utils as db_utils
 
 class UserUpdates(commands.Cog):
     """Commands for updating/resetting users."""
@@ -47,7 +59,7 @@ class UserUpdates(commands.Cog):
     @update_user.error
     async def update_user_error(self, ctx, error):
         if isinstance(error, commands.errors.CommandInvokeError):
-            embed = ErrorHandler.ErrorHandler.invoke_error_embed("Another player on this server is already associated with the player tag you entered.")
+            embed = ErrorHandler.invoke_error_embed("Another player on this server is already associated with the player tag you entered.")
             await ctx.send(embed=embed)
 
 

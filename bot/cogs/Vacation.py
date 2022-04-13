@@ -1,9 +1,15 @@
-from config import *
+"""Vacation cog. Vacation commands for leadership to update vacation status of other users."""
+
 from discord.ext import commands
 from prettytable import PrettyTable
-import bot_utils
-import db_utils
 import discord
+
+# Config
+from config.config import COMMANDS_CHANNEL, TIME_OFF_CHANNEL
+
+# Utils
+import utils.bot_utils as bot_utils
+import utils.db_utils as db_utils
 
 class Vacation(commands.Cog):
     """Commands for setting setting/viewing vacation status of users."""
