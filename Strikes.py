@@ -43,11 +43,6 @@ class Strikes(commands.Cog):
             await channel.send(f"{member.mention} {message}.  {old_strike_count} -> {new_strike_count}")
 
 
-    """
-    Command: !give_strike {member}
-
-    Give specified user 1 strike.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -80,11 +75,6 @@ class Strikes(commands.Cog):
                 await ctx.send(embed=embed)
 
 
-    """
-    Command: !remove_strike {member}
-
-    Remove 1 strike from specified user.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -117,16 +107,11 @@ class Strikes(commands.Cog):
                 await ctx.send(embed=embed)
 
 
-    """
-    Command: !reset_all_strikes
-
-    Set all members to 0 strikes.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def reset_all_strikes(self, ctx):
-        """Reset each member's strikes to 0. Permanent strikes are not affected."""
+        """Reset everyone's strikes to 0. Permanent strikes are not affected."""
         db_utils.reset_strikes()
 
         channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
@@ -138,11 +123,6 @@ class Strikes(commands.Cog):
         await ctx.send(embed=commands_channel_embed)
 
 
-    """
-    Command: !strikes_report
-
-    Get a list of users with at least 1 strike.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -191,11 +171,7 @@ class Strikes(commands.Cog):
             embed.add_field(name="Strikes Report", value="No users currently have strikes")
             await ctx.send(embed=embed)
 
-    """
-    Command: !upcoming_strikes
 
-    Get a list of users who will be receiving a strike.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -237,4 +213,3 @@ class Strikes(commands.Cog):
 
         if send_second_embed:
             await ctx.send(embed=embed_two)
-

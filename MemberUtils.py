@@ -13,15 +13,10 @@ class MemberUtils(commands.Cog):
         self.bot = bot
 
 
-    """
-    Command: !river_race_status
-
-    Show a list of clans in the current river race and how many decks they have remaining today.
-    """
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
     async def river_race_status(self, ctx, show_predictions: bool=False):
-        """Send a list of clans in the current river race and their number of decks remaining today."""
+        """Send a list of clans in the current river race and how battles they can still do today."""
         clans = clash_utils.get_clan_decks_remaining()
         embed = discord.Embed()
 
@@ -72,15 +67,10 @@ all possible remaining decks."""
             await ctx.send(embed=catch_up_embed)
 
 
-    """
-    Command: !set_reminder_time {reminder_time}
-
-    Allow individual users to set their reminder time to US or EU.
-    """
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
     async def set_reminder_time(self, ctx, reminder_time: str):
-        """Set reminder time to either US or EU. US reminders go out at 01:00 UTC. EU reminders go out at 17:00 UTC."""
+        """Set reminder time to either US or EU. US reminders go out at 02:00 UTC. EU reminders go out at 19:00 UTC."""
 
         time_zone: bot_utils.ReminderTime
         invalid_embed = discord.Embed(color=discord.Color.red())
@@ -102,15 +92,10 @@ all possible remaining decks."""
         await ctx.send(embed=success_embed)
 
 
-    """
-    Command: !vacation
-
-    Toggle the vacation status of the user who issued the command.
-    """
     @commands.command()
     @bot_utils.channel_check(TIME_OFF_CHANNEL)
     async def vacation(self, ctx):
-        """Toggles vacation status."""
+        """Toggle your vacation status."""
         vacation_status = db_utils.update_vacation_for_user(ctx.author.id)
 
         if vacation_status:
@@ -124,11 +109,6 @@ all possible remaining decks."""
         await ctx.send(embed=embed)
 
 
-    """
-    Command: !update
-
-    Update a user in the database.
-    """
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
     async def update(self, ctx):
@@ -148,15 +128,10 @@ all possible remaining decks."""
         await ctx.send(embed=embed)
 
 
-    """
-    Command: !strikes
-
-    Show a user how many strikes they currently have.
-    """
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
     async def strikes(self, ctx):
-        """Get your current strike count."""
+        """Check how many strikes you have."""
         strikes = db_utils.get_strikes(ctx.author.id)
 
         if strikes is None:
@@ -177,15 +152,10 @@ all possible remaining decks."""
         await ctx.send(embed=embed)
 
 
-    """
-    Command: !stats
-
-    Show a user their river race stats.
-    """
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
     async def stats(self, ctx):
-        """Get your river race performance stats."""
+        """Check your river race statistics."""
         player_info = db_utils.find_user_in_db(ctx.author.id)
 
         if len(player_info) == 0:

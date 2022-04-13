@@ -24,11 +24,7 @@ class UserUpdates(commands.Cog):
 
         db_utils.remove_user(member.id)
 
-    """
-    Command: !update_user {member} {player_tag}
 
-    Update a specified user in the database.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -55,11 +51,6 @@ class UserUpdates(commands.Cog):
             await ctx.send(embed=embed)
 
 
-    """
-    Command: !reset_user {member}
-
-    Reset specified user .
-    """
     @commands.command()
     @bot_utils.is_admin_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -70,11 +61,6 @@ class UserUpdates(commands.Cog):
         await ctx.send(embed=embed)
 
 
-    """
-    Command: !reset_all_users
-
-    Reset all users and delete them from DB.
-    """
     @commands.command()
     @bot_utils.is_admin_command_check()
     @bot_utils.disallowed_command_check()

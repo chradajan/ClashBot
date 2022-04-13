@@ -15,16 +15,11 @@ class StatusReports(commands.Cog):
         self.bot = bot
 
 
-        """
-    Command: !decks_report
-
-    Get a list of users and their number of decks remaining today.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def decks_report(self, ctx):
-        """Get a report of players with decks remaining today."""
+        """Get a report of players with remaining battles today."""
         usage_info = clash_utils.get_remaining_decks_today_dicts()
         users_on_vacation = db_utils.get_users_on_vacation()
 
@@ -103,11 +98,6 @@ class StatusReports(commands.Cog):
                 await ctx.send("Members currently on vacation\n" + "```\n" + table.get_string() + "```")
 
 
-    """
-    Command: !medals_report {threshold}
-
-    Get a list of users below a specified fame threshold.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -186,11 +176,6 @@ class StatusReports(commands.Cog):
                             f"{user_data['player_name']}'s deck usage history" + "\n" + "```\n" + deck_usage_history_table.get_string() + "```")
 
 
-    """
-    Command: !player_report {member}
-
-    Get information about a member in the server.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -237,16 +222,11 @@ class StatusReports(commands.Cog):
                 await ctx.send(embed=embed)
 
 
-    """
-    Command: !stats_report {member}
-
-    Get war stats of specified user.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def stats_report(self, ctx, member: discord.Member):
-        """Get war stats of specified user."""
+        """Get specified user's river race statistics."""
         player_info = db_utils.find_user_in_db(member.id)
 
         if len(player_info) == 0:

@@ -14,11 +14,7 @@ class LeaderUtils(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    """
-    Command: !export {false_logic_only} {include_card_levels}
 
-    Export database information to spreadsheet.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -28,11 +24,6 @@ class LeaderUtils(commands.Cog):
         await ctx.send(file=discord.File(path))
 
 
-    """
-    Command: !update_all_members
-
-    Update all members of the server and apply any necessary Discord role changes.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -43,16 +34,11 @@ class LeaderUtils(commands.Cog):
         await ctx.send(embed=embed)
 
 
-    """
-    Command: !force_rules_check
-
-    Force all players back to rules channel until they acknowledge new rules.
-    """
     @commands.command()
     @bot_utils.is_admin_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def force_rules_check(self, ctx):
-        """Strip roles from all non-leaders until they acknowledge new rules. Clash bot will send message to react to in rules channel."""
+        """Strip roles from all non-admins until they acknowledge new rules. A new message to react to will be sent to the rules channel."""
         # Get a list of members in guild without any special roles (New, Check Rules, or Admin) and that aren't bots.
         members = [member for member in ctx.guild.members if ((len(set(bot_utils.SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
         roles_to_remove = list(bot_utils.NORMAL_ROLES.values())
@@ -75,16 +61,11 @@ class LeaderUtils(commands.Cog):
         await ctx.send(content=f"{admin_role.mention} {leader_role.mention}", embed=completed_embed)
 
 
-    """
-    Command: !mention_users {members} {channel} {message}
-
-    Have a bot tag specific users and send a message in a specified channel.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def mention_users(self, ctx, members: commands.Greedy[discord.Member], channel: discord.TextChannel, message: str):
-        """Send message to channel mentioning specified users. Message must be enclosed in quotes."""
+        """Send message to specified channel mentioning specified users. Message must be enclosed in quotes."""
         message_string = ""
 
         for member in members:
@@ -103,11 +84,6 @@ class LeaderUtils(commands.Cog):
             return
 
 
-    """
-    Command: !send_reminder {message}
-
-    Manually send automated reminder message. Optionally modify message.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -119,16 +95,11 @@ class LeaderUtils(commands.Cog):
         await bot_utils.deck_usage_reminder(self.bot, message=reminder_message, automated=False)
 
 
-    """
-    Command: !top_medals
-
-    Send a list of the members with the top medals to the fame channel.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def top_medals(self, ctx):
-        """Send a list of top users by medals in the fame channel."""
+        """Send a list of top users by medals to the fame channel."""
         top_members = clash_utils.get_top_medal_users()
         fame_channel = discord.utils.get(ctx.guild.channels, name=FAME_CHANNEL)
         table = PrettyTable()
@@ -146,11 +117,6 @@ class LeaderUtils(commands.Cog):
             await fame_channel.send("Top members by medals\n" + "```\n" + table.get_string() + "```")
 
 
-    """
-    Command: !medals_check {threshold}
-
-    Mention users below the threshold in the fame channel.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -186,11 +152,6 @@ class LeaderUtils(commands.Cog):
         await fame_channel.send(fame_string)
 
 
-    """
-    Command: !kick {player_name}
-
-    Add a kick entry to the database with the current time for specified user.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check({COMMANDS_CHANNEL, KICKS_CHANNEL})
@@ -224,11 +185,6 @@ class LeaderUtils(commands.Cog):
             await ctx.send(embed=embed)
 
 
-    """
-    Command: !undo_kick {player_name}
-
-    Undo the latest kick for specified user.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check({COMMANDS_CHANNEL, KICKS_CHANNEL})

@@ -11,11 +11,7 @@ class Vacation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    """
-    Command: !set_vacation {member} {status}
 
-    Toggle the vacation status of the specified user.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
@@ -27,11 +23,6 @@ class Vacation(commands.Cog):
         await channel.send(f"Updated vacation status of {member.mention} to: {vacation_status_string}.")
 
 
-    """
-    Command: !vacation_list
-
-    Print a list of all users currently on vacation.
-    """
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)

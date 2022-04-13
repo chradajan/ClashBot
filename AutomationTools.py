@@ -11,17 +11,11 @@ class AutomationTools(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-
-    """
-    Command: !automation_status
-
-    Get current automated reminder/strike status.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def automation_status(self, ctx):
-        """Get status for automated strikes and reminders."""
+        """Get status of automated strikes and reminders."""
         reminder_status = "ENABLED" if db_utils.get_reminder_status() else "DISABLED"
         strike_status = "ENABLED" if db_utils.get_strike_status() else "DISABLED"
 
@@ -34,16 +28,11 @@ class AutomationTools(commands.Cog):
         await ctx.send(embed=embed)
 
 
-    """
-    Command: !set_automated_reminders {status}
-
-    Enable/disable automated reminders.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def set_automated_reminders(self, ctx, status: bool):
-        """Set whether automated reminders should be sent."""
+        """Set automated reminders on/off."""
         db_utils.set_reminder_status(status)
 
         if status:
@@ -56,16 +45,11 @@ class AutomationTools(commands.Cog):
         await ctx.send(embed=embed)
 
 
-    """
-    Command: !set_automated_strikes {status}
-
-    Enable/disable automated strikes.
-    """
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.channel_check(COMMANDS_CHANNEL)
     async def set_automated_strikes(self, ctx, status: bool):
-        """Set whether automated strikes should be given."""
+        """Set automated strikes on/off"""
         db_utils.set_strike_status(status)
 
         if status:
