@@ -1078,11 +1078,10 @@ def clean_up_db(active_members: dict=None):
     if len(active_members) == 0:
         return
 
-    cursor.execute("SELECT id, player_name, player_tag, discord_name, discord_id, status FROM users")
+    cursor.execute("SELECT player_name, player_tag, discord_name, discord_id, status FROM users")
     query_result = cursor.fetchall()
 
     for user in query_result:
-        id = user["id"]
         player_tag = user["player_tag"]
         discord_name = user["discord_name"]
         discord_id = user["discord_id"]
