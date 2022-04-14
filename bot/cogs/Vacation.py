@@ -4,10 +4,8 @@ from discord.ext import commands
 from prettytable import PrettyTable
 import discord
 
-# Config
-from config.config import COMMANDS_CHANNEL, TIME_OFF_CHANNEL
-
 # Utils
+from utils.channel_utils import CHANNEL
 import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
 
@@ -20,18 +18,17 @@ class Vacation(commands.Cog):
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def set_vacation(self, ctx, member: discord.Member, status: bool):
         """Set vacation status for the specified member."""
-        channel = discord.utils.get(ctx.guild.channels, name=TIME_OFF_CHANNEL)
         vacation_status = db_utils.update_vacation_for_user(member.id, status)
         vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
-        await channel.send(f"Updated vacation status of {member.mention} to: {vacation_status_string}.")
+        await CHANNEL.time_off().send(f"Updated vacation status of {member.mention} to: {vacation_status_string}.")
 
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def vacation_list(self, ctx):
         """Get a list of all users currently on vacation."""
         users_on_vacation = db_utils.get_users_on_vacation()

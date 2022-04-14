@@ -20,22 +20,12 @@ from cogs.UserUpdates import UserUpdates
 from cogs.Vacation import Vacation
 
 # Config
-from config.config import (
-    GUILD_NAME,
-    ADMIN_ROLE_NAME,
-    LEADER_ROLE_NAME,
-    ELDER_ROLE_NAME,
-    MEMBER_ROLE_NAME,
-    VISITOR_ROLE_NAME,
-    CHECK_RULES_ROLE_NAME,
-    NEW_ROLE_NAME,
-    TIME_OFF_CHANNEL,
-    COMMANDS_CHANNEL,
-    STRIKES_CHANNEL
-)
+from config.config import GUILD_NAME
 from config.credentials import BOT_TOKEN
 
 # Utils
+from utils.channel_utils import CHANNEL, prepare_channels
+from utils.role_utils import prepare_roles
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
@@ -70,21 +60,13 @@ bot.add_cog(UserUpdates(bot))
 bot.add_cog(Vacation(bot))
 bot.add_cog(ErrorHandler(bot))
 
-
 @bot.event
 async def on_ready():
-    for guild in bot.guilds:
-        if guild.name == GUILD_NAME:
-            bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME] = discord.utils.get(guild.roles, name=ADMIN_ROLE_NAME)
-            bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME] = discord.utils.get(guild.roles, name=NEW_ROLE_NAME)
-            bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] = discord.utils.get(guild.roles, name=CHECK_RULES_ROLE_NAME)
-            bot_utils.NORMAL_ROLES[VISITOR_ROLE_NAME] = discord.utils.get(guild.roles, name=VISITOR_ROLE_NAME)
-            bot_utils.NORMAL_ROLES[MEMBER_ROLE_NAME] = discord.utils.get(guild.roles, name=MEMBER_ROLE_NAME)
-            bot_utils.NORMAL_ROLES[ELDER_ROLE_NAME] = discord.utils.get(guild.roles, name=ELDER_ROLE_NAME)
-            bot_utils.NORMAL_ROLES[LEADER_ROLE_NAME] = discord.utils.get(guild.roles, name=LEADER_ROLE_NAME)
+    guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
+    prepare_channels(guild)
+    prepare_roles(guild)
 
     print("Bot Ready")
-
 
 
 #########################################################################################
@@ -106,7 +88,7 @@ async def automated_reminder_eu():
     Send reminder every Thursday, Friday, Saturday, and Sunday at 19:00 UTC.
     """
     if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
-        await bot_utils.deck_usage_reminder(bot, time_zone=bot_utils.ReminderTime.EU)
+        await bot_utils.deck_usage_reminder(time_zone=bot_utils.ReminderTime.EU)
 
 
 @aiocron.crontab('0 2 * * 5,6,0,1')
@@ -115,7 +97,7 @@ async def automated_reminder_us():
     Send reminder every Friday, Saturday, Sunday, and Monday at 02:00 UTC.
     """
     if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
-        await bot_utils.deck_usage_reminder(bot, time_zone=bot_utils.ReminderTime.US)
+        await bot_utils.deck_usage_reminder(time_zone=bot_utils.ReminderTime.US)
 
 
 @aiocron.crontab('0 8 * * 5,6,0,1')
@@ -124,7 +106,7 @@ async def last_call_automated_reminder():
     Send a reminder every day ~1.5 hours before reset time (08:00 UTC).
     """
     if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
-        await bot_utils.deck_usage_reminder(bot)
+        await bot_utils.deck_usage_reminder()
 
 
 @aiocron.crontab('0 10 * * 0')
@@ -140,10 +122,6 @@ async def assign_strikes_and_clear_vacation():
     """
     Assign strikes and clear vacation every Monday 18:00 UTC (Monday 11:00am PDT).
     """
-    guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
-    vacation_channel = discord.utils.get(guild.channels, name=TIME_OFF_CHANNEL)
-    strikes_channel = discord.utils.get(guild.channels, name=STRIKES_CHANNEL)
-    commands_channel = discord.utils.get(guild.channels, name=COMMANDS_CHANNEL)
     completed_saturday = db_utils.is_completed_saturday()
     message = ""
     send_missing_data_message = False
@@ -190,16 +168,14 @@ async def assign_strikes_and_clear_vacation():
                                                           player_tag,
                                                           decks_used,
                                                           decks_required,
-                                                          tracked_since,
-                                                          strikes_channel,
-                                                          commands_channel)
+                                                          tracked_since)
                 continue
 
             perfect_week = False
             member = None
 
             if discord_id is not None:
-                member = discord.utils.get(strikes_channel.members, id=discord_id)
+                member = discord.utils.get(CHANNEL.strikes().members, id=discord_id)
 
             if member is not None:
                 mention_string += f"{member.mention} "
@@ -225,19 +201,19 @@ async def assign_strikes_and_clear_vacation():
     db_utils.clear_all_vacation()
     vacation_embed = discord.Embed()
     vacation_embed.add_field(name="Vacation status has been reset for all users.", value="Make sure to use !vacation before the next war if you're going to miss it.")
-    await vacation_channel.send(embed=vacation_embed)
-    await strikes_channel.send(message)
+    await CHANNEL.time_off().send(embed=vacation_embed)
+    await CHANNEL.strikes().send(message)
 
     if not perfect_week:
-        await strikes_channel.send(embed=embed_one)
+        await CHANNEL.strikes().send(embed=embed_one)
 
         if field_count == 25:
-            await strikes_channel.send(embed=embed_two)
+            await CHANNEL.strikes().send(embed=embed_two)
 
     if send_missing_data_message:
         missing_data_embed = discord.Embed()
         missing_data_embed.add_field(name="Missing Data Warning", value="War participation data is missing for one or more days. Threshold for assigning strikes has been adjusted accordingly.")
-        await strikes_channel.send(embed=missing_data_embed)
+        await CHANNEL.strikes().send(embed=missing_data_embed)
 
 
 prev_deck_usage_sum = -1

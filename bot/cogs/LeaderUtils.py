@@ -10,18 +10,11 @@ import discord
 from cogs.ErrorHandler import ErrorHandler
 
 # Config
-from config.config import (
-    ADMIN_ROLE_NAME,
-    LEADER_ROLE_NAME,
-    CHECK_RULES_ROLE_NAME,
-    COMMANDS_CHANNEL,
-    REMINDER_CHANNEL,
-    FAME_CHANNEL,
-    KICKS_CHANNEL,
-    DEFAULT_REMINDER_MESSAGE
-)
+from config.config import DEFAULT_REMINDER_MESSAGE
 
 # Utils
+from utils.channel_utils import CHANNEL
+from utils.role_utils import ROLE
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
@@ -36,7 +29,7 @@ class LeaderUtils(commands.Cog):
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def export(self, ctx, false_logic_only: bool=True, include_card_levels: bool=False):
         """Export database to Excel spreadsheet."""
         path = db_utils.export(false_logic_only, include_card_levels)
@@ -45,7 +38,7 @@ class LeaderUtils(commands.Cog):
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def update_all_members(self, ctx: commands.Context):
         """Update all members in the server and apply any necessary Discord role updates."""
         await bot_utils.update_all_members(ctx.guild)
@@ -55,34 +48,32 @@ class LeaderUtils(commands.Cog):
 
     @commands.command()
     @bot_utils.is_admin_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def force_rules_check(self, ctx):
         """Strip roles from all non-admins until they acknowledge new rules. A new message to react to will be sent to the rules channel."""
         # Get a list of members in guild without any special roles (New, Check Rules, or Admin) and that aren't bots.
-        members = [member for member in ctx.guild.members if ((len(set(bot_utils.SPECIAL_ROLES.values()).intersection(set(member.roles))) == 0) and (not member.bot))]
-        roles_to_remove = list(bot_utils.NORMAL_ROLES.values())
+        members = [member for member in ctx.guild.members if ((len(set(ROLE.special_roles()).intersection(set(member.roles))) == 0) and (not member.bot))]
+        roles_to_remove = ROLE.normal_roles()
         starting_embed = discord.Embed(title="Beginning to update roles. This will take a few minutes.", color=0xFFFF00)
         await ctx.send(embed=starting_embed)
 
         for member in members:
             # Get a list of normal roles (Visitor, Member, Elder, or Leader) that a member current has. These will be restored after reacting to rules message.
-            roles_to_commit = [ role.name for role in list(set(bot_utils.NORMAL_ROLES.values()).intersection(set(member.roles))) ]
+            roles_to_commit = [role.name for role in list(set(ROLE.normal_roles()).intersection(set(member.roles)))]
             db_utils.commit_roles(member.id, roles_to_commit)
             await member.remove_roles(*roles_to_remove)
-            await member.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
+            await member.add_roles(ROLE.check_rules())
 
         await bot_utils.send_rules_message(ctx, self.bot.user)
-        admin_role = bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME]
-        leader_role = bot_utils.NORMAL_ROLES[LEADER_ROLE_NAME]
         completed_embed = discord.Embed(color=discord.Color.green())
         completed_embed.add_field(name="Force rules check complete",
                                   value="Don't forget to react to the new rules too if you are an Admin or Leader.")
-        await ctx.send(content=f"{admin_role.mention} {leader_role.mention}", embed=completed_embed)
+        await ctx.send(content=f"{ROLE.admin().mention} {ROLE.leader().mention}", embed=completed_embed)
 
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def mention_users(self, ctx, members: commands.Greedy[discord.Member], channel: discord.TextChannel, message: str):
         """Send message to specified channel mentioning specified users. Message must be enclosed in quotes."""
         message_string = ""
@@ -105,22 +96,21 @@ class LeaderUtils(commands.Cog):
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def send_reminder(self, ctx, *message):
         """Send message to reminders channel tagging users who still have battles to complete. Excludes members currently on vacation. Optionally specify the message you want sent with the reminder."""
         reminder_message = ' '.join(message)
         if len(reminder_message) == 0:
             reminder_message = DEFAULT_REMINDER_MESSAGE
-        await bot_utils.deck_usage_reminder(self.bot, message=reminder_message, automated=False)
+        await bot_utils.deck_usage_reminder(message=reminder_message, automated=False)
 
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def top_medals(self, ctx):
         """Send a list of top users by medals to the fame channel."""
         top_members = clash_utils.get_top_medal_users()
-        fame_channel = discord.utils.get(ctx.guild.channels, name=FAME_CHANNEL)
         table = PrettyTable()
         table.field_names = ["Member", "Medals"]
         embed = discord.Embed()
@@ -131,19 +121,18 @@ class LeaderUtils(commands.Cog):
         embed.add_field(name="Top members by medals", value="```\n" + table.get_string() + "```")
 
         try:
-            await fame_channel.send(embed=embed)
+            await CHANNEL.fame().send(embed=embed)
         except:
-            await fame_channel.send("Top members by medals\n" + "```\n" + table.get_string() + "```")
+            await CHANNEL.fame().send("Top members by medals\n" + "```\n" + table.get_string() + "```")
 
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def medals_check(self, ctx, threshold: int):
         """Mention users below the specified fame threshold. Ignores users on vacation."""
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)
         users_on_vacation = db_utils.get_users_on_vacation()
-        fame_channel = discord.utils.get(ctx.guild.channels, name=REMINDER_CHANNEL)
 
         member_string = ""
         non_member_string = ""
@@ -156,7 +145,7 @@ class LeaderUtils(commands.Cog):
             discord_id = db_utils.get_member_id(player_tag)
 
             if discord_id is not None:
-                member = discord.utils.get(fame_channel.members, id=discord_id)
+                member = discord.utils.get(CHANNEL.fame().members, id=discord_id)
 
             if member is None:
                 non_member_string += f"{player_name} - Fame: {fame}" + "\n"
@@ -168,12 +157,12 @@ class LeaderUtils(commands.Cog):
             return
 
         fame_string = f"The following members are below {threshold} medals:" + "\n" + member_string + non_member_string
-        await fame_channel.send(fame_string)
+        await CHANNEL.fame().send(fame_string)
 
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check({COMMANDS_CHANNEL, KICKS_CHANNEL})
+    @bot_utils.kicks_channel_check()
     async def kick(self, ctx, member: discord.Member):
         """Log that the specified user was kicked from the clan."""
         player_info = db_utils.find_user_in_db(member.id)
@@ -206,7 +195,7 @@ class LeaderUtils(commands.Cog):
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check({COMMANDS_CHANNEL, KICKS_CHANNEL})
+    @bot_utils.kicks_channel_check()
     async def undo_kick(self, ctx, member: discord.Member):
         """Undo the latest kick of the specified user."""
         player_info = db_utils.find_user_in_db(member.id)

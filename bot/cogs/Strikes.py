@@ -7,10 +7,8 @@ import discord
 # Cogs
 from cogs.ErrorHandler import ErrorHandler
 
-# Config
-from config.config import COMMANDS_CHANNEL, STRIKES_CHANNEL
-
 # Utils
+from utils.channel_utils import CHANNEL
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
@@ -39,7 +37,6 @@ class Strikes(commands.Cog):
             await ctx.send(f"Something went wrong while updating {player_name}'s strikes. This should not happen.")
             return
 
-        channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
         message = "has received a strike" if delta > 0 else "has had a strike removed"
 
         embed = discord.Embed(title="Strikes Updated", color=discord.Color.green())
@@ -47,14 +44,14 @@ class Strikes(commands.Cog):
         await ctx.send(embed=embed)
 
         if member is None:
-            await channel.send(f"{player_name} {message}.  {old_strike_count} -> {new_strike_count}")
+            await CHANNEL.strikes().send(f"{player_name} {message}.  {old_strike_count} -> {new_strike_count}")
         else:
-            await channel.send(f"{member.mention} {message}.  {old_strike_count} -> {new_strike_count}")
+            await CHANNEL.strikes().send(f"{member.mention} {message}.  {old_strike_count} -> {new_strike_count}")
 
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def give_strike(self, ctx, member: discord.Member):
         """Increment specified user's strikes by 1."""
         player_info = db_utils.find_user_in_db(member.id)
@@ -86,7 +83,7 @@ class Strikes(commands.Cog):
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def remove_strike(self, ctx, member: discord.Member):
         """Decrement specified user's strikes by 1."""
         player_info = db_utils.find_user_in_db(member.id)
@@ -118,23 +115,22 @@ class Strikes(commands.Cog):
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def reset_all_strikes(self, ctx):
         """Reset everyone's strikes to 0. Permanent strikes are not affected."""
         db_utils.reset_strikes()
 
-        channel = discord.utils.get(ctx.guild.channels, name=STRIKES_CHANNEL)
         strikes_channel_embed = discord.Embed(color=discord.Color.green())
         strikes_channel_embed.add_field(name="Strikes Reset", value="All users have been reset to 0 strikes")
-        await channel.send(embed=strikes_channel_embed)
+        await CHANNEL.strikes().send(embed=strikes_channel_embed)
 
-        commands_channel_embed = discord.Embed(title="Strikes successfully reset to 0.", color=discord.Color.green())
-        await ctx.send(embed=commands_channel_embed)
+        confirmation_embed = discord.Embed(title="Strikes successfully reset to 0.", color=discord.Color.green())
+        await ctx.send(embed=confirmation_embed)
 
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def strikes_report(self, ctx):
         """Get a report of players with strikes."""
         strikes = db_utils.get_users_with_strikes()
@@ -183,7 +179,7 @@ class Strikes(commands.Cog):
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def upcoming_strikes(self, ctx):
         """Get a list of users who will receive strikes for lack of participation in the current river race."""
         upcoming_strikes_list = bot_utils.upcoming_strikes(True)

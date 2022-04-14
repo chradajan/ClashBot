@@ -6,10 +6,8 @@ from difflib import SequenceMatcher
 from discord.ext import commands
 import discord
 
-# Config
-from config.config import NEW_CHANNEL
-
 # Utils
+from utils.channel_utils import CHANNEL
 import utils.bot_utils as bot_utils
 
 
@@ -53,7 +51,7 @@ class ErrorHandler(commands.Cog):
         Error handler for failed commands.
         """
         if isinstance(error, commands.errors.CommandNotFound):
-            if ctx.channel.name == NEW_CHANNEL:
+            if ctx.channel == CHANNEL.welcome():
                 return
 
             embed = await self.command_not_found_embed(ctx.invoked_with, ctx)
@@ -80,7 +78,7 @@ class ErrorHandler(commands.Cog):
                     is_leader_only = True
                 elif bot_utils.is_elder_command_check.__name__ in check_str and not check_outcome:
                     is_elder_only = True
-                elif bot_utils.channel_check.__name__ in check_str and not check_outcome:
+                elif "channel_check"in check_str and not check_outcome:
                     is_channel_check = True
                 elif bot_utils.not_welcome_or_rules_check.__name__ in check_str and not check_outcome:
                     is_welcome_or_rules_check = True
@@ -266,7 +264,7 @@ class ErrorHandler(commands.Cog):
                             value="Make sure the specified member is on Discord. If their name includes spaces, place quotes around their name.")
         else:
             embed.add_field(name="Member not found",
-                            value="The specified member either doesn't exist or there are multiple people with the same player name. If their name includes spaces, place quotes around their name.")
+                            value="The specified member could not be found. If their name includes spaces, place quotes around their name.")
         return embed
 
     

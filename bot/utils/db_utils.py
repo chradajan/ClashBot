@@ -873,89 +873,48 @@ def get_strike_status() -> bool:
     return status
 
 
-def get_roles(discord_id: int) -> list:
+def get_roles(discord_id: int) -> List[str]:
     """
     Get the list of roles currently assigned to a user.
 
     Args:
-        discord_id(int): Unique Discord id of a member.
+        discord_id (int): Unique Discord id of a member.
 
     Returns:
-        list[str]: List of role names assigned to the specified user.
+        List[str]: List of role names assigned to the specified user.
     """
     db, cursor = connect_to_db()
 
-    # Get user_id.
-    cursor.execute("SELECT id FROM users WHERE discord_id = %s", (discord_id))
-    query_result = cursor.fetchone()
+    cursor.execute("SELECT discord_roles.role_name FROM discord_roles\
+                    INNER JOIN assigned_roles on discord_roles.id = assigned_roles.discord_role_id\
+                    INNER JOIN users ON assigned_roles.user_id = users.id\
+                    WHERE users.discord_id = %s",
+                    (discord_id))
 
-    if (query_result is None):
-        db.close()
-        return []
-
-    user_id = query_result["id"]
-
-    # Get list of discord_role_ids corresponding to user_id.
-    cursor.execute("SELECT discord_role_id FROM assigned_roles WHERE user_id = %s", (user_id))
     query_result = cursor.fetchall()
+    db.close()
 
-    if (query_result is None):
-        db.close()
-        return []
-
-    discord_role_ids = []
-
-    for entry in query_result:
-        discord_role_ids.append(entry["discord_role_id"])
-
-    # Get list of role_names.
-    roles = []
-
-    for discord_role_id in discord_role_ids:
-        cursor.execute("SELECT role_name FROM discord_roles WHERE id = %s", (discord_role_id))
-        query_result = cursor.fetchone()
-
-        if (query_result is None):
-            continue
-
-        roles.append(query_result["role_name"])
-
+    roles = [role["role_name"] for role in query_result]
     return roles
 
 
-def commit_roles(discord_id: int, roles: list):
+def commit_roles(discord_id: int, roles: List[str]):
     """
     Delete the roles currently assigned to a user. Then record their new roles.
 
     Args:
-        discord_id(int): Unique Discord id of a member.
-        roles(list): List of new roles to assign to user.
+        discord_id (int): Unique Discord id of a member.
+        roles (List[str]): List of new roles to assign to user.
     """
     db, cursor = connect_to_db()
 
-    # Get user_id from player_name.
-    cursor.execute("SELECT id FROM users WHERE discord_id = %s", (discord_id))
-    query_result = cursor.fetchone()
-
-    if (query_result is None):
-        db.close()
-        return
-
-    user_id = query_result["id"]
-
-    cursor.execute("DELETE FROM assigned_roles WHERE user_id = %s", (user_id))
+    cursor.execute("DELETE FROM assigned_roles WHERE user_id IN (SELECT id FROM users WHERE discord_id = %s)", (discord_id))
 
     for role in roles:
-        cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role))
-        query_result = cursor.fetchone()
-
-        if (query_result is None):
-            continue
-
-        discord_role_id = query_result["id"]
-
-        cursor.execute("INSERT INTO assigned_roles VALUES (%s, %s)", (user_id, discord_role_id))
-
+        cursor.execute("INSERT INTO assigned_roles VALUES\
+                        ((SELECT id FROM users WHERE discord_id = %s), (SELECT id FROM discord_roles WHERE role_name = %s))",
+                        (discord_id, role))
+    
     db.commit()
     db.close()
 

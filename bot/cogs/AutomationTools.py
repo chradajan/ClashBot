@@ -6,9 +6,6 @@ from discord.ext import commands
 from prettytable import PrettyTable
 import discord
 
-# Config
-from config.config import COMMANDS_CHANNEL
-
 # Utils
 import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
@@ -22,7 +19,7 @@ class AutomationTools(commands.Cog):
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def automation_status(self, ctx):
         """Get status of automated strikes and reminders."""
         reminder_status = "ENABLED" if db_utils.get_reminder_status() else "DISABLED"
@@ -39,7 +36,7 @@ class AutomationTools(commands.Cog):
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def set_automated_reminders(self, ctx, status: bool):
         """Set automated reminders on/off."""
         db_utils.set_reminder_status(status)
@@ -56,7 +53,7 @@ class AutomationTools(commands.Cog):
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def set_automated_strikes(self, ctx, status: bool):
         """Set automated strikes on/off"""
         db_utils.set_strike_status(status)

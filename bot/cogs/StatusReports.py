@@ -8,9 +8,6 @@ import discord
 # Cogs
 from cogs.ErrorHandler import ErrorHandler
 
-# Config
-from config.config import COMMANDS_CHANNEL
-
 # Utils
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
@@ -26,7 +23,7 @@ class StatusReports(commands.Cog):
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def decks_report(self, ctx):
         """Get a report of players with remaining battles today."""
         usage_info = clash_utils.get_remaining_decks_today_dicts()
@@ -109,7 +106,7 @@ class StatusReports(commands.Cog):
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def medals_report(self, ctx, threshold: int):
         """Get a report of players below the specified medal count. Ignores users on vacation."""
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)
@@ -187,7 +184,7 @@ class StatusReports(commands.Cog):
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def player_report(self, ctx, member: discord.Member):
         """Get information about a member."""
         player_info = db_utils.find_user_in_db(member.id)
@@ -233,7 +230,7 @@ class StatusReports(commands.Cog):
 
     @commands.command()
     @bot_utils.is_elder_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def stats_report(self, ctx, member: discord.Member):
         """Get specified user's river race statistics."""
         player_info = db_utils.find_user_in_db(member.id)

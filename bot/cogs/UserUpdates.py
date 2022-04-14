@@ -6,15 +6,8 @@ import discord
 # Cogs
 from cogs.ErrorHandler import ErrorHandler
 
-# Config
-from config.config import (
-    ADMIN_ROLE_NAME,
-    CHECK_RULES_ROLE_NAME,
-    NEW_ROLE_NAME,
-    COMMANDS_CHANNEL
-)
-
 # Utils
+from utils.role_utils import ROLE
 import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
 
@@ -29,24 +22,24 @@ class UserUpdates(commands.Cog):
         if member.bot:
             return
 
-        roles_to_remove = list(bot_utils.NORMAL_ROLES.values())
-        roles_to_remove.append(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
+        roles_to_remove = ROLE.normal_roles()
+        roles_to_remove.append(ROLE.check_rules())
         await member.remove_roles(*roles_to_remove)
-        await member.add_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
+        await member.add_roles(ROLE.new())
 
         db_utils.remove_user(member.id)
 
 
     @commands.command()
     @bot_utils.is_leader_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def update_user(self, ctx, member: discord.Member, player_tag: str=None):
         """Update a member. Specify a player_tag if they need a new one, or leave it blank to update with their current player tag. Updates player name, clan role/affiliation, Discord server role, and Discord nickname."""
         if not await bot_utils.update_member(member, player_tag):
             embed = discord.Embed(color=discord.Color.red())
             embed.add_field(name="An unexpected error has occurred",
                             value=f"This is likely due to the Clash Royale API being down. {member.display_name}'s information has not been updated.")
-        elif await bot_utils.is_admin(member):
+        elif bot_utils.is_admin(member):
             embed = discord.Embed(color=discord.Color.green())
             embed.add_field(name=f"{member.display_name}'s information has been updated",
                             value=f"ClashBot does not have permission to modify Admin nicknames. {member.display_name} must do this themself if their player name has changed.")
@@ -65,7 +58,7 @@ class UserUpdates(commands.Cog):
 
     @commands.command()
     @bot_utils.is_admin_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def reset_user(self, ctx, member: discord.Member):
         """Admin only. Delete selected user from database. Set their role to New."""
         await self.reset_user_helper(member)
@@ -76,7 +69,7 @@ class UserUpdates(commands.Cog):
     @commands.command()
     @bot_utils.is_admin_command_check()
     @bot_utils.disallowed_command_check()
-    @bot_utils.channel_check(COMMANDS_CHANNEL)
+    @bot_utils.commands_channel_check()
     async def reset_all_users(self, ctx, confirmation: str):
         """Deletes all users from database, removes roles, and assigns New role. Leaders retain Leader role. Leaders must still resend player tag in welcome channel and react to rules message."""
         confirmation_message = "Yes, I really want to drop all players from the database and reset roles."
@@ -93,6 +86,4 @@ class UserUpdates(commands.Cog):
             await self.reset_user_helper(member)
 
         await bot_utils.send_rules_message(ctx, self.bot.user)
-
-        admin_role = bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME]
-        await ctx.send(f"All users have been reset. If you are a {admin_role.mention}, please send your player tag in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back. Finally, update your Discord nickname to match your in-game username.")
+        await ctx.send(f"All users have been reset. If you are a {ROLE.admin().mention}, please send your player tag in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back. Finally, update your Discord nickname to match your in-game username.")

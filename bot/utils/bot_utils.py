@@ -18,23 +18,14 @@ import re
 # Config
 from config.blacklist import BLACKLIST
 from config.config import (
-    GUILD_NAME,
-    ADMIN_ROLE_NAME,
-    LEADER_ROLE_NAME,
-    ELDER_ROLE_NAME,
-    MEMBER_ROLE_NAME,
-    VISITOR_ROLE_NAME,
-    CHECK_RULES_ROLE_NAME,
-    NEW_ROLE_NAME,
-    RULES_CHANNEL,
-    REMINDER_CHANNEL,
-    NEW_CHANNEL,
     PRIMARY_CLAN_NAME,
     PRIMARY_CLAN_TAG,
     DEFAULT_REMINDER_MESSAGE
 )
 
 # Utils
+from utils.channel_utils import CHANNEL
+from utils.role_utils import ROLE
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
 
@@ -53,9 +44,6 @@ import utils.db_utils as db_utils
 SIX_DAY_MASK = 0x3FFFF
 ONE_DAY_MASK = 0x7
 
-SPECIAL_ROLES = {}
-NORMAL_ROLES = {}
-
 class ReminderTime(Enum):
     US = "US"
     EU = "EU"
@@ -71,40 +59,79 @@ class ReminderTime(Enum):
 #                                       #
 #########################################
 
+def is_elder_or_higher(member: discord.Member) -> bool:
+    """
+    Checks if a member is an elder, leader, or admin.
 
-async def is_admin(member: discord.Member) -> bool:
-    return (SPECIAL_ROLES[ADMIN_ROLE_NAME] in member.roles) or member.guild_permissions.administrator
+    Args:
+        member (discord.Member): Member to check status of.
+
+    Returns:
+        bool: Whether member is an elder or higher.
+    """
+    return (ROLE.elder() in member.roles) or is_leader_or_higher(member)
+
+def is_leader_or_higher(member: discord.Member) -> bool:
+    """
+    Checks if a member is a leader or admin.
+
+    Args:
+        member (discord.Member): Member to check status of.
+
+    Returns:
+        bool: Whether member is a leader or higher.
+    """
+    return (ROLE.leader() in member.roles) or is_admin(member)
+
+def is_admin(member: discord.Member) -> bool:
+    """
+    Checks if a member is an admin.
+
+    Args:
+        member (discord.Member): Member to check status of.
+
+    Returns:
+        bool: Whether member is an admin.
+    """
+    return (ROLE.admin() in member.roles) or member.guild_permissions.administrator
 
 def is_elder_command_check():
-    async def predicate(ctx):
-        return (NORMAL_ROLES[ELDER_ROLE_NAME] in ctx.author.roles) or (NORMAL_ROLES[LEADER_ROLE_NAME] in ctx.author.roles) or (SPECIAL_ROLES[ADMIN_ROLE_NAME] in ctx.author.roles)
+    async def predicate(ctx: commands.Context):
+        return is_elder_or_higher(ctx.author)
     return commands.check(predicate)
 
 def is_leader_command_check():
-    async def predicate(ctx):
-        return (NORMAL_ROLES[LEADER_ROLE_NAME] in ctx.author.roles) or (SPECIAL_ROLES[ADMIN_ROLE_NAME] in ctx.author.roles)
+    async def predicate(ctx: commands.Context):
+        return is_leader_or_higher(ctx.author)
     return commands.check(predicate)
 
 def is_admin_command_check():
-    async def predicate(ctx):
-        return await is_admin(ctx.author)
+    async def predicate(ctx: commands.Context):
+        return is_admin(ctx.author)
     return commands.check(predicate)
 
-def channel_check(CHANNEL_NAME):
+def commands_channel_check():
     async def predicate(ctx):
-        if type(CHANNEL_NAME) is set:
-            return ctx.message.channel.name in CHANNEL_NAME
-        else:
-            return ctx.message.channel.name == CHANNEL_NAME
+        return ctx.channel == CHANNEL.commands()
+    return commands.check(predicate)
+
+def kicks_channel_check():
+    async def predicate(ctx):
+        return (ctx.channel == CHANNEL.commands()) or (ctx.channel == CHANNEL.kicks())
+    return commands.check(predicate)
+
+def time_off_channel_check():
+    async def predicate(ctx):
+        return ctx.channel == CHANNEL.time_off()
     return commands.check(predicate)
 
 def not_welcome_or_rules_check():
-    async def predicate(ctx):
-        return (ctx.message.channel.name != NEW_CHANNEL) and (ctx.message.channel.name != RULES_CHANNEL)
+    async def predicate(ctx: commands.Context):
+        return (ctx.channel != CHANNEL.welcome()) and (ctx.channel != CHANNEL.rules())
     return commands.check(predicate)
 
 def disallowed_command_check():
-    async def predicate(ctx):
+    async def predicate(ctx: commands.Context):
         return False
     return commands.check(predicate)
 
@@ -139,17 +166,16 @@ def full_name(member: discord.Member) -> str:
 
 
 async def send_rules_message(ctx, user_to_purge: discord.ClientUser):
-    rules_channel = discord.utils.get(ctx.guild.channels, name=RULES_CHANNEL)
+    rules_channel = CHANNEL.rules()
     await rules_channel.purge(limit=10, check=lambda message: message.author == user_to_purge)
     new_react_message = await rules_channel.send(content="@everyone After you've read the rules, react to this message for roles.")
     await new_react_message.add_reaction(u"\u2705")
 
 
-async def deck_usage_reminder(bot, time_zone: ReminderTime=ReminderTime.ALL, message: str=DEFAULT_REMINDER_MESSAGE, automated: bool=True):
+async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL, message: str=DEFAULT_REMINDER_MESSAGE, automated: bool=True):
     reminder_list = clash_utils.get_remaining_decks_today()
     users_on_vacation = db_utils.get_users_on_vacation()
-    guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
-    channel = discord.utils.get(guild.channels, name=REMINDER_CHANNEL)
+    reminder_channel = CHANNEL.reminder()
     member_string = ""
     non_member_string = ""
     check_time_zones = (time_zone != ReminderTime.ALL)
@@ -171,7 +197,7 @@ async def deck_usage_reminder(bot, time_zone: ReminderTime=ReminderTime.ALL, mes
         discord_id = db_utils.get_member_id(player_tag)
 
         if discord_id is not None:
-            member = discord.utils.get(channel.members, id=discord_id)
+            member = discord.utils.get(reminder_channel.members, id=discord_id)
 
         if member is None:
             non_member_string += f"{player_name} - Decks left: {decks_remaining}" + "\n"
@@ -181,9 +207,9 @@ async def deck_usage_reminder(bot, time_zone: ReminderTime=ReminderTime.ALL, mes
     if (len(member_string) == 0) and (len(non_member_string) == 0):
         if check_time_zones:
             no_reminder_string = f"Everyone that receives {time_zone.value} reminders has already used all their decks today. Good job!"
-            await channel.send(no_reminder_string)
+            await reminder_channel.send(no_reminder_string)
         else:
-            await channel.send("Everyone has already used all their decks today. Good job!")
+            await reminder_channel.send("Everyone has already used all their decks today. Good job!")
         return
 
     reminder_string = message + "\n" + member_string + non_member_string
@@ -198,11 +224,11 @@ async def deck_usage_reminder(bot, time_zone: ReminderTime=ReminderTime.ALL, mes
             automated_message = 'This is an automated reminder. All members with remaining decks are receiving this regardless of time zone preference.'
         reminder_string += "\n" + automated_message
 
-    await channel.send(reminder_string)
+    await reminder_channel.send(reminder_string)
 
 
 async def update_member(member: discord.Member, player_tag: str = None) -> bool:
-    if member.bot or (SPECIAL_ROLES[NEW_ROLE_NAME] in member.roles) or (SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] in member.roles):
+    if member.bot or (ROLE.new() in member.roles) or (ROLE.check_rules() in member.roles):
         return False
 
     if player_tag is None:
@@ -221,15 +247,15 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
 
     member_status = db_utils.update_user(clash_data)
 
-    if not await is_admin(member):
+    if not is_admin(member):
         if clash_data["player_name"] != member.display_name:
             await member.edit(nick = clash_data["player_name"])
 
-        current_roles = set(member.roles).intersection({NORMAL_ROLES[MEMBER_ROLE_NAME], NORMAL_ROLES[VISITOR_ROLE_NAME], NORMAL_ROLES[ELDER_ROLE_NAME]})
-        correct_roles = { NORMAL_ROLES[member_status] }
+        current_roles = set(member.roles).intersection({ROLE.member(), ROLE.visitor(), ROLE.elder()})
+        correct_roles = { ROLE.get_role_from_name(member_status)}
 
         if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in BLACKLIST):
-            correct_roles.add(NORMAL_ROLES[ELDER_ROLE_NAME])
+            correct_roles.add(ROLE.elder())
 
         if correct_roles != current_roles:
             await member.remove_roles(*list(current_roles - correct_roles))
@@ -263,9 +289,10 @@ async def update_all_members(guild: discord.Guild):
         elif player_tag in active_members:
             if ((member.display_name != active_members[player_tag]["name"]) or
                 (db_info[member.id]["clan_role"] != active_members[player_tag]["role"]) or
-                (NORMAL_ROLES[VISITOR_ROLE_NAME] in member.roles)):
+                (ROLE.visitor() in member.roles)):
                 await update_member(member, player_tag)
-        elif NORMAL_ROLES[MEMBER_ROLE_NAME] in member.roles:
+        elif ROLE.member() in member.roles:
+            print(member.display_name)
             await update_member(member, player_tag)
 
 
@@ -862,12 +889,11 @@ async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, st
     return return_info
 
 
-async def send_new_member_info(info_channel: discord.TextChannel, clash_data: dict):
+async def send_new_member_info(clash_data: dict):
     """
     Send an informational message to leaders when a new member joins the server.
 
     Args:
-        info_channel(discord.TextChannel): Channel to send message to.
         clash_data(dict): Dict containing info about new member.
     """
     card_level_data = clash_utils.get_card_levels(clash_data['player_tag'])
@@ -901,7 +927,7 @@ async def send_new_member_info(info_channel: discord.TextChannel, clash_data: di
     embed.add_field(name="Card Levels", value=f"```{card_level_string}```", inline=False)
 
     try:
-        await info_channel.send(embed=embed)
+        await CHANNEL.leader_info().send(embed=embed)
     except:
         return
 
@@ -910,9 +936,7 @@ async def strike_former_participant(player_name: str,
                                     player_tag: str,
                                     decks_used: int,
                                     decks_required: int,
-                                    tracked_since: str,
-                                    strikes_channel: discord.TextChannel,
-                                    commands_channel: discord.TextChannel):
+                                    tracked_since: str):
     """
     Send an embed to the commands channel that can be used to assign a strike to members who participated in the most recent river
     race, did not participate fully, and are no longer an active member of the clan.
@@ -923,8 +947,6 @@ async def strike_former_participant(player_name: str,
         decks_used(int): How many decks the user used in the river race.
         decks_required(int): How many decks were expected from the user to not get a strike.
         tracked_since(str): Human readable string of time that bot started tracking the user.
-        strikes_channel(discord.TextChannel): Channel to send strike message to if a strike is given.
-        commands_channel(discord.TextChannel): Channel to send this embed to.
     """
     global strike_messages
 
@@ -932,10 +954,10 @@ async def strike_former_participant(player_name: str,
     embed.add_field(name=f"Should {player_name} receive a strike?",
                     value=f"```Decks: {decks_used}/{decks_required}\nDate: {tracked_since}```")
 
-    strike_message = await commands_channel.send(embed=embed)
+    strike_message = await CHANNEL.commands().send(embed=embed)
     await strike_message.add_reaction('✅')
     await strike_message.add_reaction('❌')
-    strike_messages[strike_message.id] = (player_tag, player_name, decks_used, decks_required, tracked_since, strikes_channel)
+    strike_messages[strike_message.id] = (player_tag, player_name, decks_used, decks_required, tracked_since)
 
 
 def duplicate_names_embed(users: List[Tuple[str, str, str]], command_name: str) -> discord.Embed:

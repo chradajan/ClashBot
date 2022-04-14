@@ -6,21 +6,11 @@ from discord.ext import commands
 import discord
 
 # Config
-from config.config import (
-    ADMIN_ROLE_NAME,
-    LEADER_ROLE_NAME,
-    VISITOR_ROLE_NAME,
-    CHECK_RULES_ROLE_NAME,
-    NEW_ROLE_NAME,
-    RULES_CHANNEL,
-    NEW_CHANNEL,
-    KICKS_CHANNEL,
-    LEADER_INFO_CHANNEL,
-    PRIMARY_CLAN_TAG,
-    PRIMARY_CLAN_NAME
-)
+from config.config import PRIMARY_CLAN_TAG, PRIMARY_CLAN_NAME
 
 # Utils
+from utils.channel_utils import CHANNEL
+from utils.role_utils import ROLE
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
@@ -32,13 +22,14 @@ class MemberListeners(commands.Cog):
         self.bot = bot
         self.kick_messages = {}
 
+
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         """Give new members New role upon joining server."""
         if member.bot:
             return
 
-        await member.add_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
+        await member.add_roles(ROLE.new())
 
 
     @commands.Cog.listener()
@@ -53,7 +44,7 @@ class MemberListeners(commands.Cog):
         if message.author.bot:
             return
 
-        if message.channel.name == NEW_CHANNEL:
+        if message.channel == CHANNEL.welcome():
             if not message.content.startswith("#"):
                 await message.channel.send(content="You forgot to include the # symbol at the start of your player tag. Try again with that included.", delete_after=10)
             elif message.content == PRIMARY_CLAN_TAG:
@@ -63,19 +54,18 @@ class MemberListeners(commands.Cog):
                 clash_data = clash_utils.get_clash_user_data(message.content, discord_name, message.author.id)
                 if clash_data is not None:
                     if db_utils.add_new_user(clash_data):
-                        if not await bot_utils.is_admin(message.author):
+                        if not bot_utils.is_admin(message.author):
                             await message.author.edit(nick=clash_data["player_name"])
-                        await message.author.add_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
-                        await message.author.remove_roles(bot_utils.SPECIAL_ROLES[NEW_ROLE_NAME])
-                        info_channel = discord.utils.get(message.guild.channels, name=LEADER_INFO_CHANNEL)
-                        await bot_utils.send_new_member_info(info_channel, clash_data)
+                        await message.author.add_roles(ROLE.check_rules())
+                        await message.author.remove_roles(ROLE.new())
+                        await bot_utils.send_new_member_info(clash_data)
                     else:
                         await message.channel.send(content="A player affiliated with that player tag already exists on the server. Please enter an unused player tag.", delete_after=10)
                 else:
-                    await message.channel.send(content="Something went wrong getting your Clash Royale information. Please try again with your player tag. If this issue persists, message a leader for help.", delete_after=5)
+                    await message.channel.send(content="Something went wrong getting your Clash Royale information. Please try again with your player tag. If this issue persists, message a leader for help.", delete_after=10)
 
             await message.delete()
-        elif message.channel.name == KICKS_CHANNEL and len(message.attachments) > 0:
+        elif (message.channel == CHANNEL.kicks()) and (len(message.attachments) > 0):
             for attachment in message.attachments:
                 if attachment.content_type in {'image/png', 'image/jpeg'}:
                     player_tag, player_name = await bot_utils.get_player_info_from_image(attachment)
@@ -119,10 +109,10 @@ class MemberListeners(commands.Cog):
                 await reaction.message.clear_reaction('❌')
 
         elif strike_info is not None:
-            if (bot_utils.NORMAL_ROLES[LEADER_ROLE_NAME] not in user.roles) or (bot_utils.SPECIAL_ROLES[ADMIN_ROLE_NAME] not in user.roles):
+            if not bot_utils.is_leader_or_higher(user):
                 return
 
-            player_tag, player_name, decks_used, decks_required, tracked_since, channel = strike_info
+            player_tag, player_name, decks_used, decks_required, tracked_since = strike_info
             bot_utils.strike_messages.pop(reaction.message.id, None)
 
             if reaction.emoji == '✅':
@@ -135,12 +125,12 @@ class MemberListeners(commands.Cog):
                 member = None
 
                 if discord_id is not None:
-                    member = discord.utils.get(channel.members, id=discord_id)
+                    member = discord.utils.get(CHANNEL.strikes().members, id=discord_id)
 
                 if member is not None:
-                    await channel.send(content=f"{member.mention}", embed=embed)
+                    await CHANNEL.strikes().send(content=f"{member.mention}", embed=embed)
                 else:
-                    await channel.send(embed=embed)
+                    await CHANNEL.strikes().send(embed=embed)
 
                 edited_embed = discord.Embed(title=f"{player_name} received a strike.")
                 await reaction.message.edit(embed=edited_embed)
@@ -151,6 +141,7 @@ class MemberListeners(commands.Cog):
                 await reaction.message.edit(embed=edited_embed)
                 await reaction.message.clear_reaction('✅')
                 await reaction.message.clear_reaction('❌')
+
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
@@ -166,19 +157,18 @@ class MemberListeners(commands.Cog):
 
         member = guild.get_member(payload.user_id)
 
-        if (channel.name != RULES_CHANNEL) or (bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME] not in member.roles) or (member.bot):
+        if (channel != CHANNEL.rules()) or (ROLE.check_rules() not in member.roles) or member.bot:
             return
 
-        await member.remove_roles(bot_utils.SPECIAL_ROLES[CHECK_RULES_ROLE_NAME])
+        await member.remove_roles(ROLE.check_rules())
 
-        if await bot_utils.is_admin(member):
-            roles_to_add = list(bot_utils.NORMAL_ROLES.values())
-            await member.add_roles(*roles_to_add)
-            await member.remove_roles(bot_utils.NORMAL_ROLES[VISITOR_ROLE_NAME])
+        if bot_utils.is_admin(member):
+            await member.add_roles(*ROLE.normal_roles())
+            await member.remove_roles(ROLE.visitor())
             return
 
         db_roles = db_utils.get_roles(member.id)
         saved_roles = []
         for role in db_roles:
-            saved_roles.append(bot_utils.NORMAL_ROLES[role])
+            saved_roles.append(ROLE.get_role_from_name(role))
         await member.add_roles(*saved_roles)

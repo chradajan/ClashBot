@@ -4,9 +4,6 @@ from discord.ext import commands
 from prettytable import PrettyTable
 import discord
 
-# Config
-from config.config import TIME_OFF_CHANNEL
-
 # Utils
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
@@ -100,7 +97,7 @@ all possible remaining decks."""
 
 
     @commands.command()
-    @bot_utils.channel_check(TIME_OFF_CHANNEL)
+    @bot_utils.time_off_channel_check()
     async def vacation(self, ctx):
         """Toggle your vacation status."""
         vacation_status = db_utils.update_vacation_for_user(ctx.author.id)
@@ -124,7 +121,7 @@ all possible remaining decks."""
             embed = discord.Embed(color=discord.Color.red())
             embed.add_field(name="An unexpected error has occurred",
                             value="This is likely due to the Clash Royale API being down. Your information has not been updated.")
-        elif await bot_utils.is_admin(ctx.author):
+        elif bot_utils.is_admin(ctx.author):
             embed = discord.Embed(color=discord.Color.green())
             embed.add_field(name="Your information has been updated",
                             value="ClashBot does not have permission to modify Admin nicknames. You must do this yourself if your player name has changed.")
