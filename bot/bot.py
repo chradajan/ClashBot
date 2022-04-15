@@ -1,12 +1,11 @@
-"""
-Creates/starts the bot and handles automated routines.
-"""
+"""Creates/starts the bot and handles automated routines."""
 
+import datetime
+
+import aiocron
+import discord
 from discord.ext import commands
 from pretty_help import DefaultMenu, PrettyHelp
-import aiocron
-import datetime
-import discord
 
 # Cogs
 from cogs.AutomationTools import AutomationTools
@@ -24,11 +23,11 @@ from config.config import GUILD_NAME
 from config.credentials import BOT_TOKEN
 
 # Utils
-from utils.channel_utils import CHANNEL, prepare_channels
-from utils.role_utils import prepare_roles
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.channel_utils import CHANNEL, prepare_channels
+from utils.role_utils import prepare_roles
 
 
 ########################################################
@@ -48,7 +47,10 @@ menu = DefaultMenu('◀️', '▶️', '❌')
 intents = discord.Intents.default()
 intents.members = True
 activity = discord.Game(name="Clash Royale")
-bot = commands.Bot(command_prefix='!', activity=activity, help_command=PrettyHelp(navigation=menu, color=discord.Colour.green()), intents=intents)
+bot = commands.Bot(command_prefix='!',
+                   activity=activity,
+                   help_command=PrettyHelp(navigation=menu, color=discord.Colour.green()),
+                   intents=intents)
 
 bot.add_cog(AutomationTools(bot))
 bot.add_cog(LeaderUtils(bot))
@@ -62,6 +64,7 @@ bot.add_cog(ErrorHandler(bot))
 
 @bot.event
 async def on_ready():
+    """Get relevant channels and roles on bot startup."""
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     prepare_channels(guild)
     prepare_roles(guild)
@@ -84,44 +87,34 @@ async def on_ready():
 
 @aiocron.crontab('0 19 * * 4,5,6,0')
 async def automated_reminder_eu():
-    """
-    Send reminder every Thursday, Friday, Saturday, and Sunday at 19:00 UTC.
-    """
+    """Send reminder every Thursday, Friday, Saturday, and Sunday at 19:00 UTC."""
     if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
         await bot_utils.deck_usage_reminder(time_zone=bot_utils.ReminderTime.EU)
 
 
 @aiocron.crontab('0 2 * * 5,6,0,1')
 async def automated_reminder_us():
-    """
-    Send reminder every Friday, Saturday, Sunday, and Monday at 02:00 UTC.
-    """
+    """Send reminder every Friday, Saturday, Sunday, and Monday at 02:00 UTC."""
     if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
         await bot_utils.deck_usage_reminder(time_zone=bot_utils.ReminderTime.US)
 
 
 @aiocron.crontab('0 8 * * 5,6,0,1')
 async def last_call_automated_reminder():
-    """
-    Send a reminder every day ~1.5 hours before reset time (08:00 UTC).
-    """
+    """Send a reminder every day ~1.5 hours before reset time (08:00 UTC)."""
     if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
         await bot_utils.deck_usage_reminder()
 
 
 @aiocron.crontab('0 10 * * 0')
 async def record_race_completion_status():
-    """
-    Check if the race was completed on Saturday and save result to db.
-    """
+    """Check if the race was completed on Saturday and save result to db."""
     db_utils.set_completed_saturday_status(clash_utils.river_race_completed())
 
 
 @aiocron.crontab('0 18 * * 1')
 async def assign_strikes_and_clear_vacation():
-    """
-    Assign strikes and clear vacation every Monday 18:00 UTC (Monday 11:00am PDT).
-    """
+    """Assign strikes and clear vacation every Monday 18:00 UTC (Monday 11:00am PDT)."""
     completed_saturday = db_utils.is_completed_saturday()
     message = ""
     send_missing_data_message = False
@@ -186,10 +179,14 @@ async def assign_strikes_and_clear_vacation():
                 continue
 
             if field_count < 25:
-                embed_one.add_field(name=player_name, value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
+                embed_one.add_field(name=player_name,
+                                    value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```",
+                                    inline=False)
                 field_count += 1
             else:
-                embed_two.add_field(name=player_name, value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```", inline=False)
+                embed_two.add_field(name=player_name,
+                                    value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```",
+                                    inline=False)
 
         if perfect_week:
             message += "Everyone completed their battles this week. Good job!"
@@ -200,7 +197,8 @@ async def assign_strikes_and_clear_vacation():
 
     db_utils.clear_all_vacation()
     vacation_embed = discord.Embed()
-    vacation_embed.add_field(name="Vacation status has been reset for all users.", value="Make sure to use !vacation before the next war if you're going to miss it.")
+    vacation_embed.add_field(name="Vacation status has been reset for all users.",
+                             value="Make sure to use !vacation before the next war if you're going to miss it.")
     await CHANNEL.time_off().send(embed=vacation_embed)
     await CHANNEL.strikes().send(message)
 
@@ -212,27 +210,37 @@ async def assign_strikes_and_clear_vacation():
 
     if send_missing_data_message:
         missing_data_embed = discord.Embed()
-        missing_data_embed.add_field(name="Missing Data Warning", value="War participation data is missing for one or more days. Threshold for assigning strikes has been adjusted accordingly.")
+        missing_data_embed.add_field(name="Missing Data Warning",
+                                     value=(
+                                         "War participation data is missing for one or more days. "
+                                         "Threshold for assigning strikes has been adjusted accordingly."
+                                     ))
         await CHANNEL.strikes().send(embed=missing_data_embed)
 
 
-prev_deck_usage_sum = -1
-prev_deck_usage = None
-reset_occurred = False
+PREV_DECK_USAGE_SUM = -1
+PREV_DECK_USAGE = None
+RESET_OCCURRED = False
 
 @aiocron.crontab('20-58 9 * * *')
 async def determine_reset_time():
-    """
-    Check every minute for a drop in total deck usage today which indicates that the daily reset has occurred. When reset occurs,
-    record the number of decks used by each member. If it's Thursday, prepare to start tracking match performance for upcoming
-    race. If it's Monday, calculate match performance for the ~30 minutes between the final automated match performance calculation
-    and reset time.
-    """
-    global prev_deck_usage_sum
-    global prev_deck_usage
-    global reset_occurred
+    """Start routines that need to run at reset time.
 
-    if reset_occurred:
+    Check every minute for a drop in total deck usage to determine that the daily reset has occurred. In addition to saving deck
+    usage and reset time each the, extra tasks are performed at the end of the following days:
+
+    Wednesday:
+        - prepare_for_river_race: Sets up database to track upcoming river race.
+
+    Thursday, Friday, Saturday:
+        - calculate_match_performance: Check match performance of clan members.
+        - save_clans_in_race: Save number of decks used by each clan in the river race and their current fame.
+    """
+    global PREV_DECK_USAGE_SUM
+    global PREV_DECK_USAGE
+    global RESET_OCCURRED
+
+    if RESET_OCCURRED:
         return
 
     active_members = clash_utils.get_active_members_in_clan()
@@ -246,10 +254,10 @@ async def determine_reset_time():
     for decks_used in usage_list.values():
         current_sum += decks_used
 
-    if current_sum < prev_deck_usage_sum:
-        reset_occurred = True
+    if current_sum < PREV_DECK_USAGE_SUM:
+        RESET_OCCURRED = True
         db_utils.clean_up_db(active_members=active_members)
-        db_utils.record_deck_usage_today(prev_deck_usage)
+        db_utils.record_deck_usage_today(PREV_DECK_USAGE)
 
         if weekday == 3:
             db_utils.prepare_for_river_race(datetime.datetime.now(datetime.timezone.utc))
@@ -259,24 +267,22 @@ async def determine_reset_time():
 
         db_utils.set_reset_time(datetime.datetime.now(datetime.timezone.utc))
     else:
-        prev_deck_usage_sum = current_sum
-        prev_deck_usage = usage_list
+        PREV_DECK_USAGE_SUM = current_sum
+        PREV_DECK_USAGE = usage_list
 
 
 @aiocron.crontab('59 9 * * *')
 async def reset_globals():
-    """
-    Reset global variables needed for daily reset tracking.
-    """
-    global prev_deck_usage_sum
-    global prev_deck_usage
-    global reset_occurred
+    """Reset globals used for daily reset tracking and perform reset tracking routine described above if reset has not occurred."""
+    global PREV_DECK_USAGE_SUM
+    global PREV_DECK_USAGE
+    global RESET_OCCURRED
 
-    if not reset_occurred:
+    if not RESET_OCCURRED:
         active_members = clash_utils.get_active_members_in_clan()
         weekday = datetime.datetime.utcnow().date().weekday()
         db_utils.clean_up_db(active_members=active_members)
-        db_utils.record_deck_usage_today(prev_deck_usage)
+        db_utils.record_deck_usage_today(PREV_DECK_USAGE)
 
         if weekday == 3:
             db_utils.prepare_for_river_race(datetime.datetime.now(datetime.timezone.utc))
@@ -286,41 +292,33 @@ async def reset_globals():
 
         db_utils.set_reset_time(datetime.datetime.now(datetime.timezone.utc))
 
-    prev_deck_usage_sum = -1
-    prev_deck_usage = None
-    reset_occurred = False
+    PREV_DECK_USAGE_SUM = -1
+    PREV_DECK_USAGE = None
+    RESET_OCCURRED = False
 
 
 @aiocron.crontab('30 7,15,23 * * *')
 async def update_members():
-    """
-    Update all members of the server at 07:30, 15:30, and 23:30 UTC everyday.
-    """
+    """Update all members of the server at 07:30, 15:30, and 23:30 UTC everyday."""
     guild = discord.utils.get(bot.guilds, name=GUILD_NAME)
     await bot_utils.update_all_members(guild)
 
 
 @aiocron.crontab('0 10-23 * * 4,5,6,0')
 async def night_match_performance_tracker():
-    """
-    Calculate match performance every hour between 10:00-23:00 Thursday-Sunday.
-    """
+    """Calculate match performance every hour between 10:00-23:00 Thursday-Sunday."""
     clash_utils.calculate_match_performance(False)
 
 
 @aiocron.crontab('0 0-9 * * 5,6,0,1')
 async def morning_match_performance_tracker():
-    """
-    Calculate match performance every hour between 00:00-09:00 Friday-Monday.
-    """
+    """Calculate match performance every hour between 00:00-09:00 Friday-Monday."""
     clash_utils.calculate_match_performance(False)
 
 
 @aiocron.crontab('02 10 * * 1')
 async def final_match_performance_check():
-    """
-    Calculate match performance after the war concludes on Monday.
-    """
+    """Calculate match performance after the war concludes on Monday."""
     clash_utils.calculate_match_performance(True)
     db_utils.save_clans_in_race_info(True)
     db_utils.set_war_time_status(False)
@@ -337,4 +335,5 @@ async def final_match_performance_check():
 #                                                   #
 #####################################################
 
-bot.run(BOT_TOKEN)
+if __name__ == '__main__':
+    bot.run(BOT_TOKEN)
