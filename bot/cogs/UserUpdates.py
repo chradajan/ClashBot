@@ -85,5 +85,5 @@ class UserUpdates(commands.Cog):
         for member in ctx.guild.members:
             await self.reset_user_helper(member)
 
-        await bot_utils.send_rules_message(ctx, self.bot.user)
+        await bot_utils.send_rules_message(self.bot.user)
         await ctx.send(f"All users have been reset. If you are a {ROLE.admin().mention}, please send your player tag in the welcome channel to be re-added to the database. Then, react to the rules message to automatically get all roles back. Finally, update your Discord nickname to match your in-game username.")

@@ -64,7 +64,7 @@ class LeaderUtils(commands.Cog):
             await member.remove_roles(*roles_to_remove)
             await member.add_roles(ROLE.check_rules())
 
-        await bot_utils.send_rules_message(ctx, self.bot.user)
+        await bot_utils.send_rules_message(self.bot.user)
         completed_embed = discord.Embed(color=discord.Color.green())
         completed_embed.add_field(name="Force rules check complete",
                                   value="Don't forget to react to the new rules too if you are an Admin or Leader.")

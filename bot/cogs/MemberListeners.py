@@ -88,7 +88,7 @@ class MemberListeners(commands.Cog):
     async def on_reaction_add(self, reaction, user):
         """Monitor reacts to kick and strike messages."""
         kick_info = self.kick_messages.get(reaction.message.id)
-        strike_info = bot_utils.strike_messages.get(reaction.message.id)
+        strike_info = bot_utils.STRIKE_MESSAGES.get(reaction.message.id)
 
         if (kick_info is None and strike_info is None) or user.bot:
             return
@@ -113,7 +113,7 @@ class MemberListeners(commands.Cog):
                 return
 
             player_tag, player_name, decks_used, decks_required, tracked_since = strike_info
-            bot_utils.strike_messages.pop(reaction.message.id, None)
+            bot_utils.STRIKE_MESSAGES.pop(reaction.message.id, None)
 
             if reaction.emoji == '✅':
                 _, strikes, _, _ = db_utils.give_strike(player_tag, 1)

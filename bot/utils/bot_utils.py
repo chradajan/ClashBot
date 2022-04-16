@@ -1,19 +1,18 @@
-"""
-Miscellaneous bot utility functions.
-"""
+"""Miscellaneous bot utility functions."""
 
+import datetime
+import os
+import re
 from difflib import SequenceMatcher
-from discord.ext import commands
 from enum import Enum
-from prettytable import PrettyTable
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Union
+
 import cv2
 import discord
-import datetime
 import numpy
-import os
 import pytesseract
-import re
+from discord.ext import commands
+from prettytable import PrettyTable
 
 # Config
 from config.blacklist import BLACKLIST
@@ -24,10 +23,10 @@ from config.config import (
 )
 
 # Utils
-from utils.channel_utils import CHANNEL
-from utils.role_utils import ROLE
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.channel_utils import CHANNEL
+from utils.role_utils import ROLE
 
 
 ######################################################
@@ -45,6 +44,7 @@ SIX_DAY_MASK = 0x3FFFF
 ONE_DAY_MASK = 0x7
 
 class ReminderTime(Enum):
+    """Reminder time options."""
     US = "US"
     EU = "EU"
     ALL = "ALL"
@@ -60,78 +60,93 @@ class ReminderTime(Enum):
 #########################################
 
 def is_elder_or_higher(member: discord.Member) -> bool:
-    """
-    Checks if a member is an elder, leader, or admin.
+    """Checks if a member is an elder, leader, or admin.
 
     Args:
-        member (discord.Member): Member to check status of.
+        member: Member to check rank of.
 
     Returns:
-        bool: Whether member is an elder or higher.
+        True if member is an elder or higher, false otherwise.
     """
     return (ROLE.elder() in member.roles) or is_leader_or_higher(member)
 
+
 def is_leader_or_higher(member: discord.Member) -> bool:
-    """
-    Checks if a member is a leader or admin.
+    """Checks if a member is a leader or admin.
 
     Args:
-        member (discord.Member): Member to check status of.
+        member: Member to check rank of.
 
     Returns:
-        bool: Whether member is a leader or higher.
+        True if member is a leader or higher, false otherwise.
     """
     return (ROLE.leader() in member.roles) or is_admin(member)
 
+
 def is_admin(member: discord.Member) -> bool:
-    """
-    Checks if a member is an admin.
+    """Checks if a member is an admin.
 
     Args:
-        member (discord.Member): Member to check status of.
+        member: Member to check rank of.
 
     Returns:
-        bool: Whether member is an admin.
+        True if member is an admin, false otherwise.
     """
     return (ROLE.admin() in member.roles) or member.guild_permissions.administrator
 
+
 def is_elder_command_check():
+    """Check if member issuing command is an elder or higher."""
     async def predicate(ctx: commands.Context):
         return is_elder_or_higher(ctx.author)
     return commands.check(predicate)
 
+
 def is_leader_command_check():
+    """Check if member issuing command is a leader or higher."""
     async def predicate(ctx: commands.Context):
         return is_leader_or_higher(ctx.author)
     return commands.check(predicate)
 
+
 def is_admin_command_check():
+    """Check if member issuing command is an admin."""
     async def predicate(ctx: commands.Context):
         return is_admin(ctx.author)
     return commands.check(predicate)
 
+
 def commands_channel_check():
+    """Check if a command is being issued from the commands channel."""
     async def predicate(ctx):
         return ctx.channel == CHANNEL.commands()
     return commands.check(predicate)
 
+
 def kicks_channel_check():
+    """Check if a command is being issued from the kicks channel."""
     async def predicate(ctx):
         return (ctx.channel == CHANNEL.commands()) or (ctx.channel == CHANNEL.kicks())
     return commands.check(predicate)
 
+
 def time_off_channel_check():
+    """Check if a command is being issued from the time off channel."""
     async def predicate(ctx):
         return ctx.channel == CHANNEL.time_off()
     return commands.check(predicate)
 
+
 def not_welcome_or_rules_check():
+    """Check if a command is not being issued from the welcome or rules channels."""
     async def predicate(ctx: commands.Context):
         return (ctx.channel != CHANNEL.welcome()) and (ctx.channel != CHANNEL.rules())
     return commands.check(predicate)
 
+
 def disallowed_command_check():
-    async def predicate(ctx: commands.Context):
+    """Disables a command."""
+    async def predicate(_ctx: commands.Context):
         return False
     return commands.check(predicate)
 
@@ -149,30 +164,44 @@ def disallowed_command_check():
 #                                         #
 ###########################################
 
-strike_messages = {}
+# TODO: move this into dedicated file set for callback messages.
+STRIKE_MESSAGES = {}
 
 
 def full_name(member: discord.Member) -> str:
-    """
-    Get the full Discord name of a member.
+    """Get the full Discord name of a member.
 
     Args:
         member: Member to get name of.
 
     Returns:
-        str: Full name in the form of "name#1234"
+        Full name in the form of "name#1234"
     """
     return member.name + "#" + member.discriminator
 
 
-async def send_rules_message(ctx, user_to_purge: discord.ClientUser):
+async def send_rules_message(user_to_purge: discord.ClientUser):
+    """Send message in rules channel for users to react to to gain roles.
+
+    Args:
+        user_to_purge: Delete any messages by this user in the rules channel before sending message.
+    """
     rules_channel = CHANNEL.rules()
     await rules_channel.purge(limit=10, check=lambda message: message.author == user_to_purge)
     new_react_message = await rules_channel.send(content="@everyone After you've read the rules, react to this message for roles.")
     await new_react_message.add_reaction(u"\u2705")
 
 
-async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL, message: str=DEFAULT_REMINDER_MESSAGE, automated: bool=True):
+async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL,
+                              message: str=DEFAULT_REMINDER_MESSAGE,
+                              automated: bool=True):
+    """Send message to reminders channel mentioning users that have remaining decks today.
+
+    Args:
+        time_zone (optional): Which time zone of users to mention. Defaults to reminding users in all time zones.
+        message (optional): Message to be sent with reminder. Defaults to message set in config.
+        automated (optional): Whether to send message indicating this was an automated reminder. Defaults to true.
+    """
     reminder_list = clash_utils.get_remaining_decks_today()
     users_on_vacation = db_utils.get_users_on_vacation()
     reminder_channel = CHANNEL.reminder()
@@ -205,8 +234,12 @@ async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL, message:
             member_string += f"{member.mention} - Decks left: {decks_remaining}" + "\n"
 
     if (len(member_string) == 0) and (len(non_member_string) == 0):
+        # TODO: replace these messages with embeds.
         if check_time_zones:
-            no_reminder_string = f"Everyone that receives {time_zone.value} reminders has already used all their decks today. Good job!"
+            no_reminder_string = (
+                f"Everyone that receives {time_zone.value} reminders has already used all their decks today. "
+                "Good job!"
+            )
             await reminder_channel.send(no_reminder_string)
         else:
             await reminder_channel.send("Everyone has already used all their decks today. Good job!")
@@ -215,19 +248,39 @@ async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL, message:
     reminder_string = message + "\n" + member_string + non_member_string
 
     if automated:
-        automated_message = ''
+        # TODO: replace automated message with embed.
         if time_zone == ReminderTime.US:
-            automated_message = 'This is an automated reminder. If this reminder is in the middle of the night for you, consider switching your reminder time to 19:00 UTC with command `!set_reminder_time EU`'
+            automated_message = (
+                "This is an automated reminder. If this reminder is in the middle of the night for you, "
+                "consider switching your reminder time to 19:00 UTC with command `!set_reminder_time EU`"
+            )
         elif time_zone == ReminderTime.EU:
-            automated_message = 'This is an automated reminder. If this reminder is in the middle of the day for you, consider switching your reminder time to 02:00 UTC with command `!set_reminder_time US`'
+            automated_message = (
+                "This is an automated reminder. If this reminder is in the middle of the day for you, "
+                "consider switching your reminder time to 02:00 UTC with command `!set_reminder_time US`"
+            )
         else:
-            automated_message = 'This is an automated reminder. All members with remaining decks are receiving this regardless of time zone preference.'
+            automated_message = (
+                "This is an automated reminder. "
+                "All members with remaining decks are receiving this regardless of time zone preference."
+            )
+
         reminder_string += "\n" + automated_message
 
     await reminder_channel.send(reminder_string)
 
 
-async def update_member(member: discord.Member, player_tag: str = None) -> bool:
+async def update_member(member: discord.Member, player_tag: str=None) -> bool:
+    """Update a member's database information and adjust their relevant roles as necessary.
+
+    Args:
+        member: Member to update.
+        player_tag (optional): Player tag of member to update. If no player tag is provided, get the user tag currently associated
+            with the member in the database.
+
+    Returns:
+        Whether the update was successful or not.
+    """
     if member.bot or (ROLE.new() in member.roles) or (ROLE.check_rules() in member.roles):
         return False
 
@@ -236,8 +289,8 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
 
         if len(player_info) != 1:
             return False
-        else:
-            _, player_tag, _ = player_info[0]
+
+        _, player_tag, _ = player_info[0]
 
     discord_name = full_name(member)
     clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, member.id)
@@ -252,9 +305,11 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
             await member.edit(nick = clash_data["player_name"])
 
         current_roles = set(member.roles).intersection({ROLE.member(), ROLE.visitor(), ROLE.elder()})
-        correct_roles = { ROLE.get_role_from_name(member_status)}
+        correct_roles = {ROLE.get_role_from_name(member_status)}
 
-        if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in BLACKLIST):
+        if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}
+                and clash_data["clan_tag"] == PRIMARY_CLAN_TAG
+                and clash_data["player_tag"] not in BLACKLIST):
             correct_roles.add(ROLE.elder())
 
         if correct_roles != current_roles:
@@ -265,13 +320,15 @@ async def update_member(member: discord.Member, player_tag: str = None) -> bool:
 
 
 async def update_all_members(guild: discord.Guild):
-    """
-    Update all members of the server that need to be updated. This does not guarantee that all members actually will be updated. For
-    example, a visitor who has switched clans (but not to the primary clan), will not be updated since that switch would not affect
-    their roles on the server. A visitor who has switched to the primary clan on the other hand will be updated.
+    """Update all members of the Discord server that need to be updated.
+
+    This does not guarantee all members will actually be updated. For example, visitors are only updated if they have joined the
+    primary clan. A visitor that has switched player names or clans (non primary clan to non primary clan) would not be updated.
+    Changes in a member's Discord name, moving from/to the primary clan, and primary clan members that have changed their player
+    names or clan role will trigger an update.
 
     Args:
-        guild(discord.Guild): Guild to update members in.
+        guild: Update members of this Discord server.
     """
     active_members = clash_utils.get_active_members_in_clan()
     db_utils.clean_up_db(active_members)
@@ -287,17 +344,28 @@ async def update_all_members(guild: discord.Guild):
         if current_discord_name != db_info[member.id]["discord_name"]:
             await update_member(member, player_tag)
         elif player_tag in active_members:
-            if ((member.display_name != active_members[player_tag]["name"]) or
-                (db_info[member.id]["clan_role"] != active_members[player_tag]["role"]) or
-                (ROLE.visitor() in member.roles)):
+            if (member.display_name != active_members[player_tag]["name"]
+                    or db_info[member.id]["clan_role"] != active_members[player_tag]["role"]
+                    or ROLE.visitor() in member.roles):
                 await update_member(member, player_tag)
         elif ROLE.member() in member.roles:
-            print(member.display_name)
             await update_member(member, player_tag)
 
 
-# [(most_recent_usage, day_string), (second_most_recent_usage, day_string), ...]
-def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)) -> list:
+def break_down_usage_history(deck_usage: int, command_time: datetime.datetime=None) -> List[Tuple[int, str]]:
+    """Break down concatenated deck usage into usage per day.
+
+    Args:
+        deck_usage: Last 7 days of deck usage bitwise shifted and or'd together.
+        command_time (optional): Time to base day associated with each usage with. If not provided, use current time.
+
+    Returns:
+        Last 7 days of deck usage in the form [(decks_used, day), ...] where index 0 represents the most recent day and index 6
+            represents the oldest day with recorded deck usage.
+    """
+    if command_time is None:
+        command_time = datetime.datetime.now(datetime.timezone.utc)
+
     time_delta = None
 
     if command_time.time() > db_utils.get_reset_time().time():
@@ -318,18 +386,22 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime = 
     return usage_history
 
 
-def should_receive_strike(deck_usage: int, completed_saturday: bool, tracked_since: datetime.datetime, reset_times: dict) -> Tuple[bool, int, int, bool]:
-    """
-    Based on deck usage and race completion date, determine whether user should receive strike.
+def should_receive_strike(deck_usage: int,
+                          completed_saturday: bool,
+                          tracked_since: datetime.datetime,
+                          reset_times: Dict[str, datetime.datetime]) -> Tuple[bool, int, int, bool]:
+    """Based on deck usage and race completion date, determine whether user should receive strike.
 
     Args:
-        deck_usage(int): Concatenated deck usage history value from database.
-        completed_saturday(bool): Whether race completed early or not.
-        tracked_since(datetime.datetime): Time that bot started tracking user.
-        reset_times(dict{str: datetime.datetime}): Dict of river race reset times.
+        deck_usage: Concatenated deck usage history value from database.
+        completed_saturday: Whether race completed early or not.
+        tracked_since: Time that bot started tracking user.
+        reset_times: Dict of river race reset times.
+            {"thursday": datetime, "friday": datetime, "saturday": datetime, "sunday": datetime}
 
     Returns:
-        Tuple[should_receive_strike(bool), decks_used(int), decks_required(int), missing_data(bool)]
+        Whether the user should receive a strike, how many decks they used and should have used, and whether any data was missing.
+            (should_receive_strike, decks_used, decks_required, missing_data)
     """
     usage_history_list = break_down_usage_history(deck_usage)
     decks_required = 0
@@ -372,16 +444,17 @@ def should_receive_strike(deck_usage: int, completed_saturday: bool, tracked_sin
 
 
 def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, int, int]]:
-    """
-    Get a list of all users who will receive strike or who would have received strikes in the previous war.
-    
+    """Get a list of all users who will receive strike or who would have received strikes in the previous war.
+
     Args:
-        use_race_reset_times(bool): If true, decide the number of required decks for users individually based on when they joined
-                                    the river race. Otherwise, expect max decks possible regardless of join time.
+        use_race_reset_times: If true, decide the number of required decks for users individually based on when they joined
+            the river race. Otherwise, expect max decks possible regardless of join time.
 
     Returns:
-        List[Tuple[player_name(str), player_tag(str), decks_used(int), decks_required(int), current_strikes(int)]]
+        A list of users who will receive or have received a strike in the current/most recent river race.
+            (player_name, player_tag, decks_used, decks_required, current_strikes)
     """
+    # TODO: possibly refactor this function into different scenarios (is_war_time is true vs false, consider reset time vs not)
     deck_usage_list = db_utils.get_all_user_deck_usage_history()
     strikes_dict = db_utils.get_users_with_strikes_dict()
     active_members = clash_utils.get_active_members_in_clan()
@@ -389,7 +462,7 @@ def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, in
     completed_saturday = db_utils.is_completed_saturday()
     last_reset_time = db_utils.get_reset_time()
     now = datetime.datetime.now(datetime.timezone.utc)
-    upcoming_strikes = []
+    upcoming_strikes_list = []
     race_reset_times: dict
     war_days_to_check: int
     starting_index: int
@@ -457,20 +530,19 @@ def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, in
                 decks_used += temp_usage
 
         if decks_used < decks_required:
-            upcoming_strikes.append((player_name, player_tag, decks_used, decks_required, strikes_dict.get(player_tag, 0)))
+            upcoming_strikes_list.append((player_name, player_tag, decks_used, decks_required, strikes_dict.get(player_tag, 0)))
 
-    return upcoming_strikes
+    return upcoming_strikes_list
 
 
 def battletime_to_datetime(battle_time: str) -> datetime.datetime:
-    """
-    Convert a Clash Royale API battleTime string to a datetime object.
+    """Convert a Clash Royale API battleTime string to a datetime.
 
     Args:
-        battle_time(str): API battleTime string in the format "yyyymmddThhmmss.000Z".
-    
+        battle_time: API battleTime string formatted as "yyyymmddThhmmss.000Z" to convert into a datetime.
+
     Returns:
-        datetime: Converted datetime object.
+        Datetime version of battleTime string.
     """
     year = int(battle_time[:4])
     month = int(battle_time[4:6])
@@ -483,64 +555,109 @@ def battletime_to_datetime(battle_time: str) -> datetime.datetime:
 
 
 def datetime_to_battletime(time: datetime.datetime) -> str:
-    """
-    Convert a datetime object to a Clash Royale API battleTime string.
+    """Convert a datetime into a Clash Royale API battleTime string.
 
     Args:
-        time(datetime.datetime): datetime object to convert.
+        time: Datetime to convert into battleTime string.
 
     Returns:
-        str: Converted API battleTime string in the format "yyyymmddThhmmss.000Z".
+        battleTime string formatted as "yyyymmddThhmmss.000Z".
     """
     return f"{time.year}{time.month:02}{time.day:02}T{time.hour:02}{time.minute:02}{time.second:02}.000Z"
 
 
 def get_current_battletime() -> str:
-    """
-    Get the current time as a Clash Royale API battleTime string.
+    """Get the current time as a Clash Royale API battleTime string.
 
     Returns:
-        str: Current battleTime.
+        Current time formatted as "yyyymmddThhmmss.000Z".
     """
     return datetime_to_battletime(datetime.datetime.utcnow())
 
 
 def create_match_performance_embed(player_name: str, player_tag: str) -> discord.Embed:
-    """
-    Create a Discord Embed object displaying a user's River Race stats.
+    """Create a Discord Embed displaying a user's River Race stats.
 
     Args:
-        player_name(str): Player name of player to display stats of.
-        player_tag(str): Player tag of player to display stats of.
+        player_name: Player name of player to display stats of.
+        player_tag: Player tag of player to display stats of.
 
     Returns:
-        discord.Embed: Sendable embed containing the specified user's stats.
+        Embed containing the specified user's stats.
     """
     history = db_utils.get_match_performance_dict(player_tag)
     embed = discord.Embed(title=f"{player_name}'s River Race Stats")
 
-    embed.add_field(name="Regular PvP", value = f"``` Wins:   {history['all']['regular']['wins']} \n Losses: {history['all']['regular']['losses']} \n Total:  {history['all']['regular']['total']} \n Win rate: {history['all']['regular']['win_rate']} ```")
-    embed.add_field(name="Special PvP", value = f"``` Wins:   {history['all']['special']['wins']} \n Losses: {history['all']['special']['losses']} \n Total:  {history['all']['special']['total']} \n Win rate: {history['all']['special']['win_rate']} ```")
+    embed.add_field(name="Regular PvP",
+                    value=(
+                        "```"
+                        f"Wins:   {history['all']['regular']['wins']} \n"
+                        f"Losses: {history['all']['regular']['losses']} \n"
+                        f"Total:  {history['all']['regular']['total']} \n"
+                        f"Win rate: {history['all']['regular']['win_rate']}"
+                        "```"
+                    ))
+    embed.add_field(name="Special PvP",
+                    value=(
+                        "```"
+                        f"Wins:   {history['all']['special']['wins']} \n"
+                        f"Losses: {history['all']['special']['losses']} \n"
+                        f"Total:  {history['all']['special']['total']} \n"
+                        f"Win rate: {history['all']['special']['win_rate']}"
+                        "```"
+                    ))
     embed.add_field(name="\u200b", value="\u200b", inline=False)
 
     embed.add_field(name="Duel (individual matches)",
-                    value = f"``` Wins:   {history['all']['duel_matches']['wins']} \n Losses: {history['all']['duel_matches']['losses']} \n Total:  {history['all']['duel_matches']['total']} \n Win rate: {history['all']['duel_matches']['win_rate']} ```",
+                    value=(
+                        "```"
+                        f"Wins:   {history['all']['duel_matches']['wins']} \n"
+                        f"Losses: {history['all']['duel_matches']['losses']} \n"
+                        f"Total:  {history['all']['duel_matches']['total']} \n"
+                        f"Win rate: {history['all']['duel_matches']['win_rate']}"
+                        "```"
+                    ),
                     inline=True)
     embed.add_field(name="Duel (series)",
-                    value = f"``` Wins:   {history['all']['duel_series']['wins']} \n Losses: {history['all']['duel_series']['losses']} \n Total:  {history['all']['duel_series']['total']} \n Win rate: {history['all']['duel_series']['win_rate']} ```",
+                    value=(
+                        "```"
+                        f"Wins:   {history['all']['duel_series']['wins']} \n"
+                        f"Losses: {history['all']['duel_series']['losses']} \n"
+                        f"Total:  {history['all']['duel_series']['total']} \n"
+                        f"Win rate: {history['all']['duel_series']['win_rate']}"
+                        "```"
+                    ),
                     inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=False)
 
-    embed.add_field(name="Combined PvP matches", value = f"``` Wins:   {history['all']['combined_pvp']['wins']} \n Losses: {history['all']['combined_pvp']['losses']} \n Total:  {history['all']['combined_pvp']['total']} \n Win rate: {history['all']['combined_pvp']['win_rate']} ```", inline=False)
-    embed.add_field(name="Boat attacks", value = f"``` Wins:   {history['all']['boat_attacks']['wins']} \n Losses: {history['all']['boat_attacks']['losses']} \n Total:  {history['all']['boat_attacks']['total']} \n Win rate: {history['all']['boat_attacks']['win_rate']} ```")
+    embed.add_field(name="Combined PvP matches",
+                    value=(
+                        "```"
+                        f"Wins:   {history['all']['combined_pvp']['wins']} \n"
+                        f"Losses: {history['all']['combined_pvp']['losses']} \n"
+                        f"Total:  {history['all']['combined_pvp']['total']} \n"
+                        f"Win rate: {history['all']['combined_pvp']['win_rate']}"
+                        "```"
+                    ),
+                    inline=False)
+    embed.add_field(name="Boat attacks",
+                    value=(
+                        "```"
+                        f"Wins:   {history['all']['boat_attacks']['wins']} \n"
+                        f"Losses: {history['all']['boat_attacks']['losses']} \n"
+                        f"Total:  {history['all']['boat_attacks']['total']} \n"
+                        f"Win rate: {history['all']['boat_attacks']['win_rate']}"
+                        "```"
+                    ))
 
     return embed
 
 
 def average_fame_per_deck(win_rate: float) -> float:
-    """
-    Get the average fame per deck value at the specified win rate. Assumes the player always plays 4 battles by playing a duel
-    followed by normal matches (no boat battles). It's also assumed that win rate is the same in duels and normal matches.
+    """Get the average fame per deck value at the specified win rate.
+
+    Assumes the player always plays 4 battles by playing a duel followed by normal matches (no boat battles). It's also assumed that
+    win rate is the same in duels and normal matches.
 
     Fame per deck of a player that completes 4 battles with these assumptions can be calculated as
     F(p) = -25p^3 + 25p^2 + 125p + 100 where F(p) is fame per deck and p is probability of winning any given match (win rate). This
@@ -549,24 +666,25 @@ def average_fame_per_deck(win_rate: float) -> float:
     deck is worth in each game mode. This is equal to f = 250p + 100(1-p) for duels and f = 200p + 100(1-p) for normal matches.
 
     Args:
-        win_rate(float): Player win rate in PvP matches.
-    
+        win_rate: Player win rate in PvP matches.
+
     Returns:
-        float: Average fame per deck used.
+        Average fame per deck used.
     """
     return (-25 * win_rate**3) + (25 * win_rate**2) + (125 * win_rate) + 100
 
 
-def calculate_win_rate_from_average_fame(avg_fame_per_deck: float) -> float:
-    """
-    Solve the polynomial described in average_fame_per_deck in order to calculate the win rate needed to achieve the specified fame
-    per deck. All assumptions made in calculating average fame per deck are relevant to this calculation too.
+def calculate_win_rate_from_average_fame(avg_fame_per_deck: Union[float, None]) -> float:
+    """Solve the polynomial described in average_fame_per_deck.
+
+    Determine what win rate is needed to achieve the specified fame per deck. All assumptions descibed above hold true here as well.
+    If no roots can be determined, then None is returned.
 
     Args:
-        avg_fame_per_deck(float): Average fame per deck to calculate win rate for.
+        avg_fame_per_deck: Average fame per deck to calculate win rate of.
 
     Returns:
-        float: Win rate needed to achieve the specified average fame per deck.
+        Win rate needed to achieve the specified average fame per deck, or None if no solution exists.
     """
     roots = numpy.roots([-25, 25, 125, (100 - avg_fame_per_deck)])
     win_rate = None
@@ -578,20 +696,26 @@ def calculate_win_rate_from_average_fame(avg_fame_per_deck: float) -> float:
     return win_rate
 
 
-def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usage: bool) -> Tuple[List[tuple], dict, dict]:
-    """
-    Predict the final standings at the end of the day.
+def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usage: bool)\
+        -> Tuple[List[Tuple[str, str, int, float, int]], Dict[str, str], Dict[str, Union[int, float]]]:
+    """Predict the final standings at the end of the day.
 
     Args:
-        use_historical_win_rates(bool): Calculate each clan's win rate based on performance since start of war, otherwise assume 50%.
-        use_historical_deck_usage(bool): Made predictions based off average number of decks each clan uses per day, otherwise assume
-                                         each clan uses all remaining decks.
+        use_historical_win_rates: Calculate each clan's win rate based on performance since start of war, otherwise assume 50%.
+        use_historical_deck_usage: Made predictions based off average number of decks each clan uses per day, otherwise assume each
+            clan uses all remaining decks.
 
     Returns:
-        Tuple[List[tuple], dict, dict]: (predicted_outcomes, completed_clans, catch_up_requirements)
-            predicted_outcomes = [ Tuple[clan_name(str), clan_tag(str), predicted_score(int), win_rate(float), expected_decks_to_use(int)], ... ]
-            completed_clans = {clan_tag(str): clan_name(str)}
-            catch_up_requirements = {"decks": int, "win_rate": float}
+        Predicted outcomes at the end of the current day, any clans that have already crossed the finish line and are omitted from
+            the predicted standings, and what the primary clan needs to do in order to reach first place's current predicted score
+            if the primary clan is not predicted to get first place.
+
+            Predicted outcomes list in order from first to last place:
+                [ (clan_name, clan_tag, predicted_score, win_rate, expected_decks_to_use), ... ]
+
+            Completed clans: { clan_tag: clan_name }
+
+            Catch up requirements: { "decks": int, "win_rate": float }
     """
     clans = clash_utils.get_clans_in_race(False)
     saved_clan_info = db_utils.get_saved_clans_in_race_info()
@@ -673,19 +797,24 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
     return (predicted_outcomes, completed_clans, catch_up_requirements)
 
 
-def create_prediction_embeds(predicted_outcomes: List[tuple], completed_clans: dict, catch_up_requirements: dict, use_table: bool)\
-    -> Tuple[discord.Embed, discord.Embed, discord.Embed]:
-    """
-    Create 3 embeds from the prediction data.
+def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float, int]],
+                             completed_clans: Dict[str, str],
+                             catch_up_requirements: Dict[str, Union[int, float]],
+                             use_table: bool) -> Tuple[discord.Embed, discord.Embed, discord.Embed]:
+    """Create 3 embeds from the prediction data.
+
+    predicted_outcomes (ordered first to last): [ (clan_name, clan_tag, predicted_score, win_rate, expected_decks_to_use), ... ]
+    completed_clans: { clan_tag: clan_name }
+    catch_up_requirements: { "decks": int, "win_rate": float }
 
     Args:
-        predicted_outcomes(List[tuple]): Predicted outcomes in order for today.
-        completed_clans(dict): Dict of clans that have already crossed the finish line.
-        catch_up_requirements(dict): Requirements to match predicted score of first place if primary clan is not predicted to win.
-        use_table(bool): Display predicted standings in table instead of embed fields.
+        predicted_outcomes: Predicted outcomes today ordered from first to last.
+        completed_clans: Clans that have already crossed the finish line.
+        catch_up_requirements: Requirements to match predicted score of first place if primary clan is not predicted to win.
+        use_table: Display predicted standings in table instead of embed fields.
 
     Returns:
-        Tuple[discord.Embed, discord.Embed, discord.Embed]: (predictions_embed, completed_clans_embed, catch_up_embed)
+        Tuple of predicted outcomes embed, completed clans embed, and catch up requirements embed.
     """
     primary_clan_placement = 1
 
@@ -694,7 +823,7 @@ def create_prediction_embeds(predicted_outcomes: List[tuple], completed_clans: d
             break
         primary_clan_placement += 1
 
-    if PRIMARY_CLAN_TAG in completed_clans and not db_utils.is_colosseum_week() or primary_clan_placement == 1:
+    if primary_clan_placement == 1 or (PRIMARY_CLAN_TAG in completed_clans and not db_utils.is_colosseum_week()):
         predictions_color = discord.Color.green()
     elif primary_clan_placement == 2:
         predictions_color = 0xFFFF00
@@ -724,7 +853,7 @@ def create_prediction_embeds(predicted_outcomes: List[tuple], completed_clans: d
             predictions_embed.add_field(name=f"{placement}. {name}",
                                         value=f"```Score: {score}\nWin Rate: {round(win_rate * 100, 2)}%\nDecks: {decks_to_use}```",
                                         inline=False)
-        
+
         placement += 1
 
     if use_table:
@@ -736,14 +865,20 @@ def create_prediction_embeds(predicted_outcomes: List[tuple], completed_clans: d
 
     if len(completed_clans) > 0:
         clans_str = "\n".join(clan_name for clan_name in completed_clans.values())
-        completed_clans_embed = discord.Embed(title=f"{clans_str} has already crossed the finish line and is excluded from the predicted standings.",
+        completed_clans_embed = discord.Embed(title=(
+                                                  f"{clans_str} has already crossed the finish line and "
+                                                  "is excluded from the predicted standings."
+                                              ),
                                               color=discord.Color.blue())
 
     if len(catch_up_requirements) > 0:
         win_rate = catch_up_requirements["win_rate"]
         decks = catch_up_requirements["decks"]
         if win_rate is not None:
-            catch_up_embed = discord.Embed(title=f"{PRIMARY_CLAN_NAME} needs to use all {decks} remaining decks at a {win_rate}% win rate to catch up to the predicted score of first place.",
+            catch_up_embed = discord.Embed(title=(
+                                               f"{PRIMARY_CLAN_NAME} needs to use all {decks} remaining decks at a {win_rate}% "
+                                               "win rate to catch up to the predicted score of first place."
+                                           ),
                                            color=discord.Color.blue())
         else:
             catch_up_embed = discord.Embed(title=f"{PRIMARY_CLAN_NAME} cannot reach the predicted score of first place.",
@@ -753,15 +888,14 @@ def create_prediction_embeds(predicted_outcomes: List[tuple], completed_clans: d
 
 
 def kick(player_name: str, player_tag: str) -> discord.Embed:
-    """
-    Kick the specified player and return an embed confirming the kick.
+    """Kick the specified player and return an embed confirming the kick.
 
     Args:
-        player_name(str): Name of player to kick.
-        player_tag(str): Tag of player to kick.
+        player_name: Name of player to kick.
+        player_tag: Tag of player to kick.
 
     Returns:
-        discord.Embed: Embed object with details about the kick.
+        Embed with details about the kick.
     """
     total_kicks, last_kick_date = db_utils.kick_user(player_tag)
     embed = discord.Embed(title="Kick Logged", color=discord.Color.green())
@@ -771,15 +905,14 @@ def kick(player_name: str, player_tag: str) -> discord.Embed:
 
 
 def undo_kick(player_name: str, player_tag: str) -> discord.Embed:
-    """
-    Undo the latest kick of the specified user and return an embed with details about the kick.
+    """Undo the latest kick of the specified user and return an embed with details about the kick.
 
     Args:
-        player_name(str): Name of player to undo kick for.
-        player_tag(str): Tag of player to undo kick for.
+        player_name: Name of player to undo kick for.
+        player_tag: Tag of player to undo kick for.
 
     Returns:
-        discord.Embed: Embed with info about the kick that was undone.
+        Embed with info about the kick that was undone.
     """
     removed_kick = db_utils.undo_kick(player_tag)
     embed = discord.Embed(title="Kick Undone", color=discord.Color.green())
@@ -792,15 +925,14 @@ def undo_kick(player_name: str, player_tag: str) -> discord.Embed:
     return embed
 
 
-def parse_image_text(text: str) -> Tuple[str, str]:
-    """
-    Parse text for a player tag and/or player name.
+def parse_image_text(text: str) -> Tuple[Union[str, None], Union[str, None]]:
+    """Parse text for a player tag and/or player name.
 
     Args:
-        text(str): Text parsed from a screenshot.
+        text: Text parsed from a screenshot.
 
     Returns:
-        Tuple[str, str]: (player_tag, player_name) detected in parsed information.
+        Tuple of player tag if found (otherwise None) and player name if found (otherwise None).
     """
     tag = re.search(r"(#[A-Z0-9]+)", text)
 
@@ -820,14 +952,13 @@ def parse_image_text(text: str) -> Tuple[str, str]:
 
 
 async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, str]:
-    """
-    Parse a kick screenshot for a player name and/or player tag.
+    """Parse a kick screenshot for a player name and/or player tag.
 
     Args:
-        image(discord.Attachment): Image of in-game kick screenshot.
+        image: Image of in-game kick screenshot.
 
     Returns:
-        Tuple[str, str]: (player_tag, player_name) Closest matching player tag and player name in screenshot.
+        Tuple of closest matching player tag and player name from screenshot.
     """
     participants = None
     if db_utils.is_war_time():
@@ -865,7 +996,7 @@ async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, st
 
                 if name is None:
                     closest_name = active_name
-        
+
         if name is not None:
             temp_name_similarity = SequenceMatcher(None, name, active_name).ratio()
 
@@ -889,23 +1020,30 @@ async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, st
     return return_info
 
 
-async def send_new_member_info(clash_data: dict):
-    """
-    Send an informational message to leaders when a new member joins the server.
+async def send_new_member_info(clash_data: Dict[str, Union[str, int]]):
+    """Send an informational message to leaders when a new member joins the server.
 
     Args:
-        clash_data(dict): Dict containing info about new member.
+        clash_data: Dict containing info about new member.
     """
     card_level_data = clash_utils.get_card_levels(clash_data['player_tag'])
 
     if card_level_data is None:
         return
 
+    # TODO: add utility function to get Royale API url of player.
     url = f"https://royaleapi.com/player/{clash_data['player_tag'][1:]}"
     embed = discord.Embed(title=f"{clash_data['player_name']} just joined the server!", url=url)
 
     embed.add_field(name=f"About {clash_data['player_name']}",
-                    value="```Level: {expLevel}\nTrophies: {trophies}\nBest Trophies: {bestTrophies}\nCards Owned: {foundCards}/{totalCards}```".format(**card_level_data),
+                    value=(
+                        "```"
+                        "Level: {expLevel}\n"
+                        "Trophies: {trophies}\n"
+                        "Best Trophies: {bestTrophies}\n"
+                        "Cards Owned: {foundCards}/{totalCards}"
+                        "```"
+                    ).format(**card_level_data),
                     inline=False)
 
     found_cards = card_level_data["foundCards"]
@@ -937,18 +1075,19 @@ async def strike_former_participant(player_name: str,
                                     decks_used: int,
                                     decks_required: int,
                                     tracked_since: str):
-    """
+    """Allow leaders to optionally strike members not in primary clan at time that automated strikes message gets sent.
+
     Send an embed to the commands channel that can be used to assign a strike to members who participated in the most recent river
     race, did not participate fully, and are no longer an active member of the clan.
 
     Args:
-        player_name(str): Player name of user to potentially strike.
-        player_tag(str): Player tag of user to potentially strike.
-        decks_used(int): How many decks the user used in the river race.
-        decks_required(int): How many decks were expected from the user to not get a strike.
-        tracked_since(str): Human readable string of time that bot started tracking the user.
+        player_name: Player name of user to potentially strike.
+        player_tag: Player tag of user to potentially strike.
+        decks_used: How many decks the user used in the river race.
+        decks_required: How many decks were expected from the user to not get a strike.
+        tracked_since: Human readable string of time that bot started tracking the user.
     """
-    global strike_messages
+    global STRIKE_MESSAGES
 
     embed = discord.Embed()
     embed.add_field(name=f"Should {player_name} receive a strike?",
@@ -957,19 +1096,18 @@ async def strike_former_participant(player_name: str,
     strike_message = await CHANNEL.commands().send(embed=embed)
     await strike_message.add_reaction('✅')
     await strike_message.add_reaction('❌')
-    strike_messages[strike_message.id] = (player_tag, player_name, decks_used, decks_required, tracked_since)
+    STRIKE_MESSAGES[strike_message.id] = (player_tag, player_name, decks_used, decks_required, tracked_since)
 
 
 def duplicate_names_embed(users: List[Tuple[str, str, str]], command_name: str) -> discord.Embed:
-    """
-    Create an embedded message listing out users with identical names.
+    """Create an Embed listing out users with identical names.
 
     Args:
-        users(List[Tuple[str, str, str]]): List of users with same player name.
-        command_name(str): Name of command that led to this error.
+        users: List of users' player names, player tags, and clan names that have the same player name.
+        command_name: Name of command that led to this error.
 
     Returns:
-        discord.Embed: Embed listing out users and info about how to proceed.
+        Embed listing out users and info about how to proceed.
     """
     embed = discord.Embed(title="Duplicate names detected", color=0xFFFF00)
     embed.add_field(name="Which user did you mean?",
