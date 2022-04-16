@@ -1,11 +1,9 @@
-"""
-Miscellanous utility functions that interface with the database.
-"""
+"""Miscellanous utility functions that interface with the database."""
 
-from discord import player
-from typing import List, Set, Tuple, Union
 import datetime
 import os
+from typing import Dict, List, Set, Tuple, Union
+
 import pymysql
 import xlsxwriter
 
@@ -39,24 +37,23 @@ SIX_DAY_MASK = 0x3FFFF
 ONE_DAY_MASK = 0x7
 
 
-def connect_to_db():
-    """
-    Establish connection to database.
+def connect_to_db() -> Tuple[pymysql.Connection, pymysql.cursors.DictCursor]:
+    """Establish connection to database.
 
     Returns:
-        tuple(db, cursor)
+        Database connection and cursor.
     """
-    db = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
-    cursor = db.cursor(pymysql.cursors.DictCursor)
-    return (db, cursor)
+    database = pymysql.connect(host=IP, user=USERNAME, password=PASSWORD, database=DB_NAME, charset='utf8mb4')
+    cursor = database.cursor(pymysql.cursors.DictCursor)
+    return (database, cursor)
 
 
-def add_new_user(clash_data: dict) -> bool:
-    """
-    Add a new user to the database. Only used for users that just joined the Discord server.
+# TODO: Use TypedDict
+def add_new_user(clash_data: Dict[str, Union[str, int]]) -> bool:
+    """Add a new user to the database. Only used for users that just joined the Discord server.
 
     Args:
-        clash_data(dict): A dictionary of relevant Clash Royale information.
+        clash_data: A dictionary of relevant Clash Royale information.
             {
                 "player_tag": str,
                 "player_name": str,
@@ -68,10 +65,11 @@ def add_new_user(clash_data: dict) -> bool:
             }
 
     Returns:
-        bool: Whether player was successfully inserted into database.
+        Whether player was successfully inserted into database.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
+    # TODO: Create routine to get clan id/insert new clan
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
     query_result = cursor.fetchone()
@@ -101,22 +99,25 @@ def add_new_user(clash_data: dict) -> bool:
     query_result = cursor.fetchone()
 
     if query_result is not None:
-        if (query_result["status"] == 'ACTIVE') or (query_result["status"] == 'INACTIVE'):
-            db.rollback()
-            db.close()
+        if query_result["status"] in {'ACTIVE', 'INACTIVE'}:
+            database.rollback()
+            database.close()
             return False
-        else:
-            update_query = "UPDATE users SET player_name = %(player_name)s,\
-                            discord_name = %(discord_name)s,\
-                            discord_id = %(discord_id)s,\
-                            clan_role = %(clan_role)s,\
-                            clan_id = %(clan_id)s,\
-                            status = %(status)s\
-                            WHERE player_tag = %(player_tag)s"
-            cursor.execute(update_query, clash_data)
+
+        cursor.execute("UPDATE users SET\
+                        player_name = %(player_name)s,\
+                        discord_name = %(discord_name)s,\
+                        discord_id = %(discord_id)s,\
+                        clan_role = %(clan_role)s,\
+                        clan_id = %(clan_id)s,\
+                        status = %(status)s\
+                        WHERE player_tag = %(player_tag)s",
+                        clash_data)
     else:
-        insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(discord_id)s, %(clan_role)s, 'US', FALSE, 0, 0, 0, %(status)s, %(clan_id)s)"
-        cursor.execute(insert_user_query, clash_data)
+        cursor.execute("INSERT INTO users VALUES\
+                        (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s,\
+                        %(discord_id)s, %(clan_role)s, 'US', FALSE, 0, 0, 0, %(status)s, %(clan_id)s)",
+                        clash_data)
 
     # Get id of newly inserted user.
     cursor.execute("SELECT id FROM users WHERE player_tag = %(player_tag)s", clash_data)
@@ -130,7 +131,8 @@ def add_new_user(clash_data: dict) -> bool:
     if query_result is None:
         last_check_time = get_last_check_time()
         tracked_since = bot_utils.get_current_battletime() if (is_war_time() and (clash_data["status"] == 'ACTIVE')) else None
-        cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (user_id, last_check_time, tracked_since))
+        cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
+                       (user_id, last_check_time, tracked_since))
         cursor.execute("INSERT INTO match_history_all VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (user_id))
 
     # Check if new user is member or visitor. Get id of relevant discord_role.
@@ -143,31 +145,33 @@ def add_new_user(clash_data: dict) -> bool:
     insert_assigned_roles_query = "INSERT INTO assigned_roles VALUES (%s, %s)"
     cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
 
-    if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}) and (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) and (clash_data["player_tag"] not in BLACKLIST):
+    if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}
+            and clash_data["clan_tag"] == PRIMARY_CLAN_TAG
+            and clash_data["player_tag"] not in BLACKLIST):
         role_string = "Elder"
         cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role_string))
         query_result = cursor.fetchone()
         discord_role_id = query_result["id"]
         cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
     return True
 
 
 def add_new_unregistered_user(player_tag: str) -> bool:
-    """
-    Add an unregistered player (active in clan but not Discord) to the database.
+    """Add an unregistered player (active in clan but not Discord) to the database.
 
     Args:
-        player_tag(str): Player tag of player to insert.
+        player_tag: Player tag of player to insert.
 
     Returns:
-        bool: Whether the user was successfully added.
+        Whether the user was successfully added.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     # Get their data
+    # TODO: Use TypedDict
     clash_data = clash_utils.get_clash_user_data(player_tag, player_tag, None)
 
     if clash_data is None:
@@ -191,29 +195,32 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     clash_data["discord_name"] = f"{clash_data['status']}{player_tag}"
 
     # Insert them
-    insert_user_query = "INSERT INTO users VALUES (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, NULL, %(clan_role)s, 'US', FALSE, 0, 0, 0, %(status)s, %(clan_id)s)"
-    cursor.execute(insert_user_query, clash_data)
+    cursor.execute("INSERT INTO users VALUES\
+                    (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s,\
+                    NULL, %(clan_role)s, 'US', FALSE, 0, 0, 0, %(status)s, %(clan_id)s)",
+                    clash_data)
 
     # Create match_history entries.
     cursor.execute("SELECT id FROM users WHERE player_tag = %(player_tag)s", clash_data)
     query_result = cursor.fetchone()
     last_check_time = get_last_check_time()
     tracked_since = bot_utils.get_current_battletime() if (is_war_time() and (clash_data["status"] == 'UNREGISTERED')) else None
-    cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (query_result["id"], last_check_time, tracked_since))
-    cursor.execute("INSERT INTO match_history_all VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (query_result["id"]))
+    cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
+                   (query_result["id"], last_check_time, tracked_since))
+    cursor.execute("INSERT INTO match_history_all VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
+                   (query_result["id"]))
 
-    db.commit()
-    db.close()
-
+    database.commit()
+    database.close()
     return True
 
 
-def update_user(clash_data: dict) -> str:
-    """
-    Update a user in the database to reflect any changes to their Clash Royale or Discord statuses.
+# TODO: Use TypedDict
+def update_user(clash_data: Dict[str, Union[str, int]]) -> str:
+    """Update a user in the database to reflect any changes to their Clash Royale or Discord statuses.
 
     Args:
-        clash_data(dict): A dictionary of relevant Clash Royale information.
+        clash_data: A dictionary of relevant Clash Royale information.
             {
                 "player_tag": str,
                 "player_name": str,
@@ -224,8 +231,11 @@ def update_user(clash_data: dict) -> str:
                 "clan_tag": str,
                 "status": str (optional)
             }
+
+    Returns:
+        Status of user being updated; "Member" if user is in primary clan, otherwise "Visitor"
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
     cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
@@ -245,7 +255,8 @@ def update_user(clash_data: dict) -> str:
     update_query = ""
 
     if clash_data["discord_id"] is None:
-        update_query = "UPDATE users SET player_tag = %(player_tag)s,\
+        update_query = "UPDATE users SET\
+                        player_tag = %(player_tag)s,\
                         player_name = %(player_name)s,\
                         discord_name = %(discord_name)s,\
                         clan_role = %(clan_role)s,\
@@ -253,7 +264,8 @@ def update_user(clash_data: dict) -> str:
                         status = %(status)s\
                         WHERE player_tag = %(player_tag)s"
     else:
-        update_query = "UPDATE users SET player_tag = %(player_tag)s,\
+        update_query = "UPDATE users SET\
+                        player_tag = %(player_tag)s,\
                         player_name = %(player_name)s,\
                         discord_name = %(discord_name)s,\
                         clan_role = %(clan_role)s,\
@@ -272,15 +284,15 @@ def update_user(clash_data: dict) -> str:
                         WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s) AND tracked_since IS NULL",
                         (last_check_time, tracked_since, clash_data["player_tag"]))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
     return "Member" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "Visitor"
 
 
-def get_user_data(player_tag: str) -> dict:
-    """
-    Get a user's information from the users table.
+# TODO: Use TypedDict
+def get_user_data(player_tag: str) -> Dict:
+    """Get a user's information from the users table.
 
     Args:
         player_tag(str): Player tag of user to get info about.
@@ -301,7 +313,7 @@ def get_user_data(player_tag: str) -> dict:
                 status: str
             }
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     user_data = {}
     cursor.execute("SELECT * FROM users WHERE player_tag = %s", (player_tag))
@@ -326,29 +338,29 @@ def get_user_data(player_tag: str) -> dict:
     query_result = cursor.fetchone()
 
     if query_result is None:
-        db.close()
+        database.close()
         return None
 
     user_data["clan_name"] = query_result["clan_name"]
     user_data["clan_tag"] = query_result["clan_tag"]
 
-    db.close()
+    database.close()
     return user_data
 
 
+# TODO: Rename to something that indicates this can be used to remove strikes too.
 def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int, int]:
-    """
-    Give 1 strike to the specified player. Add them as an unregistered user if they don't exist in the database.
+    """Add or remove strikes from user. If player tag does not exist in database, add them as an unregistered user.
 
     Args:
-        player_tag(str): Player to give strike to.
-        delta(int): Number of strikes to +/- from current strikes for user.
+        player_tag: Player to give strike to.
+        delta: Number of strikes to add or remove from current strikes for user.
 
     Returns:
-        Tuple[int, int, int, int]: (old_strike_count, new_strike_count, old_permanent_strike_count, new_permanent_strike_count),
-                                   or (None, None, None, None) if something went wrong.
+        Tuple of old strike count, new strike count, old permanent strike count, and new permanent strike count. All values will be
+            None if an error occurred.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     old_strike_count = None
     new_strike_count = None
@@ -359,7 +371,7 @@ def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int, int]:
 
     if query_result is None:
         if not add_new_unregistered_user(player_tag):
-            db.close()
+            database.close()
             return (old_strike_count, new_strike_count, old_permanent_strike_count, new_permanent_strike_count)
 
         old_strike_count = 0
@@ -388,54 +400,54 @@ def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int, int]:
     cursor.execute("UPDATE users SET strikes = %s, permanent_strikes = %s WHERE player_tag = %s",
                    (new_strike_count, new_permanent_strike_count, player_tag))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
     return (old_strike_count, new_strike_count, old_permanent_strike_count, new_permanent_strike_count)
 
 
 def get_strikes(discord_id: int) -> int:
-    """
-    Get the current number of strikes a user has.
+    """Get the current number of non-permanent strikes a user has.
 
     Args:
-        discord_id(int): Unique Discord id of a member.
+        discord_id: Unique Discord id of a member.
 
     Returns:
-        int: Number of strikes the specified user currently has.
+        Number of non-permanent strikes the specified user currently has.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT strikes FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
-    db.close()
+    database.close()
 
     if query_result is None:
         return None
 
     return query_result["strikes"]
 
+
 def reset_strikes():
-    db, cursor = connect_to_db()
+    """Reset non-permanent strikes for all users"""
+    database, cursor = connect_to_db()
 
     cursor.execute("UPDATE users SET strikes = 0")
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def get_users_with_strikes() -> List[Tuple[str, str, int]]:
-    """
-    Get all users in the database that have non-permanent strikes.
+    """Get all users in the database that have non-permanent strikes.
 
     Returns:
-        List[Tuple[player_tag(str), player_name(str), strikes(int)]]: List of users with strikes.
+        List of player tags, player names, and non-permanent strikes.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT player_name, player_tag, strikes FROM users WHERE strikes > 0")
     query_result = cursor.fetchall()
-    db.close()
+    database.close()
 
     if query_result is None:
         return {}
@@ -446,18 +458,17 @@ def get_users_with_strikes() -> List[Tuple[str, str, int]]:
     return strikes_list
 
 
-def get_users_with_strikes_dict() -> dict:
-    """
-    Get all users in the database that have non-permanent strikes.
+def get_users_with_strikes_dict() -> Dict[str, int]:
+    """Get all users in the database that have non-permanent strikes.
 
     Returns:
-        dict{player_tag(str): strikes(int)}: Dict of players and strikes.
+        Dictionary mapping player tag to non-permanent strikes.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT player_tag, strikes FROM users WHERE strikes > 0")
     query_result = cursor.fetchall()
-    db.close()
+    database.close()
 
     if query_result is None:
         return {}
@@ -467,138 +478,129 @@ def get_users_with_strikes_dict() -> dict:
 
 
 def set_completed_saturday_status(status: bool):
-    """
-    Update database to indicate whether the primary clan has crossed the finish line early.
+    """Update database to indicate whether the primary clan has crossed the finish line early.
 
     Args:
-        status(bool): New status to set completed_saturday to.
+        status: New status to set completed_saturday to.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("UPDATE race_status SET completed_saturday = %s", (status))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def is_completed_saturday() -> bool:
-    """
-    Return whether the primary clan crossed the finish line early.
+    """Return whether the primary clan crossed the finish line early.
 
     Returns:
-        bool: Completed Saturday status.
+        Completed Saturday status.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT completed_saturday FROM race_status")
     query_result = cursor.fetchone()
 
-    db.close()
+    database.close()
     return query_result["completed_saturday"]
 
 
 def set_colosseum_week_status(status: bool):
-    """
-    Update database to indicate whether or not it's colosseum week.
+    """Update database to indicate whether or not it's colosseum week.
 
     Args:
-        status(bool): New status to set colosseum_week to.
+        status: New status to set colosseum_week to.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("UPDATE race_status SET colosseum_week = %s", (status))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def is_colosseum_week() -> bool:
-    """
-    Return whether it's colosseum week.
+    """Return whether it's colosseum week.
 
     Returns:
-        bool: Colosseum week status.
+        Colosseum week status.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT colosseum_week FROM race_status")
     query_result = cursor.fetchone()
 
-    db.close()
+    database.close()
     return query_result["colosseum_week"]
 
 
 def set_war_time_status(status: bool):
-    """
-    Update database to indicate whether or not it's war time.
+    """Update database to indicate whether or not it's war time.
 
     Args:
-        status(bool): New status to set war_time to.
+        status: New status to set war_time to.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("UPDATE race_status SET war_time = %s", (status))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def is_war_time() -> bool:
-    """
-    Return whether it's war time.
+    """Return whether it's war time.
 
     Returns:
-        bool: War time status.
+        War time status.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT war_time FROM race_status")
     query_result = cursor.fetchone()
 
-    db.close()
+    database.close()
     return query_result["war_time"]
 
 
 def set_last_check_time(last_check_time: datetime.datetime):
-    """
-    Update database to indicate when the last win rate tracking check occurred.
+    """Update database to indicate when the last win rate tracking check occurred.
 
     Args:
-        last_check_time(datetime.datetime): Last check time in datetime format.
+        last_check_time: Last check time in datetime format.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     last_check_time = bot_utils.datetime_to_battletime(last_check_time)
     cursor.execute("UPDATE race_status SET last_check_time = %s", (last_check_time))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def get_last_check_time() -> str:
-    """
-    Get the time when the last win rate tracking check occurred.
+    """Get the time when the last win rate tracking check occurred.
 
     Returns:
-        str: Time of last win rate tracking check.
+        Time of last win rate tracking check, formatted as Clash Royale API battleTime.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT last_check_time FROM race_status")
     query_result = cursor.fetchone()
 
-    db.close()
+    database.close()
     return query_result["last_check_time"]
 
 
 def set_reset_time(reset_time: datetime.datetime):
-    """
-    Save most recent daily reset time to database.
+    """Save most recent daily reset time to database.
 
     Args:
-        reset_time(datetime.datetime): Most recent reset time.
+        reset_time: Most recent reset time.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     reset_time_str = bot_utils.datetime_to_battletime(reset_time)
     cursor.execute("UPDATE race_status SET reset_time = %s", (reset_time_str))
@@ -609,39 +611,44 @@ def set_reset_time(reset_time: datetime.datetime):
     if weekday is not None:
         cursor.execute(f"UPDATE race_reset_times SET {weekday} = %s", (reset_time_str))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def get_reset_time() -> datetime.datetime:
-    """
-    Get the most recent daily reset time from the database.
+    """Get the most recent daily reset time from the database.
 
     Returns:
-        datetime.datetime: Most recent reset time.
+        Most recent reset time.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT reset_time FROM race_status")
     query_result = cursor.fetchone()
     reset_time = bot_utils.battletime_to_datetime(query_result["reset_time"])
 
-    db.close()
+    database.close()
     return reset_time
 
 
-def get_river_race_reset_times() -> dict:
-    """
-    Get the reset time of each day during the most recent river race.
+# TODO: Use TypedDict
+def get_river_race_reset_times() -> Dict[str, datetime.datetime]:
+    """Get the reset time of each day during the most recent river race.
 
     Returns:
-        dict{str: datetime.datetime}: Dict of weekday and reset time pairs.
+        Dictionary of weekday and reset time pairs.
+            {
+                "thursday": datetime.datetime,
+                "friday": datetime.datetime,
+                "saturday": datetime.datetime,
+                "sunday": datetime.datetime
+            }
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT * FROM race_reset_times")
     query_result = cursor.fetchone()
-    db.close()
+    database.close()
 
     reset_times = {"thursday":  bot_utils.battletime_to_datetime(query_result["thursday"]),
                    "friday":    bot_utils.battletime_to_datetime(query_result["friday"]),
@@ -652,19 +659,21 @@ def get_river_race_reset_times() -> dict:
 
 
 def find_user_in_db(search_key: Union[int, str]) -> List[Tuple[str, str, str]]:
-    """
-    Find a list player names, player tags, and clan names of users in the database corresponding to a discord id, player tag, or
-    player name. First try searching for key as a discord id or player tag. If no results are found, try searching as a player name.
+    """Find a user(s) in the database corresponding to the search key.
+
+    First try searching for a user where discord_id == search_key if key is an int, otherwise where player_tag == search_key. If no
+    results are found, then try searching where player_name == search_key. Player names are not unique and could result in finding
+    multiple users. If this occurs, all users that were found are returned.
 
     Args:
-        search_key: Key to search for in database. Can be discord id, player tag, or player name.
+        Key to search for in database. Can be discord id, player tag, or player name.
 
     Returns:
-        List[Tuple[str, str, str]]: List of tuples of (player_name, player_tag, clan_name)
+        List of tuples of (player_name, player_tag, clan_name).
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
-    if type(search_key) == int:
+    if isinstance(search_key, int):
         cursor.execute("SELECT users.player_name, users.player_tag, clans.clan_name FROM users\
                         INNER JOIN clans ON users.clan_id = clans.id WHERE discord_id = %s",
                         (search_key))
@@ -683,25 +692,24 @@ def find_user_in_db(search_key: Union[int, str]) -> List[Tuple[str, str, str]]:
 
     search_results = [(user["player_name"], user["player_tag"], user["clan_name"]) for user in query_result]
 
-    db.close()
+    database.close()
     return search_results
 
 
 def get_member_id(player_tag: str) -> int:
-    """
-    Return the Discord ID corresponding to the specified player tag, or None if member is not on Discord.
+    """Return the Discord ID corresponding to the specified player tag, or None if member is not on Discord.
 
     Args:
-        player_tag(str): Player tag of user to find ID of.
+        player_tag: Player tag of user to find Discord ID of.
 
     Returns:
-        int: Discord ID of specified user, or None if not found.
+        Discord ID of specified user, or None if not found.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT discord_id FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
-    db.close()
+    database.close()
 
     if query_result is None:
         return None
@@ -709,22 +717,20 @@ def get_member_id(player_tag: str) -> int:
     return query_result["discord_id"]
 
 
-
 def remove_user(discord_id: int):
-    """
-    Remove a user's assigned roles and change their status to either UNREGISTERED or DEPARTED.
+    """Remove a user's assigned roles and change their status to either UNREGISTERED or DEPARTED.
 
     Args:
-        discord_id(int): Unique Discord id of a member.
+        discord_id: Unique Discord id of a member.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     # Get id and player_tag of user.
     cursor.execute("SELECT id, player_tag FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
-    if (query_result is None):
-        db.close()
+    if query_result is None:
+        database.close()
         return
 
     user_id = query_result["id"]
@@ -743,13 +749,13 @@ def remove_user(discord_id: int):
         cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED' WHERE id = %s",
                        (f"DEPARTED{player_tag}", user_id))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
-# Drop all users and assigned roles.
 def remove_all_users():
-    db, cursor = connect_to_db()
+    """Remove all users and their data from the database."""
+    database, cursor = connect_to_db()
 
     cursor.execute("DELETE FROM assigned_roles")
     cursor.execute("DELETE FROM match_history_recent")
@@ -757,133 +763,143 @@ def remove_all_users():
     cursor.execute("DELETE FROM kicks")
     cursor.execute("DELETE FROM users")
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def update_vacation_for_user(discord_id: int, status: bool=None) -> bool:
-    """
-    Toggle a user's vacation status.
+    """Toggle a user's vacation status.
 
     Args:
-        discord_id(int): Unique Discord id of a member.
-        status(bool): What to set specified user's vacation status to. If None, set status to opposite of current status.
+        discord_id: Unique Discord id of a member.
+        status: What to set specified user's vacation status to. If None, set status to opposite of current status.
 
     Returns:
-        bool: The specified user's updated vacation status.
+        The specified user's updated vacation status.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
-    if (type(status) == bool):
-        update_vacation_query = "UPDATE users SET vacation = %s WHERE discord_id = %s"
-        cursor.execute(update_vacation_query, (status, discord_id))
+    if isinstance(status, bool):
+        cursor.execute("UPDATE users SET vacation = %s WHERE discord_id = %s", (status, discord_id))
     else:
-        update_vacation_query = "UPDATE users SET vacation = NOT vacation WHERE discord_id = %s"
-        cursor.execute(update_vacation_query, (discord_id))
+        cursor.execute("UPDATE users SET vacation = NOT vacation WHERE discord_id = %s", (discord_id))
 
     cursor.execute("SELECT vacation FROM users WHERE discord_id = %s", (discord_id))
     query_result = cursor.fetchone()
 
-    if (query_result is None):
-        db.close()
+    if query_result is None:
+        database.close()
         return False
 
-    db.commit()
-    db.close()
-
+    database.commit()
+    database.close()
     return query_result["vacation"]
 
 
-def get_users_on_vacation() -> dict:
-    """
-    Get a dict of active members that are currently on vacation.
+def get_users_on_vacation() -> Dict[str, str]:
+    """Get a dict of active members that are currently on vacation.
 
     Returns:
-        dict{player_tag(str): player_name(str)}: Player names and tags of users on vacation.
+        Dictionary mapping player tags to player names of users that are on vacation.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT player_name, player_tag FROM users WHERE vacation = TRUE")
     query_result = cursor.fetchall()
-    db.close()
+    database.close()
 
     if query_result is None:
         return {}
 
     active_members = clash_utils.get_active_members_in_clan()
-    users_on_vacation = { user["player_tag"]: user["player_name"] for user in query_result if user["player_tag"] in active_members }
+    users_on_vacation = {user["player_tag"]: user["player_name"] for user in query_result if user["player_tag"] in active_members}
     return users_on_vacation
 
 
-# Set vacation to false for all users.
 def clear_all_vacation():
-    db, cursor = connect_to_db()
+    """Set all users to not on vacation."""
+    database, cursor = connect_to_db()
 
     cursor.execute("UPDATE users SET vacation = FALSE")
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
-# Set whether to send deck usage reminders.
 def set_reminder_status(status: bool):
-    db, cursor = connect_to_db()
+    """Set automated reminders on or off.
+
+    Args:
+        status: Whether automated reminders should be on or off.
+    """
+    database, cursor = connect_to_db()
 
     cursor.execute("UPDATE automation_status SET send_reminders = %s", (status))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
-# Return current reminder status.
 def get_reminder_status() -> bool:
-    db, cursor = connect_to_db()
+    """Get status of automated reminders.
 
-    cursor.execute("SELECT * FROM automation_status")
+    Returns:
+        Whether automated reminders are on or off.
+    """
+    database, cursor = connect_to_db()
+
+    cursor.execute("SELECT send_reminders FROM automation_status")
     query_result = cursor.fetchone()
 
     if query_result is None:
-        db.close()
+        database.close()
         return False
 
     status = query_result["send_reminders"]
-    db.close()
+    database.close()
     return status
 
 
-# Set whether to send strikes automatically.
 def set_strike_status(status: bool):
-    db, cursor = connect_to_db()
+    """Set automated strikes on or off.
+
+    Args:
+        status: Whether automated strikes should be on or off.
+    """
+    database, cursor = connect_to_db()
 
     cursor.execute("UPDATE automation_status SET send_strikes = %s", (status))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
-# Return current strike status.
 def get_strike_status() -> bool:
-    db, cursor = connect_to_db()
+    """Get status of automated strikes.
 
-    cursor.execute("SELECT * FROM automation_status")
+    Returns:
+        Whether automated strikes are on or off.
+    """
+    database, cursor = connect_to_db()
+
+    cursor.execute("SELECT send_strikes FROM automation_status")
     query_result = cursor.fetchone()
 
     status = query_result["send_strikes"]
-    db.close()
+    database.close()
     return status
 
 
 def get_roles(discord_id: int) -> List[str]:
-    """
-    Get the list of roles currently assigned to a user.
+    """Get the list of roles currently assigned to a user.
 
     Args:
-        discord_id (int): Unique Discord id of a member.
+        discord_id: Unique Discord id of a member.
 
     Returns:
-        List[str]: List of role names assigned to the specified user.
+        List of role names assigned to the specified user.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT discord_roles.role_name FROM discord_roles\
                     INNER JOIN assigned_roles on discord_roles.id = assigned_roles.discord_role_id\
@@ -892,21 +908,20 @@ def get_roles(discord_id: int) -> List[str]:
                     (discord_id))
 
     query_result = cursor.fetchall()
-    db.close()
+    database.close()
 
     roles = [role["role_name"] for role in query_result]
     return roles
 
 
 def commit_roles(discord_id: int, roles: List[str]):
-    """
-    Delete the roles currently assigned to a user. Then record their new roles.
+    """Delete the roles currently assigned to a user. Then record their new roles.
 
     Args:
-        discord_id (int): Unique Discord id of a member.
-        roles (List[str]): List of new roles to assign to user.
+        discord_id: Unique Discord id of a member.
+        roles: List of new roles to assign to user.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("DELETE FROM assigned_roles WHERE user_id IN (SELECT id FROM users WHERE discord_id = %s)", (discord_id))
 
@@ -914,61 +929,59 @@ def commit_roles(discord_id: int, roles: List[str]):
         cursor.execute("INSERT INTO assigned_roles VALUES\
                         ((SELECT id FROM users WHERE discord_id = %s), (SELECT id FROM discord_roles WHERE role_name = %s))",
                         (discord_id, role))
-    
-    db.commit()
-    db.close()
 
+    database.commit()
+    database.close()
 
+# TODO: When ReminderTime is moved out  of bot_utils and into a types file, fix type hinting here.
 def update_time_zone(discord_id: int, time_zone):
-    """
-    Change a user's preferred time for receiving automated reminders.
+    """Change a user's preferred time for receiving automated reminders.
 
     Args:
-        discord_id(int): Unique Discord id of a member.
-        time_zone(ReminderTime): Preferred time zone.
+        discord_id: Unique Discord id of a member.
+        time_zone (ReminderTime): Preferred time zone.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("UPDATE users SET time_zone = %s WHERE discord_id = %s", (time_zone.value, discord_id))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def get_members_in_time_zone(time_zone) -> Set[str]:
-    """
-    Get the members in the specified time zone.
+    """Get the members in the specified time zone.
 
     Args:
-        time_zone(ReminderTime): Get members from this time zone.
+        time_zone (ReminderTime): Get members from this time zone.
 
     Returns:
-        set[player_tag(str)]: Player tags of users in specified time zone.
+        Set of player tags of users in specified time zone.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT player_tag FROM users WHERE time_zone = %s", (time_zone.value))
     query_result = cursor.fetchall()
-    db.close()
+    database.close()
 
     if query_result is None:
         return set()
 
-    members = { user["player_tag"] for user in query_result }
-
+    members = {user["player_tag"] for user in query_result}
     return members
 
 
-def record_deck_usage_today(deck_usage: dict):
-    """
-    Log how many decks were used today by each member of the primary clan. Any users in the database but not in the primary clan
-    will be considered to have used 0 decks today.
+def record_deck_usage_today(deck_usage: Dict[str, int]):
+    """Record deck usage for each user in the database.
+
+    Users in the passed in dictionary from the primary clan have their usage from the dictionary recorded. All other users in the
+    database have 0 decks used recorded. If deck_usage is empty, then each user in the database will have 7 decks recorded to
+    indicate that real data is missing for that day.
 
     Args:
-        deck_usage(dict): dict of users and number of decks used today.
-            {player_tag(str): decks_used_today(int)}
+        Dictionary mapping player tags to number of decks used by that player today.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT player_tag FROM users")
     query_result = cursor.fetchall()
@@ -983,6 +996,7 @@ def record_deck_usage_today(deck_usage: dict):
         deck_usage = {}
         default_deck_usage = 7
 
+    # TODO: look into using cursor.executemany() to improve performance.
     for player_tag in deck_usage:
         db_users.discard(player_tag)
         cursor.execute("SELECT player_tag, usage_history FROM users WHERE player_tag = %s", (player_tag))
@@ -1003,18 +1017,17 @@ def record_deck_usage_today(deck_usage: dict):
         updated_history = ((query_result["usage_history"] & SIX_DAY_MASK) << 3) | (default_deck_usage & ONE_DAY_MASK)
         cursor.execute("UPDATE users SET usage_history = %s WHERE player_tag = %s", (updated_history, player_tag))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, int, datetime.datetime]]:
-    """
-    Get usage history of all users in database.
+    """Get usage history of all users in database.
 
     Returns:
-        List[Tuple[str, str, int, datetime.datetime]]: List of player names, tags, discord ids, usage histories, and tracked since dates.
+        List of player names, player tags, discord IDs, usage histories, and tracked since dates.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT id, player_name, player_tag, discord_id, usage_history FROM users")
     users = cursor.fetchall()
@@ -1031,19 +1044,23 @@ def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, int, datetime
         usage_list.append((user["player_name"], user["player_tag"], user["discord_id"], user["usage_history"], tracked_since))
 
     usage_list.sort(key = lambda x : x[0].lower())
-    db.close()
+    database.close()
     return usage_list
 
 
 def clean_up_db(active_members: dict=None):
-    """
+    """Updates database to ensure status column is up to date.
+
     Checks that every user in the database has an appropriate status.
     ACTIVE users that are no longer active members of the clan are moved to INACTIVE.
     UNREGISTERED users that are no longer active members of the clan are moved to DEPARTED.
     INACTIVE users that are now part of the clan are moved to ACTIVE.
     DEPARTED users that are now part of the clan are moved to UNREGISTERED.
+
+    Args:
+        active_members: Active members of primary clan. Will fetch if not provided.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     if active_members is None:
         active_members = clash_utils.get_active_members_in_clan()
@@ -1083,100 +1100,103 @@ def clean_up_db(active_members: dict=None):
 
                 update_user(clash_data)
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
-def get_server_members_info() -> dict:
-    """
-    Get database information of all members in the server.
+# TODO: Use TypedDict
+def get_server_members_info() -> Dict[int, Dict[str, Union[str, int]]]:
+    """Get database information of all members in the server.
 
     Returns:
-        dict: dict containing info about server members.
+        Dictionary containing info about server members.
             {
-                discord_id(int): {
-                    player_tag(str),
-                    player_name(str),
-                    discord_id(int),
-                    discord_name(str),
-                    clan_role(str)
+                discord_id: {
+                    "player_tag": str,
+                    "player_name": str,
+                    "discord_id": int,
+                    "discord_name": str,
+                    "clan_role": str
                 }
             }
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT player_tag, player_name, discord_id, discord_name, clan_role FROM users WHERE discord_id IS NOT NULL")
     query_result = cursor.fetchall()
-    db.close()
+    database.close()
 
     if query_result is None:
         return {}
 
     player_info = {user["discord_id"]: user for user in query_result}
-
     return player_info
 
 
-def get_and_update_match_history_info(player_tag: str, fame: int, new_check_time: datetime.datetime) -> Tuple[int, datetime.datetime]:
-    """
-    Get a user's fame and time when their battlelog was last checked. Then store their updated fame and current time.
+def get_and_update_match_history_info(player_tag: str,
+                                      fame: int,
+                                      new_check_time: datetime.datetime) -> Tuple[int, datetime.datetime]:
+    """Get a user's fame and time when their battlelog was last checked. Then store their updated fame and current time.
 
     Args:
-        player_tag(str): Player to get/set fame for.
-        fame(int): Current fame value.
-        new_check_time(datetime.datetime): Current time to set last_check_time to.
+        player_tag: Player to get/set fame for.
+        fame: Current fame value.
+        new_check_time: Current time to set last_check_time to.
 
     Returns:
-        tuple(fame(int), last_check_time(datetime.datetime: Previous fame value and battle time.
+        Specified user's previous fame and check time.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
-    cursor.execute("SELECT last_check_time, fame FROM match_history_recent WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
+    cursor.execute("SELECT last_check_time, fame FROM match_history_recent\
+                    WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
+                    (player_tag))
     query_result = cursor.fetchone()
     fame_and_time = (None, None)
 
     if query_result is None:
         if not add_new_unregistered_user(player_tag):
-            db.close()
+            database.close()
             return fame_and_time
         fame_and_time = (0, bot_utils.battletime_to_datetime(get_last_check_time()))
     else:
         fame_and_time = (query_result["fame"], bot_utils.battletime_to_datetime(query_result["last_check_time"]))
 
-    cursor.execute("UPDATE match_history_recent SET last_check_time = %s, fame = %s WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
+    cursor.execute("UPDATE match_history_recent SET last_check_time = %s, fame = %s\
+                    WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
                    (bot_utils.datetime_to_battletime(new_check_time), fame, player_tag))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
     return fame_and_time
 
 
 def set_users_last_check_time(player_tag: str, last_check_time: datetime.datetime):
-    """
-    Sets the last check time of a specific user.
+    """Sets the last check time of a specific user.
 
     Args:
-        player_tag(str): Player to update.
-        last_check_time(datetime.datetime): Time to set for specified user.
+        player_tag: Player to update.
+        last_check_time: Time to set for specified user.
     """
-    db, cursor = connect_to_db()
-    
+    database, cursor = connect_to_db()
+
     last_check_time = bot_utils.datetime_to_battletime(last_check_time)
-    cursor.execute("UPDATE match_history_recent SET last_check_time = %s WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
+    cursor.execute("UPDATE match_history_recent SET last_check_time = %s\
+                    WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
                    (last_check_time, player_tag))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
-def update_match_history(user_performance_list: list):
-    """
-    Add each player's game stats to the match_history tables.
+# TODO: Use TypedDict and cursor.executemany()
+def update_match_history(user_performance_list: List[Dict[str, int]]):
+    """Add each player's game stats to the match_history tables.
 
     Args:
-        user_performance_list(list[dict]): List of user dictionaries with their river race results.
+        List of user dictionaries with their river race results.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     for user in user_performance_list:
         if not user:
@@ -1208,23 +1228,24 @@ def update_match_history(user_performance_list: list):
                         duel_series_losses = duel_series_losses + %(duel_series_losses)s\
                         WHERE user_id IN (SELECT id FROM users WHERE player_tag = %(player_tag)s)", user)
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
 def prepare_for_river_race(last_check_time: datetime.datetime):
-    """
+    """Configure the database at the start of a river race.
+
     Needs to run every Thursday when river race starts. Resets fame to 0 and sets last_check_time to current time. Set tracked_since
     to current time for active members and NULL for everyone else. Also sets the relevant race_status fields.
 
     Args:
-        last_check_time(datetime.datetime): When match performance is next calculated, do not look at games before this time.
+        last_check_time: Do not look at games before this time when match performance is next calculated
     """
     set_completed_saturday_status(False)
     set_war_time_status(True)
     set_last_check_time(last_check_time)
 
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     last_check_time = bot_utils.datetime_to_battletime(last_check_time)
     cursor.execute("UPDATE match_history_recent SET\
@@ -1249,6 +1270,7 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
     clans = clash_utils.get_clans_in_race(False)
     reset_clans = False
 
+    # TODO: Use cursor.executemany()
     for clan in clans:
         cursor.execute("SELECT clan_tag FROM river_race_clans WHERE clan_tag = %s", (clan["tag"]))
         if cursor.fetchone() is None:
@@ -1262,21 +1284,21 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
             cursor.execute("INSERT INTO river_race_clans VALUES (%(tag)s, %(name)s, 0, %(total_decks_used)s, 0, 0)", clan)
     else:
         for clan in clans:
-            cursor.execute("UPDATE river_race_clans SET fame = 0, total_decks_used = %(total_decks_used)s WHERE clan_tag = %(tag)s", clan)
+            cursor.execute("UPDATE river_race_clans SET fame = 0, total_decks_used = %(total_decks_used)s WHERE clan_tag = %(tag)s",
+                           clan)
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
     set_colosseum_week_status(False)
 
 
 def save_clans_in_race_info(post_race: bool):
-    """
-    Update river_race_clans table with clans' current fame and deck usage.
+    """Update river_race_clans table with clans' current fame and deck usage.
 
     Args:
-        post_race(bool): Whether this info is being saved after the river race has concluded.
+        post_race: Whether this info is being saved after the river race has concluded.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
     clans = clash_utils.get_clans_in_race(post_race)
     saved_clan_info = get_saved_clans_in_race_info()
     colosseum_week = is_colosseum_week()
@@ -1288,46 +1310,65 @@ def save_clans_in_race_info(post_race: bool):
         war_decks_used_today = total_decks_used - saved_clan_info[tag]["total_decks_used"]
 
         if colosseum_week:
-            cursor.execute("UPDATE river_race_clans SET total_decks_used = %s, war_decks_used = war_decks_used + %s, num_days = num_days + 1 WHERE clan_tag = %s",
+            cursor.execute("UPDATE river_race_clans SET\
+                            total_decks_used = %s,\
+                            war_decks_used = war_decks_used + %s,\
+                            num_days = num_days + 1\
+                            WHERE clan_tag = %s",
                            (total_decks_used, war_decks_used_today, tag))
         else:
             if clan["completed"]:
                 continue
 
-            cursor.execute("UPDATE river_race_clans SET fame = %s, total_decks_used = %s, war_decks_used = war_decks_used + %s, num_days = num_days + 1 WHERE clan_tag = %s",
+            cursor.execute("UPDATE river_race_clans SET\
+                            fame = %s,\
+                            total_decks_used = %s,\
+                            war_decks_used = war_decks_used + %s,\
+                            num_days = num_days + 1\
+                            WHERE clan_tag = %s",
                            (current_fame, total_decks_used, war_decks_used_today, tag))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
 
-def get_saved_clans_in_race_info() -> dict:
-    """
-    Get saved clans fame and decks used.
+# TODO: Use TypedDict
+def get_saved_clans_in_race_info() -> Dict[str, Dict[str, Union[str, int]]]:
+    """Get saved clans fame and decks used.
 
     Returns:
-        dict{clan_tag(str): {"clan_tag": str, "clan_name": str, "fame": int, "total_decks_used": int, "war_decks_used": int, "num_days": int}}
+        Dictionary mapping clan tags to dictionary containing saved data from that clan.
+        {
+            clan_tag: {
+                "clan_tag": str,
+                "clan_name": str,
+                "fame": int,
+                "total_decks_used": int,
+                "war_decks_used": int,
+                "num_days": int
+            }
+        }
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT * FROM river_race_clans")
     query_result = cursor.fetchall()
 
     clans_info = {clan["clan_tag"]: clan for clan in query_result}
 
-    db.close()
+    database.close()
     return clans_info
 
 
-def get_match_performance_dict(player_tag: str) -> dict:
-    """
-    Get a dict containing a specified user's match performance.
+# TODO: Use TypedDict
+def get_match_performance_dict(player_tag: str) -> Dict[str, Dict[str, Union[int, datetime.datetime, Dict[str, int]]]]:
+    """Get a dictionary containing a user's river race statistics.
 
     Args:
-        player_tag(str): Player tag to get stats for.
+        player_tag: Player tag of user to get stats of.
 
     Returns:
-        dict {str: dict{str: int/float}}: dict containing specified player's stats.
+        Dictionary containing specified users's stats.
             {
                 "all/recent": {
                     "fame": int, (recent only)
@@ -1377,20 +1418,16 @@ def get_match_performance_dict(player_tag: str) -> dict:
                 }
             }
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
-    cursor.execute("SELECT fame, tracked_since, battle_wins, battle_losses, special_battle_wins, special_battle_losses, boat_attack_wins, boat_attack_losses, duel_match_wins, duel_match_losses, duel_series_wins, duel_series_losses\
-                    FROM match_history_recent WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
-
+    cursor.execute("SELECT * FROM match_history_recent WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
     match_performance_recent = cursor.fetchone()
 
-    cursor.execute("SELECT battle_wins, battle_losses, special_battle_wins, special_battle_losses, boat_attack_wins, boat_attack_losses, duel_match_wins, duel_match_losses, duel_series_wins, duel_series_losses\
-                    FROM match_history_all WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
-
+    cursor.execute("SELECT * FROM match_history_all WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
     match_performance_all = cursor.fetchone()
 
     if (match_performance_recent is None) or (match_performance_all is None):
-        db.close()
+        database.close()
         return None
 
     db_info_dict = {"recent": match_performance_recent, "all": match_performance_all}
@@ -1463,19 +1500,18 @@ def get_match_performance_dict(player_tag: str) -> dict:
                                                      "total": total_pvp_matches,
                                                      "win_rate": overall_win_rate}
 
-    db.close()
+    database.close()
     return match_performance_dict
 
 
 def get_non_active_participants(active_members: dict=None) -> Set[str]:
-    """
-    Get a set of player tags of users who were tracked in the most recent river race but are not currently active members.
+    """Get a set of player tags of users who were tracked in the most recent river race but are not currently active members.
 
     Args:
-        active_members(dict, optional): Active members to cross reference.
+        active_members (optional): Dictionary of active members of primary clan.
 
     Returns:
-        set(str): Set of player tags.
+        Set of player tags.
     """
     if active_members is None:
         active_members = clash_utils.get_active_members_in_clan(PRIMARY_CLAN_TAG)
@@ -1483,11 +1519,12 @@ def get_non_active_participants(active_members: dict=None) -> Set[str]:
     if len(active_members) == 0:
         return set()
 
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
-    cursor.execute("SELECT player_tag FROM users WHERE id IN (SELECT user_id FROM match_history_recent WHERE tracked_since IS NOT NULL)")
+    cursor.execute("SELECT player_tag FROM users\
+                    WHERE id IN (SELECT user_id FROM match_history_recent WHERE tracked_since IS NOT NULL)")
     query_result = cursor.fetchall()
-    db.close()
+    database.close()
 
     former_participants = set()
 
@@ -1499,11 +1536,11 @@ def get_non_active_participants(active_members: dict=None) -> Set[str]:
 
 
 def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
-    """
-    Add any active members not in the database as UNREGISTERED users.
+    """Add any active members not in the database as UNREGISTERED users.
 
     Args:
-        clan_tag(str): Clan to get users from.
+        clan_tag (optional): Clan to get users from. Defaults to primary clan.
+        active_members (optional): Dictionary of active members of clan_tag.
     """
     if active_members is None:
         active_members = clash_utils.get_active_members_in_clan(clan_tag)
@@ -1513,11 +1550,11 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=
     if len(active_members) == 0:
         return
 
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT player_tag FROM users")
     query_result = cursor.fetchall()
-    db.close()
+    database.close()
 
     if query_result is None:
         return
@@ -1530,26 +1567,25 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=
 
 
 def kick_user(player_tag: str) -> Tuple[int, str]:
-    """
-    Insert a kick entry for the specified user.
+    """Insert a kick entry for the specified user.
 
     Args:
-        player_tag(str): Player tag of user to kick.
+        player_tag: Player tag of user to kick.
 
     Returns:
-        Tuple[int, str]: Tuple of total number of kicks and last time user was kicked.
+        databaseTuple of total number of kicks and last time user was kicked.
     """
     kick_time = bot_utils.get_current_battletime()
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT id FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
-    id = query_result["id"]
+    user_id = query_result["id"]
 
-    cursor.execute("INSERT INTO kicks VALUES (%s, %s)", (id, kick_time))
+    cursor.execute("INSERT INTO kicks VALUES (%s, %s)", (user_id, kick_time))
 
-    db.commit()
-    db.close()
+    database.commit()
+    database.close()
 
     kicks = get_kicks(player_tag)
     total_kicks = len(kicks)
@@ -1564,51 +1600,49 @@ def kick_user(player_tag: str) -> Tuple[int, str]:
 
 
 def undo_kick(player_tag: str) -> str:
-    """
-    Undo the latest kick of the specified user.
+    """Undo the latest kick of the specified user.
 
     Args:
-        player_tag(str): Player tag of user to undo kick for.
+        player_tag: Player tag of user to undo kick for.
 
     Returns:
-        str: Time of undone kick, or None if user has not been kicked before.
+        Time of undone kick, or None if user has not been kicked before.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT id FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
-    id = query_result["id"]
+    user_id = query_result["id"]
 
-    cursor.execute("SELECT kick_time FROM kicks WHERE user_id = %s", (id))
+    cursor.execute("SELECT kick_time FROM kicks WHERE user_id = %s", (user_id))
     query_result = cursor.fetchall()
 
     if len(query_result) == 0:
-        db.close()
+        database.close()
         return None
 
-    kicks = [ kick["kick_time"] for kick in query_result ]
+    kicks = [kick["kick_time"] for kick in query_result]
     kicks.sort()
     latest_kick_time = kicks[-1]
 
-    cursor.execute("DELETE FROM kicks WHERE user_id = %s AND kick_time = %s", (id, latest_kick_time))
+    cursor.execute("DELETE FROM kicks WHERE user_id = %s AND kick_time = %s", (user_id, latest_kick_time))
     latest_kick_time = bot_utils.battletime_to_datetime(latest_kick_time).strftime("%Y-%m-%d")
-    
-    db.commit()
-    db.close()
+
+    database.commit()
+    database.close()
     return latest_kick_time
 
 
 def get_kicks(player_tag: str) -> List[str]:
-    """
-    Get a list of times a user was kicked.
+    """Get a list of times a user was kicked.
 
     Args:
-        player_tag(str): Player tag of user to get kicks for.
-    
+        player_tag: Player tag of user to get kicks for.
+
     Returns:
-        List[datetime.date]: List of times the user was kicked.
+        List of times the user was kicked.
     """
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     cursor.execute("SELECT kick_time FROM kicks WHERE user_id = (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
     query_result = cursor.fetchall()
@@ -1619,17 +1653,15 @@ def get_kicks(player_tag: str) -> List[str]:
         kicks.append(kick_time.strftime("%Y-%m-%d"))
 
     kicks.sort()
-
-    db.close()
+    database.close()
     return kicks
 
 
 def get_file_path() -> str:
-    """
-    Get path of new CSV file that should be created during export process.
+    """Get path of new CSV file that should be created during export process.
 
     Returns:
-        str: Path to new CSV file.
+        Path to new CSV file.
     """
     path = 'export_files'
 
@@ -1637,7 +1669,7 @@ def get_file_path() -> str:
         os.makedirs(path)
 
     files = [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-    files.sort(key = lambda x : os.path.getmtime(x))
+    files.sort(key=os.path.getmtime)
 
     if len(files) >= 5:
         os.remove(files[0])
@@ -1649,21 +1681,21 @@ def get_file_path() -> str:
 
 
 def export(primary_clan_only: bool, include_card_levels: bool) -> str:
-    """
-    Create Excel spreadsheet containing relevant information from the database.
+    """Create Excel spreadsheet containing relevant information from the database.
 
     Args:
-        primary_clan_only(bool)
+        primary_clan_only: Whether to include only members of the primary clan or all users in database.
+        include_card_levels: Whether to include sheet containing information about each user's card levels.
 
     Returns:
-        str: Path to spreadsheet.
+        Path to generated spreadsheet.
     """
     # Clean up the database and add any members of the clan to it that aren't already in it.
     active_members = clash_utils.get_active_members_in_clan()
     clean_up_db()
     add_unregistered_users(active_members=active_members)
 
-    db, cursor = connect_to_db()
+    database, cursor = connect_to_db()
 
     # Get clan info.
     clans = None
@@ -1694,7 +1726,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
     if users is None:
         return None
 
-    db.close()
+    database.close()
 
     # Create Excel workbook
     file_path = get_file_path()
@@ -1712,7 +1744,8 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         card_levels_percentile_sheet = workbook.add_worksheet("Card Level Percentiles")
 
     # Info sheet headers
-    info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes", "Permanent Strikes", "Kicks", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
+    info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes",
+                    "Permanent Strikes", "Kicks", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
     info_sheet.write_row(0, 0, info_headers)
 
     # History sheet headers
@@ -1760,7 +1793,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
 
     # Card levels headers
     if include_card_levels:
-        card_levels_headers = ["Player Name", "Player Tag"] + [x for x in range(14, 0, -1)]
+        card_levels_headers = ["Player Name", "Player Tag"] + list(range(14, 0, -1))
         card_levels_quantity_sheet.write_row(0, 0, card_levels_headers)
         card_levels_percentile_sheet.write_row(0, 0, card_levels_headers)
 
@@ -1877,7 +1910,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         if include_card_levels:
             card_levels_quantity_sheet.write_row(row, 0, card_levels_quantity_row)
             card_levels_percentile_sheet.write_row(row, 0, card_levels_percentiles_row)
-        
+
         row += 1
 
     workbook.close()
