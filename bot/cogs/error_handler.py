@@ -1,20 +1,20 @@
-"""
-Global error handler.
-"""
+"""Global error handler."""
 
 from difflib import SequenceMatcher
-from discord.ext import commands
+
 import discord
+from discord.ext import commands
 
 # Utils
-from utils.channel_utils import CHANNEL
 import utils.bot_utils as bot_utils
+from utils.channel_utils import CHANNEL
 
 
 class ErrorHandler(commands.Cog):
     """Error handling cog."""
 
     def __init__(self, bot):
+        """Save bots and constants needed for error handling."""
         self.bot = bot
         self.prefix = '!'
         self.special_member_not_found_handling_commands = {
@@ -27,29 +27,26 @@ class ErrorHandler(commands.Cog):
         }
 
     def command_usage(self, command: commands.Command, msg: str="Command should be formatted as:\n") -> str:
-        """
-        Get a string showing how to properly format the specified command.
+        """Create a string showing how to properly format the specified command.
 
         Args:
-            command(commands.Command): Command to get usage of.
-            msg(str): Custom message to say in front of proper command usage.
+            command: Command to get usage of.
+            msg (optional): Custom message to say in front of proper command usage.
 
         Returns:
-            str: How to use the command.
+            How to use the command.
         """
         args_str = " ".join(f"<{arg}>" for arg in command.clean_params.keys())
         usage = msg + f"{self.prefix}{command.name}"
 
         if len(args_str) > 0:
-                usage += f" {args_str}"
+            usage += f" {args_str}"
 
         return usage
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error: discord.DiscordException):
-        """
-        Error handler for failed commands.
-        """
+        """Error handler for failed commands."""
         if isinstance(error, commands.errors.CommandNotFound):
             if ctx.channel == CHANNEL.welcome():
                 return
@@ -120,15 +117,14 @@ class ErrorHandler(commands.Cog):
 
 
     async def command_not_found_embed(self, not_found_cmd: str, ctx: commands.Context) -> discord.Embed:
-        """
-        Creates an embed with the most similar command to a sent command that does not exist.
+        """Creates an embed with the most similar command to a sent command that does not exist.
 
         Args:
-            not_found_cmd(str): Sent command that does not exist.
-            ctx(commands.Context): Context of failed command.
+            not_found_cmd: Sent command that does not exist.
+            ctx: Context of failed command.
 
         Returns:
-            discord.Embed: Embed with information about most similar command.
+            Embed with information about most similar command.
         """
         highest_similarity = 0
         closest_command = None
@@ -157,45 +153,43 @@ class ErrorHandler(commands.Cog):
 
 
     def missing_args_embed(self, command: commands.Command) -> discord.Embed:
-        """
-        Creates an embed for commands send with missing arguments.
+        """Creates an embed for commands send with missing arguments.
 
         Args:
-            command(commands.Command): Incorrectly used command.
+            command: Incorrectly used command.
 
         Returns:
-            discord.Embed: Embedded message with information about how to use command.
+            Embed with information about how to use command.
         """
         embed = discord.Embed(color=discord.Color.red())
         embed.add_field(name="Missing required argument(s)",
                         value=self.command_usage(command))
         return embed
 
-    def bad_channel_embed(self, invalid_channel: str) -> discord.Embed:
-        """
-        Creates an embed for commands that fail to find a specified channel.
+    def unknown_error_embed(self, command: commands.Command) -> discord.Embed:
+        """Creates an embed for when an unhandled error has occurred.
 
         Args:
-            invalid_channel(str): The name of a channel that could not be found.
+            command: Command that triggered unhandled error.
 
         Returns:
-            discord.Embed: Embedded message with information about failure.
+            Embed with information about how to use command.
         """
         embed = discord.Embed(color=discord.Color.red())
-        embed.add_field(name="Invalid channel",
-                        value=f"The channel {invalid_channel} could not be found.")
+        embed.add_field(name="An unknown error has occurred",
+                        value=self.command_usage(command))
+        embed.set_footer(text="More information about this error has been logged.")
         return embed
 
     def bad_argument_embed(self, command: commands.Command, error: discord.DiscordException) -> discord.Embed:
-        """
-        Creates and embed for when a converter fails.
+        """Creates and embed for when a converter fails.
 
         Args:
-            command(commands.Command): Command that resulted in a converter failure.
-            error(discord.DiscordException): Error raised by converter failure.
+            command: Command that resulted in a converter failure.
+            error: Error raised by converter failure.
 
         Returns:
-            discord.Embed: Embedded message with information about the invalid parameter.
+            Embed with information about the invalid parameter.
         """
         embed = discord.Embed(color=discord.Color.red())
 
@@ -205,30 +199,28 @@ class ErrorHandler(commands.Cog):
         else:
             embed.add_field(name=f"Invalid parameter type: `{error.argument}`",
                             value=self.command_usage(command))
+
         return embed
 
-
-    def check_failure_embed(self,
-                            is_admin_only: bool,
+    @staticmethod
+    def check_failure_embed(is_admin_only: bool,
                             is_leader_only: bool,
                             is_elder_only: bool,
                             is_channel_check: bool,
                             is_disallowed_command: bool) -> discord.Embed:
-        """
-        Creates an embed for when a command cannot be issued due to a check failure.
+        """Creates an embed for when a command cannot be issued due to a check failure.
 
         Args:
-            is_admin_only(bool): If command failed because a non-admin issued it.
-            is_leader_only(bool): If command failed because a non-leader/non-admin issued it.
-            is_elder_only(bool): If command failed because a non-elder/non-leader/non-admin issued it.
-            is_channel_check(bool): If command failed because it was sent in an illegal channel.
-            is_disallowed_command(bool): If the command is currently disallowed.
+            is_admin_only: Whether command failed because a non-admin issued it.
+            is_leader_only: Whether command failed because a non-leader/non-admin issued it.
+            is_elder_only: Whether command failed because a non-elder/non-leader/non-admin issued it.
+            is_channel_check: Whether command failed because it was sent in an illegal channel.
+            is_disallowed_command: Whether the command is currently disallowed.
 
         Returns:
-            discord.Embed: Embedded message with information about why the command could not be issued.
+            Embed with information about why the command could not be issued.
         """
         embed = discord.Embed(color=discord.Color.red())
-
         fail_reason = ""
 
         if is_elder_only:
@@ -245,74 +237,72 @@ class ErrorHandler(commands.Cog):
         embed.add_field(name="Permissions error", value=fail_reason)
         return embed
 
+    @staticmethod
+    def bad_channel_embed(invalid_channel: str) -> discord.Embed:
+        """Creates an embed for commands that fail to find a specified channel.
+
+        Args:
+            invalid_channel: The name of a channel that could not be found.
+
+        Returns:
+            Embed with information about failure.
+        """
+        embed = discord.Embed(color=discord.Color.red())
+        embed.add_field(name="Invalid channel",
+                        value=f"The channel {invalid_channel} could not be found.")
+
+        return embed
 
     @staticmethod
     def member_not_found_embed(requires_discord_member: bool) -> discord.Embed:
-        """
-        Creates an embed for when a command cannot find a specified member.
+        """Creates an embed for when a command cannot find a specified member.
 
         Args:
-            requires_discord_member(bool): Whether the failing command requires the member to be on Discord.
+            requires_discord_member: Whether the failing command requires the member to be on Discord.
 
         Returns:
-            discord.Embed: Embedded message with information about why the member was not found.
+            Embed with information about why the member was not found.
         """
         embed = discord.Embed(color=discord.Color.red())
 
         if requires_discord_member:
             embed.add_field(name="Member not found",
-                            value="Make sure the specified member is on Discord. If their name includes spaces, place quotes around their name.")
+                            value=("Make sure the specified member is on Discord. "
+                                   "If their name includes spaces, place quotes around their name."))
         else:
             embed.add_field(name="Member not found",
-                            value="The specified member could not be found. If their name includes spaces, place quotes around their name.")
+                            value=("The specified member could not be found. "
+                                   "If their name includes spaces, place quotes around their name."))
+
         return embed
 
-    
     @staticmethod
     def missing_db_info(display_name: str) -> discord.Embed:
-        """
-        Creates an embed for when a member exists but they do not yet exist in the database.
+        """Creates an embed for when a member exists but they do not yet exist in the database.
 
         Args:
-            display_name(str): Display name of Discord user.
+            display_name: Display name of Discord user.
 
         Returns:
-            discord.Embed: Embedded message with information about why command failed.
+            Embed with information about why command failed.
         """
         embed = discord.Embed(color=discord.Color.red())
         embed.add_field(name="An unexpected error has occurred",
-                        value=f"{display_name} is on Discord but is not in the database. Make sure they've entered their player tag in the welcome channel.")
+                        value=(f"{display_name} is on Discord but is not in the database. "
+                               "Make sure they've entered their player tag in the welcome channel."))
         return embed
 
 
     @staticmethod
     def invoke_error_embed(msg: str) -> discord.Embed:
-        """
-        Creates an embed for commands that could not be invoked.
+        """Creates an embed for commands that could not be invoked.
 
         Args:
-            msg(str): Message to print with error.
+            msg: Message to print with error.
 
         Returns:
-            discord.Embed: Embedded message with information about error.
+            Embed with information about error.
         """
         embed = discord.Embed(color=discord.Color.red())
         embed.add_field(name="Command invoke error", value=msg)
-        return embed
-
-
-    def unknown_error_embed(self, command: commands.Command) -> discord.Embed:
-        """
-        Creates an embed for when an unhandled error has occurred.
-
-        Args:
-            command(commands.Command): Command that triggered unhandled error.
-
-        Returns:
-            discord.Embed: Embedded message with information about how to use command.
-        """
-        embed = discord.Embed(color=discord.Color.red())
-        embed.add_field(name="An unknown error has occurred",
-                        value=self.command_usage(command))
-        embed.set_footer(text="More information about this error has been logged.")
         return embed

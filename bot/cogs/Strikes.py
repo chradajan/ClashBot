@@ -1,35 +1,35 @@
 """Strikes cog. Various commands to update strike counts."""
 
+import discord
 from discord.ext import commands
 from prettytable import PrettyTable
-import discord
 
 # Cogs
-from cogs.ErrorHandler import ErrorHandler
+from cogs.error_handler import ErrorHandler
 
 # Utils
-from utils.channel_utils import CHANNEL
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.channel_utils import CHANNEL
 
 
 class Strikes(commands.Cog):
     """Commands for updating strike counts."""
 
     def __init__(self, bot):
+        """Save bot."""
         self.bot = bot
 
-
-    async def strike_helper(self, ctx, player_name: str, player_tag: str, delta: int, member: discord.Member=None):
-        """
-        Give or remove a strike from a user and send confirmation messages back to leader commands and strikes channels.
+    @staticmethod
+    async def strike_helper(ctx: commands.Context, player_name: str, player_tag: str, delta: int, member: discord.Member=None):
+        """Give or remove a strike from a user and send confirmation messages back to leader commands and strikes channels.
 
         Args:
-            player_name(str): User's in game name.
-            player_tag(str): User to update strikes for.
-            delta(int): Number of strikes to give or remove.
-            member(discord.Member): Member object of user if they are on Discord.
+            player_name: User's in game name.
+            player_tag: User to update strikes for.
+            delta: Number of strikes to give or remove.
+            member (optional): Member object of user if they are on Discord.
         """
         old_strike_count, new_strike_count, old_permanent_strikes, new_permanent_strikes = db_utils.give_strike(player_tag, delta)
 
@@ -38,9 +38,10 @@ class Strikes(commands.Cog):
             return
 
         message = "has received a strike" if delta > 0 else "has had a strike removed"
-
         embed = discord.Embed(title="Strikes Updated", color=discord.Color.green())
-        embed.add_field(name=player_name, value=f"```Strikes: {old_strike_count} -> {new_strike_count}\nPermanent Strikes: {old_permanent_strikes} -> {new_permanent_strikes}```")
+        embed.add_field(name=player_name,
+                        value=(f"```Strikes: {old_strike_count} -> {new_strike_count}\n"
+                               f"Permanent Strikes: {old_permanent_strikes} -> {new_permanent_strikes}```"))
         await ctx.send(embed=embed)
 
         if member is None:
@@ -48,11 +49,10 @@ class Strikes(commands.Cog):
         else:
             await CHANNEL.strikes().send(f"{member.mention} {message}.  {old_strike_count} -> {new_strike_count}")
 
-
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
-    async def give_strike(self, ctx, member: discord.Member):
+    async def give_strike(self, ctx: commands.Context, member: discord.Member):
         """Increment specified user's strikes by 1."""
         player_info = db_utils.find_user_in_db(member.id)
 
@@ -60,13 +60,13 @@ class Strikes(commands.Cog):
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
-        else:
-            _, player_tag, _ = player_info[0]
 
+        _, player_tag, _ = player_info[0]
         await self.strike_helper(ctx, member.display_name, player_tag, 1, member)
 
     @give_strike.error
-    async def give_strike_error(self, ctx, error):
+    async def give_strike_error(self, ctx: commands.Context, error: discord.DiscordException):
+        """!give_strike error handler."""
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
@@ -80,11 +80,10 @@ class Strikes(commands.Cog):
                 embed = bot_utils.duplicate_names_embed(player_info, "give_strike")
                 await ctx.send(embed=embed)
 
-
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
-    async def remove_strike(self, ctx, member: discord.Member):
+    async def remove_strike(self, ctx: commands.Context, member: discord.Member):
         """Decrement specified user's strikes by 1."""
         player_info = db_utils.find_user_in_db(member.id)
 
@@ -98,7 +97,8 @@ class Strikes(commands.Cog):
         await self.strike_helper(ctx, member.display_name, player_tag, -1, member)
 
     @remove_strike.error
-    async def remove_strike_error(self, ctx, error):
+    async def remove_strike_error(self, ctx: commands.Context, error: discord.DiscordException):
+        """!remove_strike error handler."""
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
@@ -112,11 +112,10 @@ class Strikes(commands.Cog):
                 embed = bot_utils.duplicate_names_embed(player_info, "remove_strike")
                 await ctx.send(embed=embed)
 
-
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
-    async def reset_all_strikes(self, ctx):
+    async def reset_all_strikes(self, ctx: commands.Context):
         """Reset everyone's strikes to 0. Permanent strikes are not affected."""
         db_utils.reset_strikes()
 
@@ -127,11 +126,10 @@ class Strikes(commands.Cog):
         confirmation_embed = discord.Embed(title="Strikes successfully reset to 0.", color=discord.Color.green())
         await ctx.send(embed=confirmation_embed)
 
-
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
-    async def strikes_report(self, ctx):
+    async def strikes_report(self, ctx: commands.Context):
         """Get a report of players with strikes."""
         strikes = db_utils.get_users_with_strikes()
         active_members = clash_utils.get_active_members_in_clan()
@@ -180,7 +178,7 @@ class Strikes(commands.Cog):
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
-    async def upcoming_strikes(self, ctx):
+    async def upcoming_strikes(self, ctx: commands.Context):
         """Get a list of users who will receive strikes for lack of participation in the current river race."""
         upcoming_strikes_list = bot_utils.upcoming_strikes(True)
         embed_one = discord.Embed(title="Upcoming Strikes", color=discord.Color.green())

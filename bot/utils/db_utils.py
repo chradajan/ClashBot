@@ -291,7 +291,7 @@ def update_user(clash_data: Dict[str, Union[str, int]]) -> str:
 
 
 # TODO: Use TypedDict
-def get_user_data(player_tag: str) -> Dict:
+def get_user_data(player_tag: str) -> Dict[str, Union[str, int]]:
     """Get a user's information from the users table.
 
     Args:
@@ -300,17 +300,17 @@ def get_user_data(player_tag: str) -> Dict:
     Returns:
         dict: Dict of user's info.
             {
-                player_tag: str,
-                player_name: str,
-                discord_name: str,
-                clan_role: str,
-                clan_name: str,
-                clan_tag: str,
-                vacation: bool,
-                strikes: int,
-                permanent_strikes: int,
-                usage_history: int,
-                status: str
+                "player_tag": str,
+                "player_name": str,
+                "discord_name": str,
+                "clan_role": str,
+                "clan_name": str,
+                "clan_tag": str,
+                "vacation": bool,
+                "strikes": int,
+                "permanent_strikes": int,
+                "usage_history": int,
+                "status": str
             }
     """
     database, cursor = connect_to_db()

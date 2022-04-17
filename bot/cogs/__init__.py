@@ -1,9 +1,11 @@
-from .AutomationTools import *
-from .ErrorHandler import *
-from .LeaderUtils import *
-from .MemberListeners import *
-from .MemberUtils import *
-from .StatusReports import *
-from .Strikes import *
-from .UserUpdates import *
-from .Vacation import *
+"""Cog files."""
+
+from .automation_tools import *
+from .error_handler import *
+from .leader_utils import *
+from .listeners import *
+from .member_utils import *
+from .status_reports import *
+from .strikes import *
+from .user_updates import *
+from .vacation import *

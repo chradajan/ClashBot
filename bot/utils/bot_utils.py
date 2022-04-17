@@ -589,66 +589,54 @@ def create_match_performance_embed(player_name: str, player_tag: str) -> discord
     embed = discord.Embed(title=f"{player_name}'s River Race Stats")
 
     embed.add_field(name="Regular PvP",
-                    value=(
-                        "```"
-                        f"Wins:   {history['all']['regular']['wins']} \n"
-                        f"Losses: {history['all']['regular']['losses']} \n"
-                        f"Total:  {history['all']['regular']['total']} \n"
-                        f"Win rate: {history['all']['regular']['win_rate']}"
-                        "```"
-                    ))
+                    value=("```"
+                           f"Wins:   {history['all']['regular']['wins']} \n"
+                           f"Losses: {history['all']['regular']['losses']} \n"
+                           f"Total:  {history['all']['regular']['total']} \n"
+                           f"Win rate: {history['all']['regular']['win_rate']}"
+                           "```"))
     embed.add_field(name="Special PvP",
-                    value=(
-                        "```"
-                        f"Wins:   {history['all']['special']['wins']} \n"
-                        f"Losses: {history['all']['special']['losses']} \n"
-                        f"Total:  {history['all']['special']['total']} \n"
-                        f"Win rate: {history['all']['special']['win_rate']}"
-                        "```"
-                    ))
+                    value=("```"
+                           f"Wins:   {history['all']['special']['wins']} \n"
+                           f"Losses: {history['all']['special']['losses']} \n"
+                           f"Total:  {history['all']['special']['total']} \n"
+                           f"Win rate: {history['all']['special']['win_rate']}"
+                           "```"))
     embed.add_field(name="\u200b", value="\u200b", inline=False)
 
     embed.add_field(name="Duel (individual matches)",
-                    value=(
-                        "```"
-                        f"Wins:   {history['all']['duel_matches']['wins']} \n"
-                        f"Losses: {history['all']['duel_matches']['losses']} \n"
-                        f"Total:  {history['all']['duel_matches']['total']} \n"
-                        f"Win rate: {history['all']['duel_matches']['win_rate']}"
-                        "```"
-                    ),
+                    value=("```"
+                           f"Wins:   {history['all']['duel_matches']['wins']} \n"
+                           f"Losses: {history['all']['duel_matches']['losses']} \n"
+                           f"Total:  {history['all']['duel_matches']['total']} \n"
+                           f"Win rate: {history['all']['duel_matches']['win_rate']}"
+                           "```"),
                     inline=True)
     embed.add_field(name="Duel (series)",
-                    value=(
-                        "```"
-                        f"Wins:   {history['all']['duel_series']['wins']} \n"
-                        f"Losses: {history['all']['duel_series']['losses']} \n"
-                        f"Total:  {history['all']['duel_series']['total']} \n"
-                        f"Win rate: {history['all']['duel_series']['win_rate']}"
-                        "```"
-                    ),
+                    value=("```"
+                           f"Wins:   {history['all']['duel_series']['wins']} \n"
+                           f"Losses: {history['all']['duel_series']['losses']} \n"
+                           f"Total:  {history['all']['duel_series']['total']} \n"
+                           f"Win rate: {history['all']['duel_series']['win_rate']}"
+                           "```"),
                     inline=True)
     embed.add_field(name="\u200b", value="\u200b", inline=False)
 
     embed.add_field(name="Combined PvP matches",
-                    value=(
-                        "```"
-                        f"Wins:   {history['all']['combined_pvp']['wins']} \n"
-                        f"Losses: {history['all']['combined_pvp']['losses']} \n"
-                        f"Total:  {history['all']['combined_pvp']['total']} \n"
-                        f"Win rate: {history['all']['combined_pvp']['win_rate']}"
-                        "```"
-                    ),
+                    value=("```"
+                           f"Wins:   {history['all']['combined_pvp']['wins']} \n"
+                           f"Losses: {history['all']['combined_pvp']['losses']} \n"
+                           f"Total:  {history['all']['combined_pvp']['total']} \n"
+                           f"Win rate: {history['all']['combined_pvp']['win_rate']}"
+                           "```"),
                     inline=False)
     embed.add_field(name="Boat attacks",
-                    value=(
-                        "```"
-                        f"Wins:   {history['all']['boat_attacks']['wins']} \n"
-                        f"Losses: {history['all']['boat_attacks']['losses']} \n"
-                        f"Total:  {history['all']['boat_attacks']['total']} \n"
-                        f"Win rate: {history['all']['boat_attacks']['win_rate']}"
-                        "```"
-                    ))
+                    value=("```"
+                           f"Wins:   {history['all']['boat_attacks']['wins']} \n"
+                           f"Losses: {history['all']['boat_attacks']['losses']} \n"
+                           f"Total:  {history['all']['boat_attacks']['total']} \n"
+                           f"Win rate: {history['all']['boat_attacks']['win_rate']}"
+                           "```"))
 
     return embed
 
@@ -1036,14 +1024,12 @@ async def send_new_member_info(clash_data: Dict[str, Union[str, int]]):
     embed = discord.Embed(title=f"{clash_data['player_name']} just joined the server!", url=url)
 
     embed.add_field(name=f"About {clash_data['player_name']}",
-                    value=(
-                        "```"
-                        "Level: {expLevel}\n"
-                        "Trophies: {trophies}\n"
-                        "Best Trophies: {bestTrophies}\n"
-                        "Cards Owned: {foundCards}/{totalCards}"
-                        "```"
-                    ).format(**card_level_data),
+                    value=("```"
+                           "Level: {expLevel}\n"
+                           "Trophies: {trophies}\n"
+                           "Best Trophies: {bestTrophies}\n"
+                           "Cards Owned: {foundCards}/{totalCards}"
+                           "```").format(**card_level_data),
                     inline=False)
 
     found_cards = card_level_data["foundCards"]

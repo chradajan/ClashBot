@@ -1,8 +1,8 @@
 """Member Utils cog. Various commands available to all users."""
 
+import discord
 from discord.ext import commands
 from prettytable import PrettyTable
-import discord
 
 # Utils
 import utils.bot_utils as bot_utils
@@ -14,16 +14,15 @@ class MemberUtils(commands.Cog):
     """Miscellaneous utilities for everyone."""
 
     def __init__(self, bot):
+        """Save bot."""
         self.bot = bot
-
 
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
-    async def river_race_status(self, ctx, show_predictions: bool=False):
-        """Send a list of clans in the current river race and how battles they can still do today."""
+    async def river_race_status(self, ctx: commands.Context, show_predictions: bool=False):
+        """Send a list of clans in the current river race and how many battles they can still do today."""
         clans = clash_utils.get_clan_decks_remaining()
         embed = discord.Embed()
-
         table = PrettyTable()
         table.field_names = ["Clan", "Decks"]
 
@@ -40,10 +39,9 @@ class MemberUtils(commands.Cog):
             embed, _, _ = bot_utils.create_prediction_embeds(predicted_outcomes, completed_clans, {}, True)
             await ctx.send(embed=embed)
 
-
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
-    async def predict(self, ctx, use_historical_win_rates: bool, use_historical_deck_usage: bool):
+    async def predict(self, ctx: commands.Context, use_historical_win_rates: bool, use_historical_deck_usage: bool):
         """
 Predict today's river race outcome. If use_historical_win_rates is true, predicted scores will be based on each clan's \
 average win rate in this river race, otherwise it will use a win rate of 50% for each clan. If use_historical_deck_usage is \
@@ -70,10 +68,9 @@ all possible remaining decks."""
         if catch_up_embed is not None:
             await ctx.send(embed=catch_up_embed)
 
-
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
-    async def set_reminder_time(self, ctx, reminder_time: str):
+    async def set_reminder_time(self, ctx: commands.Context, reminder_time: str):
         """Set reminder time to either US or EU. US reminders go out at 02:00 UTC. EU reminders go out at 19:00 UTC."""
 
         time_zone: bot_utils.ReminderTime
@@ -95,10 +92,9 @@ all possible remaining decks."""
         success_embed.add_field(name="Your reminder time has updated", value=f"You will now receive {reminder_time} reminders")
         await ctx.send(embed=success_embed)
 
-
     @commands.command()
     @bot_utils.time_off_channel_check()
-    async def vacation(self, ctx):
+    async def vacation(self, ctx: commands.Context):
         """Toggle your vacation status."""
         vacation_status = db_utils.update_vacation_for_user(ctx.author.id)
 
@@ -106,16 +102,15 @@ all possible remaining decks."""
             embed = discord.Embed(color=discord.Color.green())
         else:
             embed = discord.Embed(color=discord.Color.red())
-        
+
         embed.add_field(name="Vacation status updated",
                         value=f"You are now {'NOT ' if not vacation_status else ''} ON VACATION")
 
         await ctx.send(embed=embed)
 
-
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
-    async def update(self, ctx):
+    async def update(self, ctx: commands.Context):
         """Update your player name, clan role/affiliation, Discord server role, and Discord nickname."""
         if not await bot_utils.update_member(ctx.author):
             embed = discord.Embed(color=discord.Color.red())
@@ -124,17 +119,17 @@ all possible remaining decks."""
         elif bot_utils.is_admin(ctx.author):
             embed = discord.Embed(color=discord.Color.green())
             embed.add_field(name="Your information has been updated",
-                            value="ClashBot does not have permission to modify Admin nicknames. You must do this yourself if your player name has changed.")
+                            value=("ClashBot does not have permission to modify Admin nicknames. "
+                                   "You must do this yourself if your player name has changed."))
         else:
             embed = discord.Embed(title="Your information has been updated",
                                   color=discord.Color.green())
 
         await ctx.send(embed=embed)
 
-
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
-    async def strikes(self, ctx):
+    async def strikes(self, ctx: commands.Context):
         """Check how many strikes you have."""
         strikes = db_utils.get_strikes(ctx.author.id)
 
@@ -155,17 +150,17 @@ all possible remaining decks."""
 
         await ctx.send(embed=embed)
 
-
     @commands.command()
     @bot_utils.not_welcome_or_rules_check()
-    async def stats(self, ctx):
+    async def stats(self, ctx: commands.Context):
         """Check your river race statistics."""
         player_info = db_utils.find_user_in_db(ctx.author.id)
 
         if len(player_info) == 0:
             embed = discord.Embed(color=discord.Color.red())
             embed.add_field(name="An unexpected error has occurred",
-                            value="Your Discord ID is not in the database. This should not happen. Contact a leader if you see this error.")
+                            value=("Your Discord ID is not in the database. This should not happen. "
+                                   "Contact a leader if you see this error."))
             await ctx.send(embed=embed)
             return
         else:

@@ -1,12 +1,14 @@
 """Status Report cog. Various report commands available to leadership."""
 
+import datetime
+from typing import Dict, Union
+
+import discord
 from discord.ext import commands
 from prettytable import PrettyTable
-import datetime
-import discord
 
 # Cogs
-from cogs.ErrorHandler import ErrorHandler
+from cogs.error_handler import ErrorHandler
 
 # Utils
 import utils.bot_utils as bot_utils
@@ -18,13 +20,13 @@ class StatusReports(commands.Cog):
     """Commands to get different status reports."""
 
     def __init__(self, bot):
+        """Save bot."""
         self.bot = bot
-
 
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
-    async def decks_report(self, ctx):
+    async def decks_report(self, ctx: commands.Context):
         """Get a report of players with remaining battles today."""
         usage_info = clash_utils.get_remaining_decks_today_dicts()
         users_on_vacation = db_utils.get_users_on_vacation()
@@ -33,12 +35,16 @@ class StatusReports(commands.Cog):
             await ctx.send("Something went wrong. There might be issues accessing the Clash Royale API right now.")
 
         embed = discord.Embed(title="Deck Usage Report",
-                              description=f"{usage_info['participants']} players have participated in war today.\nThey have used a total of {200 - usage_info['remaining_decks']} decks.")
+                              description=(f"{usage_info['participants']} players have participated in war today.\n"
+                                           f"They have used a total of {200 - usage_info['remaining_decks']} decks."))
 
         remaining_participants = 50 - usage_info["participants"]
         non_warring_active_members = usage_info["active_members_with_no_decks_used"]
         if non_warring_active_members > remaining_participants:
-            embed.add_field(name="`WARNING`", value=f"Only {remaining_participants} players can still participate in war today, but there are currently {non_warring_active_members} active members of the clan that have not used any decks. Some players could be locked out.")
+            embed.add_field(name="`WARNING`",
+                            value=(f"Only {remaining_participants} players can still participate in war today, "
+                                   f"but there are currently {non_warring_active_members} active members of the clan that have not "
+                                   "used any decks. Some players could be locked out."))
 
         await ctx.send(embed=embed)
 
@@ -103,12 +109,11 @@ class StatusReports(commands.Cog):
             except:
                 await ctx.send("Members currently on vacation\n" + "```\n" + table.get_string() + "```")
 
-
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
-    async def medals_report(self, ctx, threshold: int):
-        """Get a report of players below the specified medal count. Ignores users on vacation."""
+    async def medals_report(self, ctx: commands.Context, threshold: int):
+        """Get a report of players below the specified medal count."""
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)
         users_on_vacation = db_utils.get_users_on_vacation()
         table = PrettyTable()
@@ -128,8 +133,14 @@ class StatusReports(commands.Cog):
         except:
             await ctx.send("Players below medals threshold\n" + "```\n" + table.get_string() + "```")
 
+    @staticmethod
+    async def player_report_helper(ctx: commands.Context, user_data: Dict[str, Union[str, int]]):
+        """Build player report table and send to channel where command was invoked.
 
-    async def player_report_helper(self, ctx, user_data: dict):
+        Args:
+            ctx: Context of command being invoked.
+            user_data: Data of user to send report about.
+        """
         general_info_table = PrettyTable()
         kicks = db_utils.get_kicks(user_data["player_tag"])
         total_kicks = len(kicks)
@@ -151,19 +162,18 @@ class StatusReports(commands.Cog):
         general_info_table.add_row(["Status", user_data["status"]])
 
         url = f"https://royaleapi.com/player/{user_data['player_tag'][1:]}"
-        embed = discord.Embed(title="Player Report", url=url)
-        embed.add_field(name=f"{user_data['player_name']}'s general info", value = "```\n" + general_info_table.get_string(header=False) + "```")
+        general_info_embed = discord.Embed(title="Player Report", url=url)
+        general_info_embed.add_field(name=f"{user_data['player_name']}'s general info",
+                        value = "```\n" + general_info_table.get_string(header=False) + "```")
 
-        try:
-            await ctx.send(embed=embed)
-        except:
-            await ctx.send(f"{user_data['player_name']}'s general info" + "\n" + "```\n" + general_info_table.get_string(header=False) + "```")
+        await ctx.send(embed=general_info_embed)
 
         decks_used_today = clash_utils.get_user_decks_used_today(user_data["player_tag"])
         if decks_used_today is None:
             decks_used_today = 0
 
-        usage_history_list = bot_utils.break_down_usage_history(user_data["usage_history"], datetime.datetime.now(datetime.timezone.utc))
+        usage_history_list = bot_utils.break_down_usage_history(user_data["usage_history"],
+                                                                datetime.datetime.now(datetime.timezone.utc))
 
         deck_usage_history_table = PrettyTable()
         deck_usage_history_table.field_names = ["Day", "Decks Used"]
@@ -171,21 +181,17 @@ class StatusReports(commands.Cog):
         for decks_used, date in usage_history_list:
             deck_usage_history_table.add_row([date, decks_used])
 
-        embed = discord.Embed()
-        embed.set_footer(text=f"{user_data['player_name']} has used {decks_used_today} decks today.")
-        embed.add_field(name=f"{user_data['player_name']}'s deck usage history", value = "```\n" + deck_usage_history_table.get_string() + "```")
+        deck_usage_embed = discord.Embed()
+        deck_usage_embed.set_footer(text=f"{user_data['player_name']} has used {decks_used_today} decks today.")
+        deck_usage_embed.add_field(name=f"{user_data['player_name']}'s deck usage history",
+                        value = "```\n" + deck_usage_history_table.get_string() + "```")
 
-        try:
-            await ctx.send(embed=embed)
-        except:
-            await ctx.send(f"{user_data['player_name']} has used {decks_used_today} decks today." + "\n\n" +\
-                            f"{user_data['player_name']}'s deck usage history" + "\n" + "```\n" + deck_usage_history_table.get_string() + "```")
-
+        await ctx.send(embed=deck_usage_embed)
 
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
-    async def player_report(self, ctx, member: discord.Member):
+    async def player_report(self, ctx: commands.Context, member: discord.Member):
         """Get information about a member."""
         player_info = db_utils.find_user_in_db(member.id)
 
@@ -193,9 +199,8 @@ class StatusReports(commands.Cog):
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
-        else:
-            _, player_tag, _ = player_info[0]
 
+        _, player_tag, _ = player_info[0]
         user_data = db_utils.get_user_data(player_tag)
 
         if user_data is None:
@@ -206,7 +211,8 @@ class StatusReports(commands.Cog):
         await self.player_report_helper(ctx, user_data)
 
     @player_report.error
-    async def player_report_error(self, ctx, error):
+    async def player_report_error(self, ctx: commands.Context, error: discord.DiscordException):
+        """!player_report error handler."""
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
@@ -227,11 +233,10 @@ class StatusReports(commands.Cog):
                 embed = bot_utils.duplicate_names_embed(player_info, "player_report")
                 await ctx.send(embed=embed)
 
-
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
-    async def stats_report(self, ctx, member: discord.Member):
+    async def stats_report(self, ctx: commands.Context, member: discord.Member):
         """Get specified user's river race statistics."""
         player_info = db_utils.find_user_in_db(member.id)
 
@@ -239,14 +244,15 @@ class StatusReports(commands.Cog):
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
-        else:
-            _, player_tag, _ = player_info[0]
+
+        _, player_tag, _ = player_info[0]
 
         embed = bot_utils.create_match_performance_embed(member.display_name, player_tag)
         await ctx.send(embed=embed)
 
     @stats_report.error
-    async def stats_report_error(self, ctx, error):
+    async def stats_report_error(self, ctx: commands.Context, error: discord.DiscordException):
+        """!stats_report error handler."""
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 

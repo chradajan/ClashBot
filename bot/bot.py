@@ -8,15 +8,15 @@ from discord.ext import commands
 from pretty_help import DefaultMenu, PrettyHelp
 
 # Cogs
-from cogs.AutomationTools import AutomationTools
-from cogs.ErrorHandler import ErrorHandler
-from cogs.LeaderUtils import LeaderUtils
-from cogs.MemberListeners import MemberListeners
-from cogs.MemberUtils import MemberUtils
-from cogs.StatusReports import StatusReports
-from cogs.Strikes import Strikes
-from cogs.UserUpdates import UserUpdates
-from cogs.Vacation import Vacation
+from cogs.automation_tools import AutomationTools
+from cogs.error_handler import ErrorHandler
+from cogs.leader_utils import LeaderUtils
+from cogs.listeners import Listeners
+from cogs.member_utils import MemberUtils
+from cogs.status_reports import StatusReports
+from cogs.strikes import Strikes
+from cogs.user_updates import UserUpdates
+from cogs.vacation import Vacation
 
 # Config
 from config.config import GUILD_NAME
@@ -54,7 +54,7 @@ bot = commands.Bot(command_prefix='!',
 
 bot.add_cog(AutomationTools(bot))
 bot.add_cog(LeaderUtils(bot))
-bot.add_cog(MemberListeners(bot))
+bot.add_cog(Listeners(bot))
 bot.add_cog(MemberUtils(bot))
 bot.add_cog(StatusReports(bot))
 bot.add_cog(Strikes(bot))
@@ -211,10 +211,8 @@ async def assign_strikes_and_clear_vacation():
     if send_missing_data_message:
         missing_data_embed = discord.Embed()
         missing_data_embed.add_field(name="Missing Data Warning",
-                                     value=(
-                                         "War participation data is missing for one or more days. "
-                                         "Threshold for assigning strikes has been adjusted accordingly."
-                                     ))
+                                     value=("War participation data is missing for one or more days. "
+                                            "Threshold for assigning strikes has been adjusted accordingly."))
         await CHANNEL.strikes().send(embed=missing_data_embed)
 
 
