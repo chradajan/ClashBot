@@ -15,7 +15,7 @@ from config.config import (
     TIME_OFF_CHANNEL_NAME
 )
 
-class CHANNEL_NAMES(Enum):
+class ChannelNames(Enum):
     """Enum of relevant channel names."""
     COMMANDS = COMMANDS_CHANNEL_NAME
     FAME = FAME_CHANNEL_NAME
@@ -29,128 +29,119 @@ class CHANNEL_NAMES(Enum):
 
 
 class Channels:
+    """Stores channels relevant to bot."""
+
     def __init__(self):
         """Create channels dictionary."""
         self.channels = {
-            CHANNEL_NAMES.COMMANDS: None,
-            CHANNEL_NAMES.FAME: None,
-            CHANNEL_NAMES.KICKS: None,
-            CHANNEL_NAMES.LEADER_INFO: None,
-            CHANNEL_NAMES.WELCOME: None,
-            CHANNEL_NAMES.REMINDER: None,
-            CHANNEL_NAMES.RULES: None,
-            CHANNEL_NAMES.STRIKES: None,
-            CHANNEL_NAMES.TIME_OFF: None
+            ChannelNames.COMMANDS: None,
+            ChannelNames.FAME: None,
+            ChannelNames.KICKS: None,
+            ChannelNames.LEADER_INFO: None,
+            ChannelNames.WELCOME: None,
+            ChannelNames.REMINDER: None,
+            ChannelNames.RULES: None,
+            ChannelNames.STRIKES: None,
+            ChannelNames.TIME_OFF: None
         }
 
     def initialize(self, guild: discord.Guild):
-        """
-        Save relevant channels to dictionary based on configured channel names.
+        """Save relevant channels to dictionary based on configured channel names.
 
         Args:
-            guild (discord.Guild): Discord server to get channels from.
+            guild: Discord server to get channels from.
         """
-        self.channels[CHANNEL_NAMES.COMMANDS] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.COMMANDS.value)
-        self.channels[CHANNEL_NAMES.FAME] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.FAME.value)
-        self.channels[CHANNEL_NAMES.KICKS] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.KICKS.value)
-        self.channels[CHANNEL_NAMES.LEADER_INFO] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.LEADER_INFO.value)
-        self.channels[CHANNEL_NAMES.WELCOME] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.WELCOME.value)
-        self.channels[CHANNEL_NAMES.REMINDER] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.REMINDER.value)
-        self.channels[CHANNEL_NAMES.RULES] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.RULES.value)
-        self.channels[CHANNEL_NAMES.STRIKES] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.STRIKES.value)
-        self.channels[CHANNEL_NAMES.TIME_OFF] = discord.utils.get(guild.channels, name=CHANNEL_NAMES.TIME_OFF.value)
+        self.channels[ChannelNames.COMMANDS] = discord.utils.get(guild.channels, name=ChannelNames.COMMANDS.value)
+        self.channels[ChannelNames.FAME] = discord.utils.get(guild.channels, name=ChannelNames.FAME.value)
+        self.channels[ChannelNames.KICKS] = discord.utils.get(guild.channels, name=ChannelNames.KICKS.value)
+        self.channels[ChannelNames.LEADER_INFO] = discord.utils.get(guild.channels, name=ChannelNames.LEADER_INFO.value)
+        self.channels[ChannelNames.WELCOME] = discord.utils.get(guild.channels, name=ChannelNames.WELCOME.value)
+        self.channels[ChannelNames.REMINDER] = discord.utils.get(guild.channels, name=ChannelNames.REMINDER.value)
+        self.channels[ChannelNames.RULES] = discord.utils.get(guild.channels, name=ChannelNames.RULES.value)
+        self.channels[ChannelNames.STRIKES] = discord.utils.get(guild.channels, name=ChannelNames.STRIKES.value)
+        self.channels[ChannelNames.TIME_OFF] = discord.utils.get(guild.channels, name=ChannelNames.TIME_OFF.value)
 
     def commands(self) -> discord.TextChannel:
-        """
-        Get commands channel.
+        """Get commands channel.
 
         Returns:
-            discord.TextChannel: Commands channel.
+            Commands channel.
         """
-        return self.channels[CHANNEL_NAMES.COMMANDS]
+        return self.channels[ChannelNames.COMMANDS]
 
     def fame(self) -> discord.TextChannel:
-        """
-        Get fame channel.
+        """Get fame channel.
 
         Returns:
-            discord.TextChannel: Fame channel.
+            Fame channel.
         """
-        return self.channels[CHANNEL_NAMES.FAME]
+        return self.channels[ChannelNames.FAME]
 
     def kicks(self) -> discord.TextChannel:
-        """
-        Get kicks channel.
+        """Get kicks channel.
 
         Returns:
-            discord.TextChannel: Kicks channel.
+            Kicks channel.
         """
-        return self.channels[CHANNEL_NAMES.KICKS]
+        return self.channels[ChannelNames.KICKS]
 
     def leader_info(self) -> discord.TextChannel:
-        """
-        Get leader info channel.
+        """Get leader info channel.
 
         Returns:
-            discord.TextChannel: Leader info channel.
+            Leader info channel.
         """
-        return self.channels[CHANNEL_NAMES.LEADER_INFO]
+        return self.channels[ChannelNames.LEADER_INFO]
 
     def welcome(self) -> discord.TextChannel:
-        """
-        Get welcome channel.
+        """Get welcome channel.
 
         Returns:
-            discord.TextChannel: Welcome channel.
+            Welcome channel.
         """
-        return self.channels[CHANNEL_NAMES.WELCOME]
+        return self.channels[ChannelNames.WELCOME]
 
     def reminder(self) -> discord.TextChannel:
-        """
-        Get reminder channel.
+        """Get reminder channel.
 
         Returns:
-            discord.TextChannel: Reminder channel.
+            Reminder channel.
         """
-        return self.channels[CHANNEL_NAMES.REMINDER]
+        return self.channels[ChannelNames.REMINDER]
 
     def rules(self) -> discord.TextChannel:
-        """
-        Get rules channel.
+        """Get rules channel.
 
         Returns:
-            discord.TextChannel: Rules channel.
+            Rules channel.
         """
-        return self.channels[CHANNEL_NAMES.RULES]
+        return self.channels[ChannelNames.RULES]
 
     def strikes(self) -> discord.TextChannel:
-        """
-        Get strikes channel.
+        """Get strikes channel.
 
         Returns:
-            discord.TextChannel: Strikes channel.
+            Strikes channel.
         """
-        return self.channels[CHANNEL_NAMES.STRIKES]
+        return self.channels[ChannelNames.STRIKES]
 
     def time_off(self) -> discord.TextChannel:
-        """
-        Get time off channel.
+        """Get time off channel.
 
         Returns:
-            discord.TextChannel: Time off channel.
+            Time off channel.
         """
-        return self.channels[CHANNEL_NAMES.TIME_OFF]
+        return self.channels[ChannelNames.TIME_OFF]
 
 
 CHANNEL = Channels()
 
 
 def prepare_channels(guild: discord.Guild):
-    """
-    Find roles in guild and save to dictionary.
+    """Initialize CHANNEL object.
 
     Args:
-        guild(discord.Guild): Guild to find roles within.
+        Guild to get channels of.
     """
     global CHANNEL
     CHANNEL.initialize(guild)

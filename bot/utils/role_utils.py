@@ -14,7 +14,7 @@ from config.config import (
     VISITOR_ROLE_NAME
 )
 
-class ROLE_NAMES(Enum):
+class RoleNames(Enum):
     """Enum of relevant role names."""
     ADMIN = ADMIN_ROLE_NAME
     CHECK_RULES = CHECK_RULES_ROLE_NAME
@@ -26,135 +26,121 @@ class ROLE_NAMES(Enum):
 
 
 class Roles:
+    """Stores roles relevant to bot."""
     def __init__(self):
         """Create roles dictionary."""
         self.roles = {
-            ROLE_NAMES.ADMIN: None,
-            ROLE_NAMES.CHECK_RULES: None,
-            ROLE_NAMES.ELDER: None,
-            ROLE_NAMES.LEADER: None,
-            ROLE_NAMES.MEMBER: None,
-            ROLE_NAMES.NEW: None,
-            ROLE_NAMES.VISITOR: None
+            RoleNames.ADMIN: None,
+            RoleNames.CHECK_RULES: None,
+            RoleNames.ELDER: None,
+            RoleNames.LEADER: None,
+            RoleNames.MEMBER: None,
+            RoleNames.NEW: None,
+            RoleNames.VISITOR: None
         }
 
     def initialize(self, guild: discord.Guild):
-        """
-        Save relevant roles to dictionary based on configured role names.
+        """Save relevant roles to dictionary based on configured role names.
 
         Args:
-            guild (discord.Guild): Discord server to get roles from.
+            guild: Discord server to get roles from.
         """
-        self.roles[ROLE_NAMES.ADMIN] = discord.utils.get(guild.roles, name=ROLE_NAMES.ADMIN.value)
-        self.roles[ROLE_NAMES.CHECK_RULES] = discord.utils.get(guild.roles, name=ROLE_NAMES.CHECK_RULES.value)
-        self.roles[ROLE_NAMES.ELDER] = discord.utils.get(guild.roles, name=ROLE_NAMES.ELDER.value)
-        self.roles[ROLE_NAMES.LEADER] = discord.utils.get(guild.roles, name=ROLE_NAMES.LEADER.value)
-        self.roles[ROLE_NAMES.MEMBER] = discord.utils.get(guild.roles, name=ROLE_NAMES.MEMBER.value)
-        self.roles[ROLE_NAMES.NEW] = discord.utils.get(guild.roles, name=ROLE_NAMES.NEW.value)
-        self.roles[ROLE_NAMES.VISITOR] = discord.utils.get(guild.roles, name=ROLE_NAMES.VISITOR.value)
+        self.roles[RoleNames.ADMIN] = discord.utils.get(guild.roles, name=RoleNames.ADMIN.value)
+        self.roles[RoleNames.CHECK_RULES] = discord.utils.get(guild.roles, name=RoleNames.CHECK_RULES.value)
+        self.roles[RoleNames.ELDER] = discord.utils.get(guild.roles, name=RoleNames.ELDER.value)
+        self.roles[RoleNames.LEADER] = discord.utils.get(guild.roles, name=RoleNames.LEADER.value)
+        self.roles[RoleNames.MEMBER] = discord.utils.get(guild.roles, name=RoleNames.MEMBER.value)
+        self.roles[RoleNames.NEW] = discord.utils.get(guild.roles, name=RoleNames.NEW.value)
+        self.roles[RoleNames.VISITOR] = discord.utils.get(guild.roles, name=RoleNames.VISITOR.value)
 
     def admin(self) -> discord.Role:
-        """
-        Get admin role.
+        """Get admin role.
 
         Returns:
-            discord.Role: Admin role.
+            Admin role.
         """
-        return self.roles[ROLE_NAMES.ADMIN]
-    
+        return self.roles[RoleNames.ADMIN]
+
     def check_rules(self) -> discord.Role:
-        """
-        Get check rules role.
+        """Get check rules role.
 
         Returns:
-            discord.Role: Check rules role.
+            Check rules role.
         """
-        return self.roles[ROLE_NAMES.CHECK_RULES]
+        return self.roles[RoleNames.CHECK_RULES]
 
     def elder(self) -> discord.Role:
-        """
-        Get elder role.
+        """Get elder role.
 
         Returns:
-            discord.Role: Elder role.
+            Elder role.
         """
-        return self.roles[ROLE_NAMES.ELDER]
+        return self.roles[RoleNames.ELDER]
 
     def leader(self) -> discord.Role:
-        """
-        Get leader role.
+        """Get leader role.
 
         Returns:
-            discord.Role: Leader role.
+            Leader role.
         """
-        return self.roles[ROLE_NAMES.LEADER]
+        return self.roles[RoleNames.LEADER]
 
     def member(self) -> discord.Role:
-        """
-        Get member role.
+        """Get member role.
 
         Returns:
-            discord.Role: Member role.
+            Member role.
         """
-        return self.roles[ROLE_NAMES.MEMBER]
+        return self.roles[RoleNames.MEMBER]
 
     def new(self) -> discord.Role:
-        """
-        Get new role.
+        """Get new role.
 
         Returns:
-            discord.Role: New role.
+            New role.
         """
-        return self.roles[ROLE_NAMES.NEW]
+        return self.roles[RoleNames.NEW]
 
     def visitor(self) -> discord.Role:
-        """
-        Get visitor role.
+        """Get visitor role.
 
         Returns:
-            discord.Role: Visitor role.
+            Visitor role.
         """
-        return self.roles[ROLE_NAMES.VISITOR]
+        return self.roles[RoleNames.VISITOR]
 
     def normal_roles(self) -> List[discord.TextChannel]:
-        """
-        Get a list of normal roles.
+        """Get a list of normal roles.
 
         Returns:
-            List[TextChannel]: List consisting of elder, leader, member, and visitor roles.
+            List consisting of elder, leader, member, and visitor roles.
         """
         return [
-            self.roles[ROLE_NAMES.ELDER],
-            self.roles[ROLE_NAMES.LEADER],
-            self.roles[ROLE_NAMES.MEMBER],
-            self.roles[ROLE_NAMES.VISITOR]
+            self.roles[RoleNames.ELDER],
+            self.roles[RoleNames.LEADER],
+            self.roles[RoleNames.MEMBER],
+            self.roles[RoleNames.VISITOR]
         ]
 
     def special_roles(self) -> List[discord.TextChannel]:
-        """
-        Get a list of special roles.
+        """Get a list of special roles.
 
         Returns:
-            List[TextChannel]: List consisting of admin, check rules, and new roles.
+            List consisting of admin, check rules, and new roles.
         """
-        return [
-            self.roles[ROLE_NAMES.ADMIN],
-            self.roles[ROLE_NAMES.CHECK_RULES],
-            self.roles[ROLE_NAMES.NEW]
-        ]
+        return [self.roles[RoleNames.ADMIN], self.roles[RoleNames.CHECK_RULES], self.roles[RoleNames.NEW]]
 
     def get_role_from_name(self, role_name: str) -> Union[discord.Role, None]:
-        """
-        Get a role from its name.
+        """Get a role from its name.
 
         Args:
-            role_name (str): Name of role to get.
+            role_name: Name of role to get.
 
         Returns:
-            discord.Role: Role corresponding to specified name, or None if name does not match a role.
+            Role corresponding to specified name, or None if name does not match a role.
         """
         try:
-            role_enum = ROLE_NAMES(role_name)
+            role_enum = RoleNames(role_name)
         except ValueError:
             return None
 
@@ -163,12 +149,12 @@ class Roles:
 
 ROLE = Roles()
 
+
 def prepare_roles(guild: discord.Guild):
-    """
-    Find roles in guild and save to dictionary.
+    """Initialize ROLE object.
 
     Args:
-        guild(discord.Guild): Guild to find roles within.
+        Guild to get channels of.
     """
     global ROLE
     ROLE.initialize(guild)
