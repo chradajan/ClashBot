@@ -180,6 +180,18 @@ def full_name(member: discord.Member) -> str:
     return member.name + "#" + member.discriminator
 
 
+def royale_api_url(player_tag: str) -> str:
+    """Get url of Royale API page of specified player.
+
+    Args:
+        player_tag: Player tag of user to get Royale API url.
+
+    Returns:
+        Royale API url of page for specified user.
+    """
+    return f"https://royaleapi.com/player/{player_tag[1:]}"
+
+
 async def send_rules_message(user_to_purge: discord.ClientUser):
     """Send message in rules channel for users to react to to gain roles.
 
@@ -234,21 +246,21 @@ async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL,
             member_string += f"{member.mention} - Decks left: {decks_remaining}" + "\n"
 
     if (len(member_string) == 0) and (len(non_member_string) == 0):
-        # TODO: replace these messages with embeds.
         if check_time_zones:
             no_reminder_string = (
                 f"Everyone that receives {time_zone.value} reminders has already used all their decks today. "
                 "Good job!"
             )
-            await reminder_channel.send(no_reminder_string)
         else:
-            await reminder_channel.send("Everyone has already used all their decks today. Good job!")
+            no_reminder_string = "Everyone has already used all their decks today. Good job!"
+
+        no_reminder_embed = discord.Embed(title=no_reminder_string, color=discord.Color.green())
+        await reminder_channel.send(embed=no_reminder_embed)
         return
 
     reminder_string = message + "\n" + member_string + non_member_string
 
     if automated:
-        # TODO: replace automated message with embed.
         if time_zone == ReminderTime.US:
             automated_message = (
                 "This is an automated reminder. If this reminder is in the middle of the night for you, "
@@ -454,7 +466,6 @@ def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, in
         A list of users who will receive or have received a strike in the current/most recent river race.
             (player_name, player_tag, decks_used, decks_required, current_strikes)
     """
-    # TODO: possibly refactor this function into different scenarios (is_war_time is true vs false, consider reset time vs not)
     deck_usage_list = db_utils.get_all_user_deck_usage_history()
     strikes_dict = db_utils.get_users_with_strikes_dict()
     active_members = clash_utils.get_active_members_in_clan()
@@ -1019,9 +1030,8 @@ async def send_new_member_info(clash_data: Dict[str, Union[str, int]]):
     if card_level_data is None:
         return
 
-    # TODO: add utility function to get Royale API url of player.
-    url = f"https://royaleapi.com/player/{clash_data['player_tag'][1:]}"
-    embed = discord.Embed(title=f"{clash_data['player_name']} just joined the server!", url=url)
+    embed = discord.Embed(title=f"{clash_data['player_name']} just joined the server!",
+                          url=royale_api_url(clash_data["player_tag"]))
 
     embed.add_field(name=f"About {clash_data['player_name']}",
                     value=("```"

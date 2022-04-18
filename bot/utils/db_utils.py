@@ -1811,7 +1811,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
                      "Yes" if user["vacation"] else "No",
                      user["strikes"], user["permanent_strikes"], len(kicks), user["status"],
                      clans_dict[clan_id]["clan_name"], clans_dict[clan_id]["clan_tag"],
-                     f"https://royaleapi.com/player/{user['player_tag'][1:]}"]
+                     bot_utils.royale_api_url(user['player_tag'])]
 
         # Get history
         user_history = bot_utils.break_down_usage_history(user["usage_history"], now)

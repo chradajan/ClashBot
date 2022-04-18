@@ -161,8 +161,7 @@ class StatusReports(commands.Cog):
         general_info_table.add_row(["On Vacation", "Yes" if user_data["vacation"] else "No"])
         general_info_table.add_row(["Status", user_data["status"]])
 
-        url = f"https://royaleapi.com/player/{user_data['player_tag'][1:]}"
-        general_info_embed = discord.Embed(title="Player Report", url=url)
+        general_info_embed = discord.Embed(title="Player Report", url=bot_utils.royale_api_url(user_data['player_tag']))
         general_info_embed.add_field(name=f"{user_data['player_name']}'s general info",
                         value = "```\n" + general_info_table.get_string(header=False) + "```")
 
