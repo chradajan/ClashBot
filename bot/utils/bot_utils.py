@@ -27,6 +27,7 @@ import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
 from utils.channel_utils import CHANNEL
 from utils.role_utils import ROLE
+from utils.util_types import ReminderTime
 
 
 ######################################################
@@ -42,12 +43,6 @@ from utils.role_utils import ROLE
 
 SIX_DAY_MASK = 0x3FFFF
 ONE_DAY_MASK = 0x7
-
-class ReminderTime(Enum):
-    """Reminder time options."""
-    US = "US"
-    EU = "EU"
-    ALL = "ALL"
 
 #########################################
 #     _____ _               _           #

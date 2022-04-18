@@ -8,6 +8,7 @@ from prettytable import PrettyTable
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.util_types import ReminderTime
 
 
 class MemberUtils(commands.Cog):
@@ -73,17 +74,17 @@ all possible remaining decks."""
     async def set_reminder_time(self, ctx: commands.Context, reminder_time: str):
         """Set reminder time to either US or EU. US reminders go out at 02:00 UTC. EU reminders go out at 19:00 UTC."""
 
-        time_zone: bot_utils.ReminderTime
+        time_zone: ReminderTime
         invalid_embed = discord.Embed(color=discord.Color.red())
         invalid_embed.add_field(name="Invalid time zone", value="Valid reminder times are `US` or `EU`")
 
         try:
-            time_zone = bot_utils.ReminderTime(reminder_time.upper())
+            time_zone = ReminderTime(reminder_time.upper())
         except ValueError:
             await ctx.send(embed=invalid_embed)
             return
 
-        if time_zone == bot_utils.ReminderTime.ALL:
+        if time_zone == ReminderTime.ALL:
             await ctx.send(embed=invalid_embed)
             return
 

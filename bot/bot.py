@@ -28,6 +28,7 @@ import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
 from utils.channel_utils import CHANNEL, prepare_channels
 from utils.role_utils import prepare_roles
+from utils.util_types import ReminderTime
 
 
 ########################################################
@@ -89,14 +90,14 @@ async def on_ready():
 async def automated_reminder_eu():
     """Send reminder every Thursday, Friday, Saturday, and Sunday at 19:00 UTC."""
     if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
-        await bot_utils.deck_usage_reminder(time_zone=bot_utils.ReminderTime.EU)
+        await bot_utils.deck_usage_reminder(time_zone=ReminderTime.EU)
 
 
 @aiocron.crontab('0 2 * * 5,6,0,1')
 async def automated_reminder_us():
     """Send reminder every Friday, Saturday, Sunday, and Monday at 02:00 UTC."""
     if db_utils.get_reminder_status() and not clash_utils.river_race_completed():
-        await bot_utils.deck_usage_reminder(time_zone=bot_utils.ReminderTime.US)
+        await bot_utils.deck_usage_reminder(time_zone=ReminderTime.US)
 
 
 @aiocron.crontab('0 8 * * 5,6,0,1')

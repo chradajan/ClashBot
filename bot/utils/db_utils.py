@@ -20,6 +20,7 @@ from config.credentials import (
 # Utils
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
+from utils.util_types import ReminderTime
 
 
 ######################################################
@@ -933,8 +934,7 @@ def commit_roles(discord_id: int, roles: List[str]):
     database.commit()
     database.close()
 
-# TODO: When ReminderTime is moved out  of bot_utils and into a types file, fix type hinting here.
-def update_time_zone(discord_id: int, time_zone):
+def update_time_zone(discord_id: int, time_zone: ReminderTime):
     """Change a user's preferred time for receiving automated reminders.
 
     Args:
@@ -949,7 +949,7 @@ def update_time_zone(discord_id: int, time_zone):
     database.close()
 
 
-def get_members_in_time_zone(time_zone) -> Set[str]:
+def get_members_in_time_zone(time_zone: ReminderTime) -> Set[str]:
     """Get the members in the specified time zone.
 
     Args:
