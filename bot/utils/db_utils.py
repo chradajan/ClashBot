@@ -645,7 +645,7 @@ def find_user_in_db(search_key: Union[int, str]) -> List[Tuple[str, str, str]]:
                         (search_key))
         query_result = cursor.fetchall()
 
-    if len(query_result) == 0:
+    if not query_result:
         cursor.execute("SELECT users.player_name, users.player_tag, clans.clan_name FROM users\
                         INNER JOIN clans ON users.clan_id = clans.id WHERE player_name = %s",
                         (search_key))
@@ -1025,7 +1025,7 @@ def clean_up_db(active_members: Dict[str, ClashData]=None):
     if active_members is None:
         active_members = clash_utils.get_active_members_in_clan()
 
-    if len(active_members) == 0:
+    if not active_members:
         return
 
     cursor.execute("SELECT player_name, player_tag, discord_name, status FROM users")
@@ -1428,7 +1428,7 @@ def get_non_active_participants(active_members: Dict[str, ClashData]=None) -> Se
     if active_members is None:
         active_members = clash_utils.get_active_members_in_clan(PRIMARY_CLAN_TAG)
 
-    if len(active_members) == 0:
+    if not active_members:
         return set()
 
     database, cursor = connect_to_db()
@@ -1459,7 +1459,7 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[
     else:
         active_members = active_members.copy()
 
-    if len(active_members) == 0:
+    if not active_members:
         return
 
     database, cursor = connect_to_db()
@@ -1529,7 +1529,7 @@ def undo_kick(player_tag: str) -> str:
     cursor.execute("SELECT kick_time FROM kicks WHERE user_id = %s", (user_id))
     query_result = cursor.fetchall()
 
-    if len(query_result) == 0:
+    if not query_result:
         database.close()
         return None
 

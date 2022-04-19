@@ -200,7 +200,7 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
     active_members = get_active_members_in_clan(clan_tag)
     decks_remaining_list = []
 
-    if len(active_members) == 0:
+    if not active_members:
         return []
 
     for participant in participants:
@@ -238,7 +238,7 @@ def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> DecksRepo
     active_members = get_active_members_in_clan(clan_tag)
     participants = get_river_race_participants(clan_tag)
 
-    if len(participants) == 0 or len(active_members) == 0:
+    if not participants or not active_members:
         return {}
 
     return_info: DecksReport = {
@@ -297,7 +297,7 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[st
     else:
         active_members = active_members.copy()
 
-    if (len(participants) == 0) or (len(active_members) == 0):
+    if not participants or not active_members:
         return {}
 
     usage_list = {}
@@ -337,7 +337,7 @@ def get_user_decks_used_today(player_tag: str) -> int:
 
     participants = get_river_race_participants(clan_tag)
 
-    if len(participants) == 0:
+    if not participants:
         return 0
 
     for participant in participants:
@@ -366,7 +366,7 @@ def get_top_medal_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
 
     active_members = get_active_members_in_clan(clan_tag)
 
-    if len(active_members) == 0:
+    if not active_members:
         return []
 
     fame_list = [(active_members[participant['player_tag']]['player_name'], participant['fame'])
@@ -606,7 +606,7 @@ def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG,
     if active_members is None:
         active_members = get_active_members_in_clan(clan_tag)
 
-    if len(active_members) == 0:
+    if not active_members:
         return
 
     db_utils.clean_up_db(active_members)
@@ -620,7 +620,7 @@ def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG,
         participants = get_river_race_participants(clan_tag)
         check_time = datetime.datetime.now(datetime.timezone.utc)
 
-    if len(participants) == 0:
+    if not participants:
         return
 
     for participant in participants:
@@ -660,7 +660,7 @@ def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> Dict[s
         clan_tag = clan['tag']
         active_members = get_active_members_in_clan(clan_tag)
 
-        if len(active_members) == 0:
+        if not active_members:
             clan_averages[clan_tag] = 0
             continue
 

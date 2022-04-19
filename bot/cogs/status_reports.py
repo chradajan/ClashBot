@@ -32,7 +32,7 @@ class StatusReports(commands.Cog):
         usage_info = clash_utils.get_remaining_decks_today_dicts()
         users_on_vacation = db_utils.get_users_on_vacation()
 
-        if len(usage_info) == 0:
+        if not usage_info:
             await ctx.send("Something went wrong. There might be issues accessing the Clash Royale API right now.")
 
         embed = discord.Embed(title="Deck Usage Report",
@@ -195,7 +195,7 @@ class StatusReports(commands.Cog):
         """Get information about a member."""
         player_info = db_utils.find_user_in_db(member.id)
 
-        if len(player_info) == 0:
+        if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
@@ -216,7 +216,7 @@ class StatusReports(commands.Cog):
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
-            if len(player_info) == 0:
+            if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
                 await ctx.send(embed=embed)
             elif len(player_info) == 1:
@@ -240,7 +240,7 @@ class StatusReports(commands.Cog):
         """Get specified user's river race statistics."""
         player_info = db_utils.find_user_in_db(member.id)
 
-        if len(player_info) == 0:
+        if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
@@ -256,7 +256,7 @@ class StatusReports(commands.Cog):
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
-            if len(player_info) == 0:
+            if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]

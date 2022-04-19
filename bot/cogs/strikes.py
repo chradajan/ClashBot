@@ -56,7 +56,7 @@ class Strikes(commands.Cog):
         """Increment specified user's strikes by 1."""
         player_info = db_utils.find_user_in_db(member.id)
 
-        if len(player_info) == 0:
+        if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
@@ -70,7 +70,7 @@ class Strikes(commands.Cog):
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
-            if len(player_info) == 0:
+            if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
                 await ctx.send(embed=embed)
             elif len(player_info) == 1:
@@ -87,7 +87,7 @@ class Strikes(commands.Cog):
         """Decrement specified user's strikes by 1."""
         player_info = db_utils.find_user_in_db(member.id)
 
-        if len(player_info) == 0:
+        if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
@@ -102,7 +102,7 @@ class Strikes(commands.Cog):
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
-            if len(player_info) == 0:
+            if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
                 await ctx.send(embed=embed)
             elif len(player_info) == 1:
@@ -191,7 +191,7 @@ class Strikes(commands.Cog):
             embed_one.set_footer(text="Automated strikes are currently disabled.")
             embed_two.set_footer(text="Automated strikes are currently disabled.")
 
-        if len(upcoming_strikes_list) == 0:
+        if not upcoming_strikes_list:
             embed = discord.Embed(title="No players are currently set to receive strikes.", color=discord.Color.green())
 
             if not strikes_enabled:

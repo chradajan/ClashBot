@@ -49,7 +49,7 @@ class LeaderUtils(commands.Cog):
         """Force all non-admins to acknowledge the rules. After reacting to the bot's message, they will get back their roles."""
         # Get a list of members in guild without any special roles (New, Check Rules, or Admin) and that aren't bots.
         members = [member for member in ctx.guild.members
-                   if (len(set(ROLE.special_roles()).intersection(set(member.roles))) == 0) and not member.bot]
+                   if (not set(ROLE.special_roles()).intersection(set(member.roles))) and not member.bot]
         roles_to_remove = ROLE.normal_roles()
         starting_embed = discord.Embed(title="Beginning to update roles. This will take a few minutes.", color=0xFFFF00)
         await ctx.send(embed=starting_embed)
@@ -104,7 +104,7 @@ class LeaderUtils(commands.Cog):
     async def send_reminder(self, ctx: commands.Context, *message):
         """Send reminder message to users with remaining decks. Optionally send a custom message with reminder."""
         reminder_message = ' '.join(message)
-        if len(reminder_message) == 0:
+        if not reminder_message:
             reminder_message = DEFAULT_REMINDER_MESSAGE
         await bot_utils.deck_usage_reminder(message=reminder_message, automated=False)
 
@@ -162,7 +162,7 @@ class LeaderUtils(commands.Cog):
             else:
                 member_string += f"{member.mention} - Fame: {fame}" + "\n"
 
-        if (len(member_string) == 0) and (len(non_member_string) == 0):
+        if not member_string and not non_member_string:
             await ctx.send("There are currently no members below the threshold you specified.")
             return
 
@@ -176,7 +176,7 @@ class LeaderUtils(commands.Cog):
         """Log that the specified user was kicked from the clan."""
         player_info = db_utils.find_user_in_db(member.id)
 
-        if len(player_info) == 0:
+        if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
@@ -192,7 +192,7 @@ class LeaderUtils(commands.Cog):
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
-            if len(player_info) == 0:
+            if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
@@ -209,7 +209,7 @@ class LeaderUtils(commands.Cog):
         """Undo the latest kick of the specified user."""
         player_info = db_utils.find_user_in_db(member.id)
 
-        if len(player_info) == 0:
+        if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
             return
@@ -225,7 +225,7 @@ class LeaderUtils(commands.Cog):
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
 
-            if len(player_info) == 0:
+            if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]

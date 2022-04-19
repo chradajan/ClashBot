@@ -157,7 +157,7 @@ all possible remaining decks."""
         """Check your river race statistics."""
         player_info = db_utils.find_user_in_db(ctx.author.id)
 
-        if len(player_info) == 0:
+        if not player_info:
             embed = discord.Embed(color=discord.Color.red())
             embed.add_field(name="An unexpected error has occurred",
                             value=("Your Discord ID is not in the database. This should not happen. "

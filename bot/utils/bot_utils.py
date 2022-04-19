@@ -273,7 +273,7 @@ async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL,
 
     if check_time_zones:
         time_zone_set = db_utils.get_members_in_time_zone(time_zone)
-        if len(time_zone_set) == 0:
+        if not time_zone_set:
             check_time_zones = False
 
     for player_name, player_tag, decks_remaining in reminder_list:
@@ -294,7 +294,7 @@ async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL,
         else:
             member_string += f"{member.mention} - Decks left: {decks_remaining}" + "\n"
 
-    if (len(member_string) == 0) and (len(non_member_string) == 0):
+    if not member_string and not non_member_string:
         if check_time_zones:
             no_reminder_string = (
                 f"Everyone that receives {time_zone.value} reminders has already used all their decks today. "
@@ -525,7 +525,7 @@ def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, in
     war_days_to_check: int
     starting_index: int
 
-    if len(active_members) == 0:
+    if not active_members:
         return []
 
     if use_race_reset_times:
@@ -775,7 +775,7 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
         else:
             win_rates = clash_utils.calculate_river_race_win_rates(race_reset_times['thursday']  - datetime.timedelta(days=1))
 
-        if len(win_rates) == 0:
+        if not win_rates:
             win_rates = {clan["tag"]: 0.50 for clan in clans}
     else:
         win_rates = {clan["tag"]: 0.50 for clan in clans}
