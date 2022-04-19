@@ -4,7 +4,6 @@ import datetime
 import os
 import re
 from difflib import SequenceMatcher
-from enum import Enum
 from typing import Dict, List, Tuple, Union
 
 import cv2
@@ -27,7 +26,13 @@ import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
 from utils.channel_utils import CHANNEL
 from utils.role_utils import ROLE
-from utils.util_types import ReminderTime
+from utils.util_types import (
+    ClashData,
+    CombinedData,
+    DiscordData,
+    ReminderTime,
+    Status
+)
 
 
 ######################################################
@@ -175,6 +180,54 @@ def full_name(member: discord.Member) -> str:
     return member.name + "#" + member.discriminator
 
 
+def get_discord_data(player_tag: str,
+                     clan_tag: str,
+                     member: discord.Member=None) -> DiscordData:
+    """Get relevant Discord data from member.
+
+    Args:
+        player_tag: Player tag of user needed for determining status.
+        clan_tag: Clan tag of user.
+        member: Discord member if user is on Discord.
+    Returns:
+        Relevant Discord data. If no member is provided, then discord_id will be None and discord_name will utilize status and
+        player tag.
+    """
+    is_active_member = clan_tag == PRIMARY_CLAN_TAG
+
+    if member is None:
+        status = Status.UNREGISTERED if is_active_member else Status.DEPARTED
+        discord_name = status.value + player_tag
+        discord_id = None
+    else:
+        status = Status.ACTIVE if is_active_member else Status.INACTIVE
+        discord_name = full_name(member)
+        discord_id = member.id
+
+    discord_data: DiscordData = {'discord_name': discord_name, 'discord_id': discord_id, 'status': status}
+    return discord_data
+
+
+def get_combined_data(player_tag: str, member: discord.Member=None) -> Union[CombinedData, None]:
+    """Get user's Clash Royale and Discord data.
+
+    Args:
+        player_tag: Player tag of user to get data of.
+        member: Discord member if user is on Discord.
+
+    Returns:
+        Clash Royale and Discord data of user, or None if error occurs.
+    """
+    clash_data = clash_utils.get_clash_data(player_tag)
+
+    if clash_data is None:
+        return None
+
+    discord_data = get_discord_data(player_tag, clash_data['clan_tag'], member)
+    combined_data: CombinedData = {**clash_data, **discord_data}
+    return combined_data
+
+
 def royale_api_url(player_tag: str) -> str:
     """Get url of Royale API page of specified player.
 
@@ -299,24 +352,23 @@ async def update_member(member: discord.Member, player_tag: str=None) -> bool:
 
         _, player_tag, _ = player_info[0]
 
-    discord_name = full_name(member)
-    clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, member.id)
+    user_data = get_combined_data(player_tag, member)
 
-    if clash_data is None:
+    if user_data is None:
         return False
 
-    member_status = db_utils.update_user(clash_data)
+    db_utils.update_user(user_data)
 
     if not is_admin(member):
-        if clash_data["player_name"] != member.display_name:
-            await member.edit(nick = clash_data["player_name"])
+        if user_data['player_name'] != member.display_name:
+            await member.edit(nick=user_data['player_name'])
 
         current_roles = set(member.roles).intersection({ROLE.member(), ROLE.visitor(), ROLE.elder()})
-        correct_roles = {ROLE.get_role_from_name(member_status)}
+        correct_roles = {ROLE.member() if (user_data['status'] == Status.ACTIVE) else ROLE.visitor()}
 
-        if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}
-                and clash_data["clan_tag"] == PRIMARY_CLAN_TAG
-                and clash_data["player_tag"] not in BLACKLIST):
+        if (user_data['role'] in {"elder", "coLeader", "leader"}
+                and user_data['clan_tag'] == PRIMARY_CLAN_TAG
+                and user_data['player_tag'] not in BLACKLIST):
             correct_roles.add(ROLE.elder())
 
         if correct_roles != current_roles:
@@ -345,14 +397,14 @@ async def update_all_members(guild: discord.Guild):
         if member.bot or member.id not in db_info:
             continue
 
-        player_tag = db_info[member.id]["player_tag"]
+        player_tag = db_info[member.id]['player_tag']
         current_discord_name = full_name(member)
 
-        if current_discord_name != db_info[member.id]["discord_name"]:
+        if current_discord_name != db_info[member.id]['discord_name']:
             await update_member(member, player_tag)
         elif player_tag in active_members:
-            if (member.display_name != active_members[player_tag]["name"]
-                    or db_info[member.id]["clan_role"] != active_members[player_tag]["role"]
+            if (member.display_name != active_members[player_tag]['player_name']
+                    or db_info[member.id]['clan_role'] != active_members[player_tag]['role']
                     or ROLE.visitor() in member.roles):
                 await update_member(member, player_tag)
         elif ROLE.member() in member.roles:
@@ -1014,35 +1066,30 @@ async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, st
     return return_info
 
 
-async def send_new_member_info(clash_data: Dict[str, Union[str, int]]):
+async def send_new_member_info(clash_data: ClashData):
     """Send an informational message to leaders when a new member joins the server.
 
     Args:
-        clash_data: Dict containing info about new member.
+        clash_data: Dictionary containing info about new member.
     """
-    card_level_data = clash_utils.get_card_levels(clash_data['player_tag'])
-
-    if card_level_data is None:
-        return
-
     embed = discord.Embed(title=f"{clash_data['player_name']} just joined the server!",
                           url=royale_api_url(clash_data["player_tag"]))
 
     embed.add_field(name=f"About {clash_data['player_name']}",
                     value=("```"
-                           "Level: {expLevel}\n"
+                           "Level: {exp_level}\n"
                            "Trophies: {trophies}\n"
-                           "Best Trophies: {bestTrophies}\n"
-                           "Cards Owned: {foundCards}/{totalCards}"
-                           "```").format(**card_level_data),
+                           "Best Trophies: {best_trophies}\n"
+                           "Cards Owned: {found_cards}/{total_cards}"
+                           "```").format(**clash_data),
                     inline=False)
 
-    found_cards = card_level_data["foundCards"]
+    found_cards = clash_data["found_cards"]
     card_level_string = ""
     percentile = 0
 
     for i in range(14, 0, -1):
-        percentile += card_level_data["cards"][i] / found_cards
+        percentile += clash_data["cards"][i] / found_cards
         percentage = round(percentile * 100)
 
         if 0 < percentage < 5:

@@ -20,7 +20,8 @@ from config.credentials import (
 # Utils
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
-from utils.util_types import ReminderTime
+from utils.role_utils import RoleNames
+from utils.util_types import ClashData, CombinedData, ReminderTime, Status
 
 
 ######################################################
@@ -50,20 +51,11 @@ def connect_to_db() -> Tuple[pymysql.Connection, pymysql.cursors.DictCursor]:
 
 
 # TODO: Use TypedDict
-def add_new_user(clash_data: Dict[str, Union[str, int]]) -> bool:
+def add_new_user(user_data: CombinedData) -> bool:
     """Add a new user to the database. Only used for users that just joined the Discord server.
 
     Args:
-        clash_data: A dictionary of relevant Clash Royale information.
-            {
-                "player_tag": str,
-                "player_name": str,
-                "discord_name": str,
-                "discord_id": int,
-                "clan_role": str,
-                "clan_name": str,
-                "clan_tag": str
-            }
+        combined_data: Relevant Clash Royale and Discord data.
 
     Returns:
         Whether player was successfully inserted into database.
@@ -72,35 +64,35 @@ def add_new_user(clash_data: Dict[str, Union[str, int]]) -> bool:
 
     # TODO: Create routine to get clan id/insert new clan
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
-    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
+    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
     query_result = cursor.fetchone()
 
     if query_result is None:
         insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
-        cursor.execute(insert_clan_query, clash_data)
-        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
+        cursor.execute(insert_clan_query, user_data)
+        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
         query_result = cursor.fetchone()
 
-    # Add clan_id to clash_data for use in user insertion.
-    clash_data["clan_id"] = query_result["id"]
+    # Add clan_id to user_data for use in user insertion.
+    user_data['clan_id'] = query_result['id']
 
-    # Set their proper status
-    clash_data["status"] = "ACTIVE" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "INACTIVE"
+    # Convert status to string.
+    user_data['status_str'] = user_data['status'].value
 
     # Check if the user has previously joined the server with a different player tag.
     # If they have, set their previous associated account's discord_id to NULL and create a new entry.
-    cursor.execute("SELECT * FROM users WHERE discord_id = %(discord_id)s", clash_data)
+    cursor.execute("SELECT * FROM users WHERE discord_id = %(discord_id)s", user_data)
     query_result = cursor.fetchone()
 
     if query_result is not None:
-        cursor.execute("UPDATE users SET discord_id = NULL WHERE discord_id = %(discord_id)s", clash_data)
+        cursor.execute("UPDATE users SET discord_id = NULL WHERE discord_id = %(discord_id)s", user_data)
 
     # Check if player already exists in table.
-    cursor.execute("SELECT * FROM users WHERE player_tag = %(player_tag)s", clash_data)
+    cursor.execute("SELECT * FROM users WHERE player_tag = %(player_tag)s", user_data)
     query_result = cursor.fetchone()
 
     if query_result is not None:
-        if query_result["status"] in {'ACTIVE', 'INACTIVE'}:
+        if Status(query_result['status']) in {Status.ACTIVE, Status.INACTIVE}:
             database.rollback()
             database.close()
             return False
@@ -109,21 +101,21 @@ def add_new_user(clash_data: Dict[str, Union[str, int]]) -> bool:
                         player_name = %(player_name)s,\
                         discord_name = %(discord_name)s,\
                         discord_id = %(discord_id)s,\
-                        clan_role = %(clan_role)s,\
+                        clan_role = %(role)s,\
                         clan_id = %(clan_id)s,\
-                        status = %(status)s\
+                        status = %(status_str)s\
                         WHERE player_tag = %(player_tag)s",
-                        clash_data)
+                        user_data)
     else:
         cursor.execute("INSERT INTO users VALUES\
                         (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s,\
-                        %(discord_id)s, %(clan_role)s, 'US', FALSE, 0, 0, 0, %(status)s, %(clan_id)s)",
-                        clash_data)
+                        %(discord_id)s, %(role)s, 'US', FALSE, 0, 0, 0, %(status_str)s, %(clan_id)s)",
+                        user_data)
 
     # Get id of newly inserted user.
-    cursor.execute("SELECT id FROM users WHERE player_tag = %(player_tag)s", clash_data)
+    cursor.execute("SELECT id FROM users WHERE player_tag = %(player_tag)s", user_data)
     query_result = cursor.fetchone()
-    user_id = query_result["id"]
+    user_id = query_result['id']
 
     # Check for match_history and create entries if necessary.
     cursor.execute("SELECT user_id FROM match_history_all WHERE user_id = %s", (user_id))
@@ -131,28 +123,28 @@ def add_new_user(clash_data: Dict[str, Union[str, int]]) -> bool:
 
     if query_result is None:
         last_check_time = get_last_check_time()
-        tracked_since = bot_utils.get_current_battletime() if (is_war_time() and (clash_data["status"] == 'ACTIVE')) else None
+        tracked_since = bot_utils.get_current_battletime() if (is_war_time() and (user_data['status'] == Status.ACTIVE)) else None
         cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
                        (user_id, last_check_time, tracked_since))
         cursor.execute("INSERT INTO match_history_all VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (user_id))
 
     # Check if new user is member or visitor. Get id of relevant discord_role.
-    role_string = "Member" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "Visitor"
+    role_string = RoleNames.MEMBER.value if (user_data['status'] == Status.ACTIVE) else RoleNames.VISITOR.value
     cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role_string))
     query_result = cursor.fetchone()
-    discord_role_id = query_result["id"]
+    discord_role_id = query_result['id']
 
     # Add new role into assigned_roles table.
     insert_assigned_roles_query = "INSERT INTO assigned_roles VALUES (%s, %s)"
     cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
 
-    if (clash_data["clan_role"] in {"elder", "coLeader", "leader"}
-            and clash_data["clan_tag"] == PRIMARY_CLAN_TAG
-            and clash_data["player_tag"] not in BLACKLIST):
+    if (user_data["role"] in {"elder", "coLeader", "leader"}
+            and user_data["status"] == Status.ACTIVE
+            and user_data["player_tag"] not in BLACKLIST):
         role_string = "Elder"
         cursor.execute("SELECT id FROM discord_roles WHERE role_name = %s", (role_string))
         query_result = cursor.fetchone()
-        discord_role_id = query_result["id"]
+        discord_role_id = query_result['id']
         cursor.execute(insert_assigned_roles_query, (user_id, discord_role_id))
 
     database.commit()
@@ -171,124 +163,92 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     """
     database, cursor = connect_to_db()
 
-    # Get their data
-    # TODO: Use TypedDict
-    clash_data = clash_utils.get_clash_user_data(player_tag, player_tag, None)
+    # Get their data.
+    user_data = bot_utils.get_combined_data(player_tag)
 
-    if clash_data is None:
+    if user_data is None:
         return False
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
-    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
+    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
     query_result = cursor.fetchone()
 
     if query_result is None:
         insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
-        cursor.execute(insert_clan_query, clash_data)
-        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
+        cursor.execute(insert_clan_query, user_data)
+        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
         query_result = cursor.fetchone()
 
-    # Add clan_id to clash_data for use in user insertion.
-    clash_data["clan_id"] = query_result["id"]
+    # Add clan_id to user_data for use in user insertion.
+    user_data['clan_id'] = query_result['id']
 
-    # Set their proper status
-    clash_data["status"] = "UNREGISTERED" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "DEPARTED"
-    clash_data["discord_name"] = f"{clash_data['status']}{player_tag}"
+    # Convert status to string.
+    user_data['status_str'] = user_data['status'].value
 
     # Insert them
     cursor.execute("INSERT INTO users VALUES\
                     (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s,\
-                    NULL, %(clan_role)s, 'US', FALSE, 0, 0, 0, %(status)s, %(clan_id)s)",
-                    clash_data)
+                    NULL, %(role)s, 'US', FALSE, 0, 0, 0, %(status_str)s, %(clan_id)s)",
+                    user_data)
 
     # Create match_history entries.
-    cursor.execute("SELECT id FROM users WHERE player_tag = %(player_tag)s", clash_data)
+    cursor.execute("SELECT id FROM users WHERE player_tag = %(player_tag)s", user_data)
     query_result = cursor.fetchone()
     last_check_time = get_last_check_time()
-    tracked_since = bot_utils.get_current_battletime() if (is_war_time() and (clash_data["status"] == 'UNREGISTERED')) else None
+    tracked_since = bot_utils.get_current_battletime() if (is_war_time() and user_data['status'] == Status.UNREGISTERED) else None
     cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
-                   (query_result["id"], last_check_time, tracked_since))
+                   (query_result['id'], last_check_time, tracked_since))
     cursor.execute("INSERT INTO match_history_all VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
-                   (query_result["id"]))
+                   (query_result['id']))
 
     database.commit()
     database.close()
     return True
 
 
-# TODO: Use TypedDict
-def update_user(clash_data: Dict[str, Union[str, int]]) -> str:
+def update_user(user_data: CombinedData):
     """Update a user in the database to reflect any changes to their Clash Royale or Discord statuses.
 
     Args:
-        clash_data: A dictionary of relevant Clash Royale information.
-            {
-                "player_tag": str,
-                "player_name": str,
-                "discord_name": str,
-                "discord_id": int,
-                "clan_role": str,
-                "clan_name": str,
-                "clan_tag": str,
-                "status": str (optional)
-            }
-
-    Returns:
-        Status of user being updated; "Member" if user is in primary clan, otherwise "Visitor"
+        user_data: Relevant Clash Royale and Discord data.
     """
     database, cursor = connect_to_db()
 
     # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
-    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
+    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
     query_result = cursor.fetchone()
 
     if query_result is None:
         insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
-        cursor.execute(insert_clan_query, clash_data)
-        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", clash_data)
+        cursor.execute(insert_clan_query, user_data)
+        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
         query_result = cursor.fetchone()
 
-    clash_data["clan_id"] = query_result["id"]
+    # Add extra fields to user_data needed for query.
+    user_data['clan_id'] = query_result['id']
+    user_data['status_str'] = user_data['status'].value
 
-    if clash_data.get("status") is None:
-        clash_data["status"] = "ACTIVE" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "INACTIVE"
+    cursor.execute("UPDATE users SET\
+                    player_tag = %(player_tag)s,\
+                    player_name = %(player_name)s,\
+                    discord_name = %(discord_name)s,\
+                    clan_role = %(role)s,\
+                    clan_id = %(clan_id)s,\
+                    status = %(status_str)s\
+                    WHERE player_tag = %(player_tag)s",
+                    user_data)
 
-    update_query = ""
-
-    if clash_data["discord_id"] is None:
-        update_query = "UPDATE users SET\
-                        player_tag = %(player_tag)s,\
-                        player_name = %(player_name)s,\
-                        discord_name = %(discord_name)s,\
-                        clan_role = %(clan_role)s,\
-                        clan_id = %(clan_id)s,\
-                        status = %(status)s\
-                        WHERE player_tag = %(player_tag)s"
-    else:
-        update_query = "UPDATE users SET\
-                        player_tag = %(player_tag)s,\
-                        player_name = %(player_name)s,\
-                        discord_name = %(discord_name)s,\
-                        clan_role = %(clan_role)s,\
-                        clan_id = %(clan_id)s,\
-                        status = %(status)s\
-                        WHERE discord_id = %(discord_id)s"
-
-    cursor.execute(update_query, clash_data)
-
-    if clash_data["status"] in {"ACTIVE", "UNREGISTERED"} and is_war_time():
+    if user_data['status'] in {Status.ACTIVE, Status.UNREGISTERED} and is_war_time():
         last_check_time = get_last_check_time()
         tracked_since = bot_utils.get_current_battletime()
         cursor.execute("UPDATE match_history_recent SET\
                         last_check_time = %s,\
                         tracked_since = %s\
                         WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s) AND tracked_since IS NULL",
-                        (last_check_time, tracked_since, clash_data["player_tag"]))
+                        (last_check_time, tracked_since, user_data["player_tag"]))
 
     database.commit()
     database.close()
-
-    return "Member" if (clash_data["clan_tag"] == PRIMARY_CLAN_TAG) else "Visitor"
 
 
 # TODO: Use TypedDict
@@ -734,8 +694,8 @@ def remove_user(discord_id: int):
         database.close()
         return
 
-    user_id = query_result["id"]
-    player_tag = query_result["player_tag"]
+    user_id = query_result['id']
+    player_tag = query_result['player_tag']
 
     # Delete any assigned Discord roles associated with the user.
     cursor.execute("DELETE FROM assigned_roles WHERE user_id = %s", (user_id))
@@ -744,11 +704,12 @@ def remove_user(discord_id: int):
     # If the user is still an active member of the primary clan, change their status to UNREGISTERED.
     # Otherwise change it to DEPARTED.
     if player_tag in active_members:
-        cursor.execute("UPDATE users SET discord_name = %s, status = 'UNREGISTERED' WHERE id = %s",
-                       (f"UNREGISTERED{player_tag}", user_id))
+        new_status = Status.UNREGISTERED
     else:
-        cursor.execute("UPDATE users SET discord_name = %s, status = 'DEPARTED' WHERE id = %s",
-                       (f"DEPARTED{player_tag}", user_id))
+        new_status = Status.DEPARTED
+
+    cursor.execute("UPDATE users SET discord_name = %s, status = %s WHERE id = %s",
+                   (f"{new_status.value}{player_tag}", new_status.value, user_id))
 
     database.commit()
     database.close()
@@ -813,7 +774,7 @@ def get_users_on_vacation() -> Dict[str, str]:
         return {}
 
     active_members = clash_utils.get_active_members_in_clan()
-    users_on_vacation = {user["player_tag"]: user["player_name"] for user in query_result if user["player_tag"] in active_members}
+    users_on_vacation = {user['player_tag']: user['player_name'] for user in query_result if user['player_tag'] in active_members}
     return users_on_vacation
 
 
@@ -1048,7 +1009,7 @@ def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, int, datetime
     return usage_list
 
 
-def clean_up_db(active_members: dict=None):
+def clean_up_db(active_members: Dict[str, ClashData]=None):
     """Updates database to ensure status column is up to date.
 
     Checks that every user in the database has an appropriate status.
@@ -1068,37 +1029,45 @@ def clean_up_db(active_members: dict=None):
     if len(active_members) == 0:
         return
 
-    cursor.execute("SELECT player_name, player_tag, discord_name, discord_id, status FROM users")
+    cursor.execute("SELECT player_name, player_tag, discord_name, status FROM users")
     query_result = cursor.fetchall()
 
     for user in query_result:
-        player_tag = user["player_tag"]
-        discord_name = user["discord_name"]
-        discord_id = user["discord_id"]
-        status = user["status"]
+        player_tag = user['player_tag']
+        discord_name = user['discord_name']
+        status = Status(user['status'])
 
         if player_tag in active_members:
-            if status in {'INACTIVE', 'DEPARTED'}:
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
-                if clash_data is None:
+            if status in {Status.INACTIVE, Status.DEPARTED}:
+                user_data = bot_utils.get_combined_data(player_tag)
+                user_data['discord_name'] = discord_name
+
+                if user_data is None:
                     continue
 
-                if status == 'DEPARTED':
-                    clash_data["discord_name"] = f"UNREGISTERED{player_tag}"
-                    clash_data["status"] = 'UNREGISTERED'
+                if status == Status.DEPARTED:
+                    user_data['discord_name'] = f"{Status.UNREGISTERED.value}{player_tag}"
+                    user_data['status'] = Status.UNREGISTERED
+                else:
+                    user_data['discord_name'] = discord_name
+                    user_data['status'] = Status.ACTIVE
 
-                update_user(clash_data)
+                update_user(user_data)
         else:
-            if status in {'ACTIVE', 'UNREGISTERED'}:
-                clash_data = clash_utils.get_clash_user_data(player_tag, discord_name, discord_id)
-                if clash_data is None:
+            if status in {Status.ACTIVE, Status.UNREGISTERED}:
+                user_data = bot_utils.get_combined_data(player_tag)
+
+                if user_data is None:
                     continue
 
-                if status == 'UNREGISTERED':
-                    clash_data["discord_name"] = f"DEPARTED{player_tag}"
-                    clash_data["status"] = 'DEPARTED'
+                if status == Status.UNREGISTERED:
+                    user_data['discord_name'] = f"{Status.DEPARTED.value}{player_tag}"
+                    user_data['status'] = Status.DEPARTED
+                else:
+                    user_data['discord_name'] = discord_name
+                    user_data['status'] = Status.INACTIVE
 
-                update_user(clash_data)
+                update_user(user_data)
 
     database.commit()
     database.close()
@@ -1264,8 +1233,8 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
                     duel_series_losses = 0", (last_check_time))
 
     cursor.execute("UPDATE match_history_recent SET tracked_since = %s WHERE\
-                    user_id IN (SELECT id FROM users WHERE status = 'ACTIVE' OR status = 'UNREGISTERED')",
-                    (last_check_time))
+                    user_id IN (SELECT id FROM users WHERE status IN (%s, %s))",
+                    (last_check_time, Status.ACTIVE.value, Status.UNREGISTERED.value))
 
     clans = clash_utils.get_clans_in_race(False)
     reset_clans = False
@@ -1504,7 +1473,7 @@ def get_match_performance_dict(player_tag: str) -> Dict[str, Dict[str, Union[int
     return match_performance_dict
 
 
-def get_non_active_participants(active_members: dict=None) -> Set[str]:
+def get_non_active_participants(active_members: Dict[str, ClashData]=None) -> Set[str]:
     """Get a set of player tags of users who were tracked in the most recent river race but are not currently active members.
 
     Args:
@@ -1529,13 +1498,13 @@ def get_non_active_participants(active_members: dict=None) -> Set[str]:
     former_participants = set()
 
     for user in query_result:
-        if user["player_tag"] not in active_members:
-            former_participants.add(user["player_tag"])
+        if user['player_tag'] not in active_members:
+            former_participants.add(user['player_tag'])
 
     return former_participants
 
 
-def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
+def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[str, ClashData]=None):
     """Add any active members not in the database as UNREGISTERED users.
 
     Args:
@@ -1560,7 +1529,7 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=
         return
 
     for user in query_result:
-        active_members.pop(user["player_tag"], None)
+        active_members.pop(user['player_tag'], None)
 
     for player_tag in active_members:
         add_new_unregistered_user(player_tag)
@@ -1713,11 +1682,11 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
     clans_dict = {}
 
     for clan in clans:
-        clans_dict[clan["id"]] = clan
+        clans_dict[clan['id']] = clan
 
     # Get users.
     if primary_clan_only:
-        cursor.execute("SELECT * FROM users WHERE status = 'ACTIVE' OR status = 'UNREGISTERED'")
+        cursor.execute("SELECT * FROM users WHERE status IN (%s, %s)", (Status.ACTIVE.value, Status.UNREGISTERED.value))
     else:
         cursor.execute("SELECT * FROM users")
 
@@ -1760,7 +1729,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
 
     today_header = now_date.strftime("%a, %b %d")
 
-    for _, day in bot_utils.break_down_usage_history(users[0]["usage_history"], now)[::-1]:
+    for _, day in bot_utils.break_down_usage_history(users[0]['usage_history'], now)[::-1]:
         history_headers.append(day)
     history_headers.append(today_header)
 
@@ -1805,22 +1774,22 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
 
     for user in users:
         # Get info
-        clan_id = user["clan_id"]
-        kicks = get_kicks(user["player_tag"])
-        info_row = [user["player_name"], user["player_tag"], user["discord_name"], user["clan_role"], user["time_zone"],
-                     "Yes" if user["vacation"] else "No",
-                     user["strikes"], user["permanent_strikes"], len(kicks), user["status"],
-                     clans_dict[clan_id]["clan_name"], clans_dict[clan_id]["clan_tag"],
+        clan_id = user['clan_id']
+        kicks = get_kicks(user['player_tag'])
+        info_row = [user['player_name'], user['player_tag'], user['discord_name'], user['clan_role'], user['time_zone'],
+                     "Yes" if user['vacation'] else "No",
+                     user['strikes'], user['permanent_strikes'], len(kicks), user['status'],
+                     clans_dict[clan_id]['clan_name'], clans_dict[clan_id]['clan_tag'],
                      bot_utils.royale_api_url(user['player_tag'])]
 
         # Get history
-        user_history = bot_utils.break_down_usage_history(user["usage_history"], now)
-        history_row = [user["player_name"], user["player_tag"]]
+        user_history = bot_utils.break_down_usage_history(user['usage_history'], now)
+        history_row = [user['player_name'], user['player_tag']]
 
         for usage, _ in user_history[::-1]:
             history_row.append(usage)
 
-        usage_today = deck_usage_today.get(user["player_tag"])
+        usage_today = deck_usage_today.get(user['player_tag'])
 
         if usage_today is None:
             usage_today = 0
@@ -1828,14 +1797,14 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         history_row.append(usage_today)
 
         # Kicks
-        kicks_row = [user["player_name"], user["player_tag"]]
+        kicks_row = [user['player_name'], user['player_tag']]
         kicks_row.extend(kicks)
 
         # Get stats
-        match_performance = get_match_performance_dict(user["player_tag"])
+        match_performance = get_match_performance_dict(user['player_tag'])
 
-        decks_used = (match_performance["recent"]["combined_pvp"]["wins"] + match_performance["recent"]["combined_pvp"]["losses"] +
-                      match_performance["recent"]["boat_attacks"]["wins"] + match_performance["recent"]["boat_attacks"]["losses"])
+        decks_used = (match_performance['recent']['combined_pvp']['wins'] + match_performance['recent']['combined_pvp']['losses'] +
+                      match_performance['recent']['boat_attacks']['wins'] + match_performance['recent']['boat_attacks']['losses'])
 
         tracked_since = match_performance["recent"]["tracked_since"]
 
@@ -1844,60 +1813,60 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         else:
             tracked_since = tracked_since.strftime("%Y-%m-%d, %H:%M")
 
-        recent_stats_row = [user["player_name"], user["player_tag"], match_performance["recent"]["fame"], decks_used, tracked_since,
-                            match_performance["recent"]["regular"]["wins"],
-                            match_performance["recent"]["regular"]["losses"],
-                            (float(match_performance["recent"]["regular"]["win_rate"][:-1]) / 100),
-                            match_performance["recent"]["special"]["wins"],
-                            match_performance["recent"]["special"]["losses"],
-                            (float(match_performance["recent"]["special"]["win_rate"][:-1]) / 100),
-                            match_performance["recent"]["duel_matches"]["wins"],
-                            match_performance["recent"]["duel_matches"]["losses"],
-                            (float(match_performance["recent"]["duel_matches"]["win_rate"][:-1]) / 100),
-                            match_performance["recent"]["duel_series"]["wins"],
-                            match_performance["recent"]["duel_series"]["losses"],
-                            (float(match_performance["recent"]["duel_series"]["win_rate"][:-1]) / 100),
-                            match_performance["recent"]["combined_pvp"]["wins"],
-                            match_performance["recent"]["combined_pvp"]["losses"],
-                            (float(match_performance["recent"]["combined_pvp"]["win_rate"][:-1]) / 100),
-                            match_performance["recent"]["boat_attacks"]["wins"],
-                            match_performance["recent"]["boat_attacks"]["losses"],
-                            (float(match_performance["recent"]["boat_attacks"]["win_rate"][:-1]) / 100)]
+        recent_stats_row = [user['player_name'], user['player_tag'], match_performance['recent']['fame'], decks_used, tracked_since,
+                            match_performance['recent']['regular']['wins'],
+                            match_performance['recent']['regular']['losses'],
+                            (float(match_performance['recent']['regular']['win_rate'][:-1]) / 100),
+                            match_performance['recent']['special']['wins'],
+                            match_performance['recent']['special']['losses'],
+                            (float(match_performance['recent']['special']['win_rate'][:-1]) / 100),
+                            match_performance['recent']['duel_matches']['wins'],
+                            match_performance['recent']['duel_matches']['losses'],
+                            (float(match_performance['recent']['duel_matches']['win_rate'][:-1]) / 100),
+                            match_performance['recent']['duel_series']['wins'],
+                            match_performance['recent']['duel_series']['losses'],
+                            (float(match_performance['recent']['duel_series']['win_rate'][:-1]) / 100),
+                            match_performance['recent']['combined_pvp']['wins'],
+                            match_performance['recent']['combined_pvp']['losses'],
+                            (float(match_performance['recent']['combined_pvp']['win_rate'][:-1]) / 100),
+                            match_performance['recent']['boat_attacks']['wins'],
+                            match_performance['recent']['boat_attacks']['losses'],
+                            (float(match_performance['recent']['boat_attacks']['win_rate'][:-1]) / 100)]
 
-        all_stats_row = [user["player_name"], user["player_tag"],
-                         match_performance["all"]["regular"]["wins"],
-                         match_performance["all"]["regular"]["losses"],
-                         (float(match_performance["all"]["regular"]["win_rate"][:-1]) / 100),
-                         match_performance["all"]["special"]["wins"],
-                         match_performance["all"]["special"]["losses"],
-                         (float(match_performance["all"]["special"]["win_rate"][:-1]) / 100),
-                         match_performance["all"]["duel_matches"]["wins"],
-                         match_performance["all"]["duel_matches"]["losses"],
-                         (float(match_performance["all"]["duel_matches"]["win_rate"][:-1]) / 100),
-                         match_performance["all"]["duel_series"]["wins"],
-                         match_performance["all"]["duel_series"]["losses"],
-                         (float(match_performance["all"]["duel_series"]["win_rate"][:-1]) / 100),
-                         match_performance["all"]["combined_pvp"]["wins"],
-                         match_performance["all"]["combined_pvp"]["losses"],
-                         (float(match_performance["all"]["combined_pvp"]["win_rate"][:-1]) / 100),
-                         match_performance["all"]["boat_attacks"]["wins"],
-                         match_performance["all"]["boat_attacks"]["losses"],
-                         (float(match_performance["all"]["boat_attacks"]["win_rate"][:-1]) / 100)]
+        all_stats_row = [user['player_name'], user['player_tag'],
+                         match_performance['all']['regular']['wins'],
+                         match_performance['all']['regular']['losses'],
+                         (float(match_performance['all']['regular']['win_rate'][:-1]) / 100),
+                         match_performance['all']['special']['wins'],
+                         match_performance['all']['special']['losses'],
+                         (float(match_performance['all']['special']['win_rate'][:-1]) / 100),
+                         match_performance['all']['duel_matches']['wins'],
+                         match_performance['all']['duel_matches']['losses'],
+                         (float(match_performance['all']['duel_matches']['win_rate'][:-1]) / 100),
+                         match_performance['all']['duel_series']['wins'],
+                         match_performance['all']['duel_series']['losses'],
+                         (float(match_performance['all']['duel_series']['win_rate'][:-1]) / 100),
+                         match_performance['all']['combined_pvp']['wins'],
+                         match_performance['all']['combined_pvp']['losses'],
+                         (float(match_performance['all']['combined_pvp']['win_rate'][:-1]) / 100),
+                         match_performance['all']['boat_attacks']['wins'],
+                         match_performance['all']['boat_attacks']['losses'],
+                         (float(match_performance['all']['boat_attacks']['win_rate'][:-1]) / 100)]
 
         # Card levels
-        card_levels_quantity_row = [user["player_name"], user["player_tag"]]
-        card_levels_percentiles_row = [user["player_name"], user["player_tag"]]
+        card_levels_quantity_row = [user['player_name'], user['player_tag']]
+        card_levels_percentiles_row = [user['player_name'], user['player_tag']]
 
         if include_card_levels:
-            card_level_data = clash_utils.get_card_levels(user["player_tag"])
+            clash_data = clash_utils.get_clash_data(user['player_tag'])
 
-            if card_level_data is not None:
+            if clash_data is not None:
                 percentile = 0
 
                 for i in range(14, 0, -1):
-                    percentile += card_level_data["cards"][i] / card_level_data["foundCards"]
+                    percentile += clash_data['cards'][i] / clash_data['found_cards']
                     percentage = round(percentile * 100)
-                    card_levels_quantity_row.append(card_level_data["cards"][i])
+                    card_levels_quantity_row.append(clash_data['cards'][i])
                     card_levels_percentiles_row.append(percentage)
 
         # Write data to spreadsheet

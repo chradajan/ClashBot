@@ -145,7 +145,7 @@ class Strikes(commands.Cog):
         for player_tag, player_name, strikes in strikes:
             if player_tag in active_members:
                 active_members_have_strikes = True
-                active_name = active_members[player_tag]["name"]
+                active_name = active_members[player_tag]['player_name']
                 active_table.add_row([active_name, strikes])
             else:
                 non_active_members_have_strikes = True

@@ -51,15 +51,14 @@ class Listeners(commands.Cog):
                                                     "Please send your player tag instead."),
                                            delete_after=10)
             else:
-                discord_name = bot_utils.full_name(message.author)
-                clash_data = clash_utils.get_clash_user_data(message.content, discord_name, message.author.id)
-                if clash_data is not None:
-                    if db_utils.add_new_user(clash_data):
+                user_data = bot_utils.get_combined_data(message.content, message.author)
+                if user_data is not None:
+                    if db_utils.add_new_user(user_data):
                         if not bot_utils.is_admin(message.author):
-                            await message.author.edit(nick=clash_data["player_name"])
+                            await message.author.edit(nick=user_data["player_name"])
                         await message.author.add_roles(ROLE.check_rules())
                         await message.author.remove_roles(ROLE.new())
-                        await bot_utils.send_new_member_info(clash_data)
+                        await bot_utils.send_new_member_info(user_data)
                     else:
                         await message.channel.send(content=("A player affiliated with that player tag is already on the server. "
                                                             "Please enter an unused player tag."),

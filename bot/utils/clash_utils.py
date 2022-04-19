@@ -14,36 +14,18 @@ from config.credentials import CLASH_API_KEY
 # Utils
 import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
+from utils.util_types import ClashData
 
 
-# TODO: Create TypedDict of member data from API and remove irrelevant fields.
-def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, Dict[str, Union[str, int, dict]]]:
+def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, ClashData]:
     """Get a dictionary containing information about members currently in a clan.
 
     Args:
         clan_tag (optional): Clan to get members of. Defaults to primary clan.
 
     Returns:
-        Dictionary of active members, or empty dict if API request fails.
-            {
-                player_tag(str): {
-                    "tag": str,
-                    "name": str,
-                    "role": str,
-                    "lastSeen": str,
-                    "expLevel": int,
-                    "trophies": int,
-                    "arena": {
-                        "id": int,
-                        "name": str
-                    },
-                    "clanRank": int,
-                    "previousClanRank": int,
-                    "donations": int,
-                    "donationsReceived": int,
-                    "clanChestPoints": int
-                }
-            }
+        Dictionary of active members, or empty dict if API request fails. best_trophies, cards, found_cards, total_cards, and
+            clan_name fields are all populated but do not contain actual data.
     """
     req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members",
                        headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
@@ -54,8 +36,20 @@ def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, Dict
     json_obj = req.json()
     active_members = {}
 
-    for member in json_obj["items"]:
-        active_members[member["tag"]] = member
+    for member in json_obj['items']:
+        active_members[member['tag']] = {
+            'player_tag': member['tag'],
+            'player_name': member['name'],
+            'role': member['role'],
+            'exp_level': member['expLevel'],
+            'trophies': member['trophies'],
+            'best_trophies': -1,
+            'cards': {},
+            'found_cards': -1,
+            'total_cards': -1,
+            'clan_name': "",
+            'clan_tag': clan_tag
+        }
 
     return active_members
 
@@ -149,26 +143,14 @@ def parse_player_tag(message: str) -> str:
     return None
 
 
-# TODO: Create TypedDict for clash data
-def get_clash_user_data(message: str, discord_name: str, discord_id: int) -> Dict[str, Union[str, int]]:
+def get_clash_data(message: str) -> Union[ClashData, None]:
     """Get a user's relevant Clash Royale information.
 
     Args:
         message: Message that should contain a valid player tag.
-        discord_name: The user's discord name in the format name#discriminator.
-        discord_id: Unique Discord id of a member.
 
     Returns:
-        dict: A dictionary of relevant Clash Royale information, or None if an error occurs.
-            {
-                "player_tag": str,
-                "player_name": str,
-                "discord_name": str,
-                "discord_id": int,
-                "clan_role": str,
-                "clan_name": str,
-                "clan_tag": str
-            }
+        A dictionary of relevant Clash Royale information, or None if an error occurs.
     """
     player_tag = parse_player_tag(message)
 
@@ -182,24 +164,28 @@ def get_clash_user_data(message: str, discord_name: str, discord_id: int) -> Dic
         return None
 
     json_obj = req.json()
+    user_in_clan = 'clan' in json_obj
 
-    user_dict = {
-        "player_tag": player_tag,
-        "player_name": json_obj["name"],
-        "discord_name": discord_name,
-        "discord_id": discord_id
+    clash_data: ClashData = {
+        'player_tag': json_obj['tag'],
+        'player_name': json_obj['name'],
+        'role': json_obj.get('role', "None"),
+        'exp_level': json_obj['expLevel'],
+        'trophies': json_obj['trophies'],
+        'best_trophies': json_obj['bestTrophies'],
+        'cards': {i: 0 for i in range(1, 15)},
+        'found_cards': 0,
+        'total_cards': get_total_cards(),
+        'clan_name': json_obj['clan']['name'] if user_in_clan else "None",
+        'clan_tag': json_obj['clan']['tag'] if user_in_clan else "None"
     }
 
-    if "clan" in json_obj.keys():
-        user_dict["clan_role"] = json_obj["role"]
-        user_dict["clan_name"] = json_obj["clan"]["name"]
-        user_dict["clan_tag"] = json_obj["clan"]["tag"]
-    else:
-        user_dict["clan_role"] = "None"
-        user_dict["clan_name"] = "None"
-        user_dict["clan_tag"] = "None"
+    for card in json_obj['cards']:
+        card_level = 14 - (card['maxLevel'] - card['level'])
+        clash_data['cards'][card_level] += 1
+        clash_data['found_cards'] += 1
 
-    return user_dict
+    return clash_data
 
 
 # TODO: also return any active members that are not in participants.
@@ -220,10 +206,10 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
         return []
 
     for participant in participants:
-        player_tag = participant["tag"]
-        remaining_decks = 4 - participant["decksUsedToday"]
+        player_tag = participant['tag']
+        remaining_decks = 4 - participant['decksUsedToday']
         if (remaining_decks != 0) and (player_tag in active_members):
-            decks_remaining_list.append((active_members[player_tag]["name"], participant["tag"], remaining_decks))
+            decks_remaining_list.append((active_members[player_tag]['player_name'], participant['tag'], remaining_decks))
 
     decks_remaining_list.sort(key = lambda x : (x[2], x[0].lower()))
     return decks_remaining_list
@@ -261,44 +247,44 @@ def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str,
         return {}
 
     return_info = {
-        "remaining_decks": 200,
-        "participants": 0,
-        "active_members_with_no_decks_used": 0,
-        "active_members_with_remaining_decks": [],
-        "active_members_without_remaining_decks": [],
-        "inactive_members_with_decks_used": [],
-        "locked_out_active_members": []
+        'remaining_decks': 200,
+        'participants': 0,
+        'active_members_with_no_decks_used': 0,
+        'active_members_with_remaining_decks': [],
+        'active_members_without_remaining_decks': [],
+        'inactive_members_with_decks_used': [],
+        'locked_out_active_members': []
     }
 
     for participant in participants:
-        if participant["decksUsedToday"] > 0:
-            return_info["remaining_decks"] -= participant["decksUsedToday"]
-            return_info["participants"] += 1
+        if participant['decksUsedToday'] > 0:
+            return_info['remaining_decks'] -= participant['decksUsedToday']
+            return_info['participants'] += 1
 
     for participant in participants:
-        if participant["tag"] in active_members:
-            participant_name = active_members[participant["tag"]]["name"]
-            if participant["decksUsedToday"] == 4:
-                return_info["active_members_without_remaining_decks"].append((participant_name, 0))
-            elif participant["decksUsedToday"] == 0:
-                return_info["active_members_with_no_decks_used"] += 1
-                if return_info["participants"] == 50:
-                    return_info["locked_out_active_members"].append((participant_name, 4))
+        if participant['tag'] in active_members:
+            participant_name = active_members[participant['tag']]['player_name']
+            if participant['decksUsedToday'] == 4:
+                return_info['active_members_without_remaining_decks'].append((participant_name, 0))
+            elif participant['decksUsedToday'] == 0:
+                return_info['active_members_with_no_decks_used'] += 1
+                if return_info['participants'] == 50:
+                    return_info['locked_out_active_members'].append((participant_name, 4))
                 else:
-                    return_info["active_members_with_remaining_decks"].append((participant_name, 4))
+                    return_info['active_members_with_remaining_decks'].append((participant_name, 4))
             else:
-                return_info["active_members_with_remaining_decks"].append((participant_name, (4 - participant["decksUsedToday"])))
-        elif participant["decksUsedToday"] > 0:
-            return_info["inactive_members_with_decks_used"].append((participant["name"], (4 - participant["decksUsedToday"])))
+                return_info['active_members_with_remaining_decks'].append((participant_name, (4 - participant['decksUsedToday'])))
+        elif participant['decksUsedToday'] > 0:
+            return_info['inactive_members_with_decks_used'].append((participant['name'], (4 - participant['decksUsedToday'])))
 
-    return_info["active_members_with_remaining_decks"].sort(key = lambda x : (x[1], x[0].lower()))
-    return_info["active_members_without_remaining_decks"].sort(key = lambda x : (x[1], x[0].lower()))
-    return_info["inactive_members_with_decks_used"].sort(key = lambda x : (x[1], x[0].lower()))
-    return_info["locked_out_active_members"].sort(key = lambda x : (x[1], x[0].lower()))
+    return_info['active_members_with_remaining_decks'].sort(key = lambda x : (x[1], x[0].lower()))
+    return_info['active_members_without_remaining_decks'].sort(key = lambda x : (x[1], x[0].lower()))
+    return_info['inactive_members_with_decks_used'].sort(key = lambda x : (x[1], x[0].lower()))
+    return_info['locked_out_active_members'].sort(key = lambda x : (x[1], x[0].lower()))
     return return_info
 
 
-def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None) -> Dict[str, int]:
+def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[str, ClashData]=None) -> Dict[str, int]:
     """Get a list of players in a clan and how many decks each player used today.
 
     Args:
@@ -321,8 +307,8 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=No
     usage_list = {}
 
     for participant in participants:
-        usage_list[participant["tag"]] = participant["decksUsedToday"]
-        active_members.pop(participant["tag"], None)
+        usage_list[participant['tag']] = participant['decksUsedToday']
+        active_members.pop(participant['tag'], None)
 
     for player_tag in active_members:
         usage_list[player_tag] = 0
@@ -389,9 +375,9 @@ def get_top_medal_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     if len(active_members) == 0:
         return []
 
-    fame_list = [(active_members[participant["tag"]]["name"], participant["fame"])
+    fame_list = [(active_members[participant['tag']]['player_name'], participant['fame'])
                  for participant in participants
-                 if participant["tag"] in active_members]
+                 if participant['tag'] in active_members]
 
     fame_list.sort(key = lambda x : x[1], reverse = True)
 
@@ -429,8 +415,8 @@ def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     hall_of_shame = []
 
     for participant in participants:
-        if (participant["fame"] < threshold) and (participant["tag"] in active_members):
-            hall_of_shame.append((active_members[participant["tag"]]["name"], participant["tag"], participant["fame"]))
+        if (participant['fame'] < threshold) and (participant['tag'] in active_members):
+            hall_of_shame.append((active_members[participant['tag']]['player_name'], participant['tag'], participant['fame']))
 
     hall_of_shame.sort(key = lambda x : (x[2], x[0].lower()))
     return hall_of_shame
@@ -626,7 +612,7 @@ def calculate_player_win_rate(player_tag: str,
     return player_dict
 
 
-def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG, active_members: dict=None):
+def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[str, ClashData]=None):
     """Get the match performance of each player in the specified clan. Saves results in match_history table.
 
     Args:
@@ -687,24 +673,24 @@ def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> Dict[s
     json_obj = req.json()
     clan_averages = {}
 
-    for clan in json_obj["clans"]:
+    for clan in json_obj['clans']:
         wins = 0
         total = 0
-        clan_tag = clan["tag"]
+        clan_tag = clan['tag']
         active_members = get_active_members_in_clan(clan_tag)
 
         if len(active_members) == 0:
             clan_averages[clan_tag] = 0
             continue
 
-        args_list = [participant["tag"] for participant in clan["participants"] if participant["tag"] in active_members]
+        args_list = [participant['tag'] for participant in clan['participants'] if participant['tag'] in active_members]
 
         with ThreadPoolExecutor(max_workers=10) as pool:
             results = list(pool.map(win_rate_helper, args_list))
 
         for result in results:
-            temp_wins = result["battle_wins"] + result["special_battle_wins"] + result["duel_match_wins"]
-            temp_losses = result["battle_losses"] + result["special_battle_losses"] + result["duel_match_losses"]
+            temp_wins = result['battle_wins'] + result['special_battle_wins'] + result['duel_match_wins']
+            temp_losses = result['battle_losses'] + result['special_battle_losses'] + result['duel_match_losses']
             wins += temp_wins
             total += temp_wins + temp_losses
 
@@ -800,50 +786,3 @@ def get_total_cards() -> int:
             get_total_cards.last_check_time = now
 
     return get_total_cards.cached_total
-
-
-# TODO: Use TypedDict
-def get_card_levels(player_tag: str) -> Dict[str, Union[str, int, Dict[int, int]]]:
-    """Get dictionary containing info about a player's player/card levels.
-
-    Args:
-        player_tag: Player to get card levels of.
-
-    Returns:
-        Player level and card level information.
-                {
-                    "player_tag": str,
-                    "player_name": str,
-                    "expLevel": int,
-                    "trophies": int,
-                    "bestTrophies": int,
-                    "cards": dict {14: int, 13: int, 12: int, ..., 1: int},
-                    "foundCards": int,
-                    "totalCards": int
-                }
-    """
-    req = requests.get(url=f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}",
-                       headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
-
-    if req.status_code != 200:
-        return None
-
-    json_obj = req.json()
-
-    clash_data = {
-        "player_tag": player_tag,
-        "player_name": json_obj["name"],
-        "expLevel": json_obj["expLevel"],
-        "trophies": json_obj["trophies"],
-        "bestTrophies": json_obj["bestTrophies"],
-        "cards": {i: 0 for i in range(1, 15)},
-        "foundCards": 0,
-        "totalCards": get_total_cards()
-    }
-
-    for card in json_obj["cards"]:
-        card_level = 14 - (card["maxLevel"] - card["level"])
-        clash_data["cards"][card_level] += 1
-        clash_data["foundCards"] += 1
-
-    return clash_data
