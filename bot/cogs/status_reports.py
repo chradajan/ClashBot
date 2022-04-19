@@ -39,8 +39,8 @@ class StatusReports(commands.Cog):
                               description=(f"{usage_info['participants']} players have participated in war today.\n"
                                            f"They have used a total of {200 - usage_info['remaining_decks']} decks."))
 
-        remaining_participants = 50 - usage_info["participants"]
-        non_warring_active_members = usage_info["active_members_with_no_decks_used"]
+        remaining_participants = 50 - usage_info['participants']
+        non_warring_active_members = usage_info['active_members_with_no_decks_used']
         if non_warring_active_members > remaining_participants:
             embed.add_field(name="`WARNING`",
                             value=(f"Only {remaining_participants} players can still participate in war today, "
@@ -49,12 +49,12 @@ class StatusReports(commands.Cog):
 
         await ctx.send(embed=embed)
 
-        if len(usage_info["active_members_with_remaining_decks"]) > 0:
+        if len(usage_info['active_members_with_remaining_decks']) > 0:
             embed = discord.Embed()
             table = PrettyTable()
             table.field_names = ["Member", "Decks"]
 
-            for player_name, decks_remaining in usage_info["active_members_with_remaining_decks"]:
+            for player_name, decks_remaining in usage_info['active_members_with_remaining_decks']:
                 table.add_row([player_name, decks_remaining])
 
             embed.add_field(name="Active members with remaining decks", value = "```\n" + table.get_string() + "```")
@@ -64,12 +64,12 @@ class StatusReports(commands.Cog):
             except:
                 await ctx.send("Active members with remaining decks\n" + "```\n" + table.get_string() + "```")
 
-        if len(usage_info["inactive_members_with_decks_used"]) > 0:
+        if len(usage_info['inactive_members_with_decks_used']) > 0:
             embed = discord.Embed()
             table = PrettyTable()
             table.field_names = ["Member", "Decks"]
 
-            for player_name, decks_remaining in usage_info["inactive_members_with_decks_used"]:
+            for player_name, decks_remaining in usage_info['inactive_members_with_decks_used']:
                 table.add_row([player_name, decks_remaining])
 
             embed.add_field(name="Former members with remaining decks", value = "```\n" + table.get_string() + "```")
@@ -79,12 +79,12 @@ class StatusReports(commands.Cog):
             except:
                 await ctx.send("Former members with remaining decks\n" + "```\n" + table.get_string() + "```")
 
-        if len(usage_info["locked_out_active_members"]) > 0:
+        if len(usage_info['locked_out_active_members']) > 0:
             embed = discord.Embed()
             table = PrettyTable()
             table.field_names = ["Member", "Decks"]
 
-            for player_name, decks_remaining in usage_info["locked_out_active_members"]:
+            for player_name, decks_remaining in usage_info['locked_out_active_members']:
                 table.add_row([player_name, decks_remaining])
 
             embed.add_field(name="Active members locked out today", value = "```\n" + table.get_string() + "```")

@@ -16,6 +16,7 @@ import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
 from utils.util_types import (
     ClashData,
+    DecksReport,
     Participant,
     RaceStats,
     RiverRaceClan
@@ -218,30 +219,21 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
     return decks_remaining_list
 
 
-def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, Union[int, List[Tuple[str, int]]]]:
+def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> DecksReport:
     """Retrieve a dict containing detailed information about deck usage today.
 
     Args:
         clan_tag(str, optional): Clan to get deck usage info from. Defaults to primary clan.
 
     Returns:
-        dict: Detailed lists of specified clan's deck usage.
-            {
-                remaining_decks int:
-                    Maximum number of decks that could still be used today.
-                participants: int
-                    Number of players who have used at least 1 deck today.
-                active_members_with_no_decks_used: int
-                    Number of players in the clan that have not used decks.
-                active_members_with_remaining_decks: [(player_name, decks_remaining), ...]
-                    Members in clan that could still battle.
-                active_members_without_remaining_decks: List[(player_name, decks_remaining), ...]
-                    Members in clan that have used 4 decks today.
-                inactive_members_with_decks_used: [(player_name, decks_remaining), ...]
-                    Members no longer in clan that battled today while in the clan.
-                locked_out_active_members: [(player_name, decks_remaining), ...]
-                    Members in clan that are locked out of battling today.
-            }
+        Detailed lists of specified clan's deck usage.
+            remaining_decks: Maximum number of decks that could still be used today.
+            participants: Number of players who have used at least 1 deck today.
+            active_members_with_no_decks_used: Number of players in the clan that have not used decks.
+            active_members_with_remaining_decks: List of members in clan that could still battle.
+            active_members_without_remaining_decks: List of members in clan that have used 4 decks today.
+            inactive_members_with_decks_used: List of members no longer in clan that battled today while in the clan.
+            locked_out_active_members: List of members in clan that are locked out of battling today.
     """
     active_members = get_active_members_in_clan(clan_tag)
     participants = get_river_race_participants(clan_tag)
@@ -249,7 +241,7 @@ def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str,
     if len(participants) == 0 or len(active_members) == 0:
         return {}
 
-    return_info = {
+    return_info: DecksReport = {
         'remaining_decks': 200,
         'participants': 0,
         'active_members_with_no_decks_used': 0,

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import auto, Enum
-from typing import Dict, TypedDict, Union
+from typing import Dict, List, Tuple, TypedDict, Union
 
 
 class AutoName(Enum):
@@ -153,3 +153,14 @@ class ResetTimes(TypedDict):
     friday: datetime
     saturday: datetime
     sunday: datetime
+
+
+class DecksReport(TypedDict):
+    """Dictionary containing a report of deck usage today."""
+    remaining_decks: int
+    participants: int
+    active_members_with_no_decks_used: int
+    active_members_with_remaining_decks: List[Tuple[str, int]]
+    active_members_without_remaining_decks: List[Tuple[str, int]]
+    inactive_members_with_decks_used: List[Tuple[str, int]]
+    locked_out_active_members: List[Tuple[str, int]]
