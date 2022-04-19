@@ -21,7 +21,13 @@ from config.credentials import (
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 from utils.role_utils import RoleNames
-from utils.util_types import ClashData, CombinedData, ReminderTime, Status
+from utils.util_types import (
+    ClashData,
+    CombinedData,
+    RaceStats,
+    ReminderTime,
+    Status
+)
 
 
 ######################################################
@@ -1159,7 +1165,7 @@ def set_users_last_check_time(player_tag: str, last_check_time: datetime.datetim
 
 
 # TODO: Use TypedDict and cursor.executemany()
-def update_match_history(user_performance_list: List[Dict[str, int]]):
+def update_match_history(user_performance_list: List[RaceStats]):
     """Add each player's game stats to the match_history tables.
 
     Args:

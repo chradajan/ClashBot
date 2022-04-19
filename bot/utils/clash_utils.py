@@ -14,7 +14,12 @@ from config.credentials import CLASH_API_KEY
 # Utils
 import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
-from utils.util_types import ClashData, Participant, RiverRaceClan
+from utils.util_types import (
+    ClashData,
+    Participant,
+    RaceStats,
+    RiverRaceClan
+)
 
 
 def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, ClashData]:
@@ -466,12 +471,11 @@ def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
     return json_obj["clan"]["fame"] >= 10000
 
 
-# TODO: Use TypedDict
 def calculate_player_win_rate(player_tag: str,
                               fame: int,
                               current_check_time: datetime.datetime,
                               last_check_time: datetime.datetime=None,
-                              clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, int]:
+                              clan_tag: str=PRIMARY_CLAN_TAG) -> RaceStats:
     """Look at a player's battle log and break down their performance in recent river race battles.
 
     Args:
@@ -483,18 +487,6 @@ def calculate_player_win_rate(player_tag: str,
 
     Returns:
         Number of wins and losses in each river race battle type for the specified player.
-            {
-                "battle_wins": int,
-                "battle_losses": int,
-                "special_battle_wins": int,
-                "special_battle_losses": int,
-                "boat_attack_wins": int,
-                "boat_attack_losses": int,
-                "duel_match_wins": int,
-                "duel_match_losses": int,
-                "duel_series_wins": int,
-                "duel_series_losses": int
-            }
     """
     is_automated = False
 
@@ -528,17 +520,19 @@ def calculate_player_win_rate(player_tag: str,
                 and battle["team"][0]["clan"]["tag"] == clan_tag):
             river_race_battle_list.append(battle)
 
-    player_dict = {"player_tag": player_tag}
-    player_dict["battle_wins"] = 0
-    player_dict["battle_losses"] = 0
-    player_dict["special_battle_wins"] = 0
-    player_dict["special_battle_losses"] = 0
-    player_dict["boat_attack_wins"] = 0
-    player_dict["boat_attack_losses"] = 0
-    player_dict["duel_match_wins"] = 0
-    player_dict["duel_match_losses"] = 0
-    player_dict["duel_series_wins"] = 0
-    player_dict["duel_series_losses"] = 0
+    player_dict: RaceStats = {
+        "player_tag": player_tag,
+        "battle_wins": 0,
+        "battle_losses": 0,
+        "special_battle_wins": 0,
+        "special_battle_losses": 0,
+        "boat_attack_wins": 0,
+        "boat_attack_losses": 0,
+        "duel_match_wins": 0,
+        "duel_match_losses": 0,
+        "duel_series_wins": 0,
+        "duel_series_losses": 0
+    }
 
     for battle in river_race_battle_list:
         if battle["type"] == "riverRacePvP":
@@ -651,7 +645,7 @@ def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> Dict[s
     now = datetime.datetime.now(datetime.timezone.utc)
     clan_tag = ""
 
-    def win_rate_helper(tag: str) -> dict:
+    def win_rate_helper(tag: str) -> RaceStats:
         return calculate_player_win_rate(tag, 0, now, last_check_time, clan_tag)
 
     req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{PRIMARY_CLAN_TAG[1:]}/currentriverrace",

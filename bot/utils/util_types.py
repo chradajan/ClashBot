@@ -69,3 +69,18 @@ class RiverRaceClan(TypedDict):
     total_decks_used: int
     decks_used_today: int
     completed: bool
+
+
+class RaceStats(TypedDict):
+    """Dictionary containing data about a user's stats in a river race."""
+    player_tag: str
+    battle_wins: int
+    battle_losses: int
+    special_battle_wins: int
+    special_battle_losses: int
+    boat_attack_wins: int
+    boat_attack_losses: int
+    duel_match_wins: int
+    duel_match_losses: int
+    duel_series_wins: int
+    duel_series_losses: int
