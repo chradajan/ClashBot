@@ -1166,7 +1166,6 @@ def set_users_last_check_time(player_tag: str, last_check_time: datetime.datetim
     database.close()
 
 
-# TODO: Use cursor.executemany()
 def update_match_history(user_performance_list: List[RaceStats]):
     """Add each player's game stats to the match_history tables.
 
@@ -1175,11 +1174,9 @@ def update_match_history(user_performance_list: List[RaceStats]):
     """
     database, cursor = connect_to_db()
 
-    for user in user_performance_list:
-        if not user:
-            continue
+    user_performance_list = [user for user in user_performance_list if user]
 
-        cursor.execute("UPDATE match_history_recent SET\
+    cursor.executemany("UPDATE match_history_recent SET\
                         battle_wins = battle_wins + %(battle_wins)s,\
                         battle_losses = battle_losses + %(battle_losses)s,\
                         special_battle_wins = special_battle_wins + %(special_battle_wins)s,\
@@ -1190,9 +1187,9 @@ def update_match_history(user_performance_list: List[RaceStats]):
                         duel_match_losses = duel_match_losses + %(duel_match_losses)s,\
                         duel_series_wins  = duel_series_wins + %(duel_series_wins)s,\
                         duel_series_losses = duel_series_losses + %(duel_series_losses)s\
-                        WHERE user_id IN (SELECT id FROM users WHERE player_tag = %(player_tag)s)", user)
+                        WHERE user_id IN (SELECT id FROM users WHERE player_tag = %(player_tag)s)", user_performance_list)
 
-        cursor.execute("UPDATE match_history_all SET\
+    cursor.executemany("UPDATE match_history_all SET\
                         battle_wins = battle_wins + %(battle_wins)s,\
                         battle_losses = battle_losses + %(battle_losses)s,\
                         special_battle_wins = special_battle_wins + %(special_battle_wins)s,\
@@ -1203,7 +1200,7 @@ def update_match_history(user_performance_list: List[RaceStats]):
                         duel_match_losses = duel_match_losses + %(duel_match_losses)s,\
                         duel_series_wins  = duel_series_wins + %(duel_series_wins)s,\
                         duel_series_losses = duel_series_losses + %(duel_series_losses)s\
-                        WHERE user_id IN (SELECT id FROM users WHERE player_tag = %(player_tag)s)", user)
+                        WHERE user_id IN (SELECT id FROM users WHERE player_tag = %(player_tag)s)", user_performance_list)
 
     database.commit()
     database.close()
@@ -1247,7 +1244,6 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
     clans = clash_utils.get_clans_in_race(False)
     reset_clans = False
 
-    # TODO: Use cursor.executemany()
     for clan in clans:
         cursor.execute("SELECT clan_tag FROM river_race_clans WHERE clan_tag = %s", (clan['clan_tag']))
         if cursor.fetchone() is None:
@@ -1256,16 +1252,12 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
 
     if is_colosseum_week() or reset_clans:
         cursor.execute("DELETE FROM river_race_clans")
-
-        for clan in clans:
-            cursor.execute("INSERT INTO river_race_clans VALUES (%(clan_tag)s, %(clan_name)s, 0, %(total_decks_used)s, 0, 0)", clan)
+        cursor.executemany("INSERT INTO river_race_clans VALUES (%(clan_tag)s, %(clan_name)s, 0, %(total_decks_used)s, 0, 0)",
+                           clans)
     else:
-        for clan in clans:
-            cursor.execute("UPDATE river_race_clans SET\
-                            fame = 0,\
-                            total_decks_used = %(total_decks_used)s\
+        cursor.executemany("UPDATE river_race_clans SET fame = 0, total_decks_used = %(total_decks_used)s\
                             WHERE clan_tag = %(clan_tag)s",
-                           clan)
+                            clans)
 
     database.commit()
     database.close()
