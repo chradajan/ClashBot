@@ -122,7 +122,7 @@ class Listeners(commands.Cog):
             bot_utils.STRIKE_MESSAGES.pop(reaction.message.id, None)
 
             if reaction.emoji == '✅':
-                _, strikes, _, _ = db_utils.give_strike(player_tag, 1)
+                _, strikes, _, _ = db_utils.update_strikes(player_tag, 1)
                 embed = discord.Embed()
                 embed.add_field(name=player_name,
                                 value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```")

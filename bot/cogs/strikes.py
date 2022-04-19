@@ -31,23 +31,23 @@ class Strikes(commands.Cog):
             delta: Number of strikes to give or remove.
             member (optional): Member object of user if they are on Discord.
         """
-        old_strike_count, new_strike_count, old_permanent_strikes, new_permanent_strikes = db_utils.give_strike(player_tag, delta)
+        old_strikes, new_strikes, old_permanent_strikes, new_permanent_strikes = db_utils.update_strikes(player_tag, delta)
 
-        if old_strike_count is None:
+        if old_strikes is None:
             await ctx.send(f"Something went wrong while updating {player_name}'s strikes. This should not happen.")
             return
 
         message = "has received a strike" if delta > 0 else "has had a strike removed"
         embed = discord.Embed(title="Strikes Updated", color=discord.Color.green())
         embed.add_field(name=player_name,
-                        value=(f"```Strikes: {old_strike_count} -> {new_strike_count}\n"
+                        value=(f"```Strikes: {old_strikes} -> {new_strikes}\n"
                                f"Permanent Strikes: {old_permanent_strikes} -> {new_permanent_strikes}```"))
         await ctx.send(embed=embed)
 
         if member is None:
-            await CHANNEL.strikes().send(f"{player_name} {message}.  {old_strike_count} -> {new_strike_count}")
+            await CHANNEL.strikes().send(f"{player_name} {message}.  {old_strikes} -> {new_strikes}")
         else:
-            await CHANNEL.strikes().send(f"{member.mention} {message}.  {old_strike_count} -> {new_strike_count}")
+            await CHANNEL.strikes().send(f"{member.mention} {message}.  {old_strikes} -> {new_strikes}")
 
     @commands.command()
     @bot_utils.is_leader_command_check()

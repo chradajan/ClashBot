@@ -309,8 +309,7 @@ def get_user_data(player_tag: str) -> DatabaseDataExtended:
     return user_data
 
 
-# TODO: Rename to something that indicates this can be used to remove strikes too.
-def give_strike(player_tag: str, delta: int) -> Tuple[int, int, int, int]:
+def update_strikes(player_tag: str, delta: int) -> Tuple[int, int, int, int]:
     """Add or remove strikes from user. If player tag does not exist in database, add them as an unregistered user.
 
     Args:

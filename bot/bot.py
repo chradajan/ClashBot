@@ -174,7 +174,7 @@ async def assign_strikes_and_clear_vacation():
             if member is not None:
                 mention_string += f"{member.mention} "
 
-            _, strikes, _, _ = db_utils.give_strike(player_tag, 1)
+            _, strikes, _, _ = db_utils.update_strikes(player_tag, 1)
 
             if strikes is None:
                 continue
