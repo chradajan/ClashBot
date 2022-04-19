@@ -1006,7 +1006,6 @@ async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, st
     Returns:
         Tuple of closest matching player tag and player name from screenshot.
     """
-    participants = None
     if db_utils.is_war_time():
         participants = clash_utils.get_river_race_participants()
     else:
@@ -1031,8 +1030,8 @@ async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, st
     highest_name_similarity = 0
 
     for participant in participants:
-        active_tag = participant["tag"]
-        active_name = participant["name"]
+        active_tag = participant['player_tag']
+        active_name = participant['player_name']
 
         if tag is not None:
             temp_tag_similarity = SequenceMatcher(None, tag, active_tag).ratio()
@@ -1057,9 +1056,9 @@ async def get_player_info_from_image(image: discord.Attachment) -> Tuple[str, st
 
     if (tag is not None) and (name is not None):
         for participant in participants:
-            if participant["tag"] != closest_tag:
+            if participant['player_tag'] != closest_tag:
                 continue
-            if participant["name"] != closest_name:
+            if participant['player_name'] != closest_name:
                 return_info = (None, None)
             break
 

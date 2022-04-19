@@ -48,3 +48,14 @@ class DiscordData(TypedDict):
 
 class CombinedData(ClashData, DiscordData):
     """Dictionary containing Clash Royale and Discord data."""
+
+
+class Participant(TypedDict):
+    """Dictionary containing data about a participant in a river race."""
+    player_tag: str
+    player_name: str
+    fame: int
+    repair_points: int
+    boat_attacks: int
+    decks_used: int
+    decks_used_today: int

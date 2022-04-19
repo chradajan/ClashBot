@@ -14,7 +14,7 @@ from config.credentials import CLASH_API_KEY
 # Utils
 import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
-from utils.util_types import ClashData
+from utils.util_types import ClashData, Participant
 
 
 def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, ClashData]:
@@ -54,8 +54,7 @@ def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, Clas
     return active_members
 
 
-# TODO: Create TypedDict of participant data.
-def get_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Dict[str, Union[str, int]]]:
+def get_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Participant]:
     """Get a list of participants in the current river race.
 
     Args:
@@ -63,17 +62,6 @@ def get_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Dict[str
 
     Returns:
         List of participants in specified clan's current river race, or empty list if API request fails.
-            [
-                {
-                    "tag": str,
-                    "name": str,
-                    "fame": int,
-                    "repairPoints": int,
-                    "boatAttacks": int,
-                    "decksUsed": int,
-                    "decksUsedToday": int
-                },
-            ]
     """
     req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace",
                        headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
@@ -82,10 +70,20 @@ def get_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Dict[str
         return []
 
     json_obj = req.json()
-    return json_obj["clan"]["participants"]
+    participants = json_obj["clan"]["participants"]
+
+    for participant in participants:
+        participant['player_tag'] = participant.pop('tag')
+        participant['player_name'] = participant.pop('name')
+        participant['repair_points'] = participant.pop('repairPoints')
+        participant['boat_attacks'] = participant.pop('boatAttacks')
+        participant['decks_used'] = participant.pop('decksUsed')
+        participant['decks_used_today'] = participant.pop('decksUsedToday')
+
+    return participants
 
 
-def get_last_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Dict[str, Union[str, int]]]:
+def get_last_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Participant]:
     """Get participants in most recently completed river race.
 
     Args:
@@ -93,17 +91,6 @@ def get_last_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Dic
 
     Returns:
         List of participants in specified clan's most recently completed river race, or empty list if API request fails.
-            [
-                {
-                    "tag": str,
-                    "name": str,
-                    "fame": int,
-                    "repairPoints": int,
-                    "boatAttacks": int,
-                    "decksUsed": int,
-                    "decksUsedToday": int
-                },
-            ]
     """
     req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/riverracelog?limit=1",
                        headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
@@ -112,7 +99,6 @@ def get_last_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Dic
         return []
 
     json_obj = req.json()
-    participants = []
     clan_index = 0
 
     for clan in json_obj["items"][0]["standings"]:
@@ -121,8 +107,15 @@ def get_last_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Dic
 
         clan_index += 1
 
-    for participant in json_obj["items"][0]["standings"][clan_index]["clan"]["participants"]:
-        participants.append(participant)
+    participants = json_obj["items"][0]["standings"][clan_index]["clan"]["participants"]
+
+    for participant in participants:
+        participant['player_tag'] = participant.pop('tag')
+        participant['player_name'] = participant.pop('name')
+        participant['repair_points'] = participant.pop('repairPoints')
+        participant['boat_attacks'] = participant.pop('boatAttacks')
+        participant['decks_used'] = participant.pop('decksUsed')
+        participant['decks_used_today'] = participant.pop('decksUsedToday')
 
     return participants
 
@@ -206,10 +199,10 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
         return []
 
     for participant in participants:
-        player_tag = participant['tag']
-        remaining_decks = 4 - participant['decksUsedToday']
+        player_tag = participant['player_tag']
+        remaining_decks = 4 - participant['decks_used_today']
         if (remaining_decks != 0) and (player_tag in active_members):
-            decks_remaining_list.append((active_members[player_tag]['player_name'], participant['tag'], remaining_decks))
+            decks_remaining_list.append((active_members[player_tag]['player_name'], participant['player_tag'], remaining_decks))
 
     decks_remaining_list.sort(key = lambda x : (x[2], x[0].lower()))
     return decks_remaining_list
@@ -257,25 +250,26 @@ def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str,
     }
 
     for participant in participants:
-        if participant['decksUsedToday'] > 0:
-            return_info['remaining_decks'] -= participant['decksUsedToday']
+        if participant['decks_used_today'] > 0:
+            return_info['remaining_decks'] -= participant['decks_used_today']
             return_info['participants'] += 1
 
     for participant in participants:
-        if participant['tag'] in active_members:
-            participant_name = active_members[participant['tag']]['player_name']
-            if participant['decksUsedToday'] == 4:
+        if participant['player_tag'] in active_members:
+            participant_name = active_members[participant['player_tag']]['player_name']
+            if participant['decks_used_today'] == 4:
                 return_info['active_members_without_remaining_decks'].append((participant_name, 0))
-            elif participant['decksUsedToday'] == 0:
+            elif participant['decks_used_today'] == 0:
                 return_info['active_members_with_no_decks_used'] += 1
                 if return_info['participants'] == 50:
                     return_info['locked_out_active_members'].append((participant_name, 4))
                 else:
                     return_info['active_members_with_remaining_decks'].append((participant_name, 4))
             else:
-                return_info['active_members_with_remaining_decks'].append((participant_name, (4 - participant['decksUsedToday'])))
-        elif participant['decksUsedToday'] > 0:
-            return_info['inactive_members_with_decks_used'].append((participant['name'], (4 - participant['decksUsedToday'])))
+                return_info['active_members_with_remaining_decks'].append((participant_name, (4 - participant['decks_used_today'])))
+        elif participant['decks_used_today'] > 0:
+            return_info['inactive_members_with_decks_used'].append((participant['player_name'],
+                                                                    (4 - participant['decks_used_today'])))
 
     return_info['active_members_with_remaining_decks'].sort(key = lambda x : (x[1], x[0].lower()))
     return_info['active_members_without_remaining_decks'].sort(key = lambda x : (x[1], x[0].lower()))
@@ -307,8 +301,8 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[st
     usage_list = {}
 
     for participant in participants:
-        usage_list[participant['tag']] = participant['decksUsedToday']
-        active_members.pop(participant['tag'], None)
+        usage_list[participant['player_tag']] = participant['decks_used_today']
+        active_members.pop(participant['player_tag'], None)
 
     for player_tag in active_members:
         usage_list[player_tag] = 0
@@ -335,7 +329,7 @@ def get_user_decks_used_today(player_tag: str) -> int:
     clan_tag = None
 
     if "clan" in json_obj.keys():
-        clan_tag = json_obj["clan"]["tag"]
+        clan_tag = json_obj['clan']['tag']
     else:
         return 0
 
@@ -345,10 +339,10 @@ def get_user_decks_used_today(player_tag: str) -> int:
         return 0
 
     for participant in participants:
-        if participant["tag"] != player_tag:
+        if participant['player_tag'] != player_tag:
             continue
 
-        return participant["decksUsedToday"]
+        return participant['decks_used_today']
 
     return 0
 
@@ -363,8 +357,6 @@ def get_top_medal_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     Returns:
         List of player names and their medals.
     """
-    participants = None
-
     if db_utils.is_war_time():
         participants = get_river_race_participants(clan_tag)
     else:
@@ -375,9 +367,9 @@ def get_top_medal_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     if len(active_members) == 0:
         return []
 
-    fame_list = [(active_members[participant['tag']]['player_name'], participant['fame'])
+    fame_list = [(active_members[participant['player_tag']]['player_name'], participant['fame'])
                  for participant in participants
-                 if participant['tag'] in active_members]
+                 if participant['player_tag'] in active_members]
 
     fame_list.sort(key = lambda x : x[1], reverse = True)
 
@@ -404,8 +396,6 @@ def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     Returns:
         List of player names and medals below specified threshold.
     """
-    participants = None
-
     if db_utils.is_war_time():
         participants = get_river_race_participants(clan_tag)
     else:
@@ -415,8 +405,10 @@ def get_hall_of_shame(threshold: int, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tu
     hall_of_shame = []
 
     for participant in participants:
-        if (participant['fame'] < threshold) and (participant['tag'] in active_members):
-            hall_of_shame.append((active_members[participant['tag']]['player_name'], participant['tag'], participant['fame']))
+        if (participant['fame'] < threshold) and (participant['player_tag'] in active_members):
+            hall_of_shame.append((active_members[participant['player_tag']]['player_name'],
+                                  participant['player_tag'],
+                                  participant['fame']))
 
     hall_of_shame.sort(key = lambda x : (x[2], x[0].lower()))
     return hall_of_shame
@@ -629,8 +621,6 @@ def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG,
     db_utils.clean_up_db(active_members)
     db_utils.add_unregistered_users(clan_tag, active_members)
     performance_list = []
-    participants = None
-    check_time = None
 
     if post_race:
         participants = get_last_river_race_participants(clan_tag)
@@ -643,7 +633,7 @@ def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG,
         return
 
     for participant in participants:
-        performance_list.append(calculate_player_win_rate(participant["tag"], participant["fame"], check_time))
+        performance_list.append(calculate_player_win_rate(participant['player_tag'], participant['fame'], check_time))
 
     db_utils.update_match_history(performance_list)
     db_utils.set_last_check_time(check_time)
