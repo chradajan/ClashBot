@@ -784,13 +784,13 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
 
     if use_historical_deck_usage:
         for clan in clans:
-            tag = clan["tag"]
+            tag = clan['clan_tag']
 
-            if saved_clan_info[tag]["num_days"] == 0:
-                expected_decks_to_use = 200 - clan["decks_used_today"]
+            if saved_clan_info[tag]['num_days'] == 0:
+                expected_decks_to_use = 200 - clan['decks_used_today']
             else:
-                avg_deck_usage = round(saved_clan_info[tag]["war_decks_used"] / saved_clan_info[tag]["num_days"])
-                current_deck_usage = clan["decks_used_today"]
+                avg_deck_usage = round(saved_clan_info[tag]['war_decks_used'] / saved_clan_info[tag]['num_days'])
+                current_deck_usage = clan['decks_used_today']
 
                 if current_deck_usage > avg_deck_usage:
                     expected_decks_to_use = round((200 - current_deck_usage) * 0.25)
@@ -800,8 +800,8 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
             expected_deck_usage[tag] = expected_decks_to_use
     else:
         for clan in clans:
-            tag = clan["tag"]
-            expected_decks_to_use = 200 - clan["decks_used_today"]
+            tag = clan['clan_tag']
+            expected_decks_to_use = 200 - clan['decks_used_today']
             expected_deck_usage[tag] = expected_decks_to_use
 
     predicted_outcomes = []
@@ -809,26 +809,26 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
     catch_up_requirements = {}
 
     for clan in clans:
-        tag = clan["tag"]
+        tag = clan['clan_tag']
 
-        if clan["completed"]:
-            completed_clans[tag] = clan["name"]
+        if clan['completed']:
+            completed_clans[tag] = clan['clan_name']
 
         win_rate = win_rates[tag]
         saved_fame = saved_clan_info.get(tag, {"fame": 0})["fame"]
-        fame_earned_today = clan["fame"] - saved_fame
+        fame_earned_today = clan['fame'] - saved_fame
         fame_per_deck = average_fame_per_deck(win_rate)
         expected_decks_to_use = expected_deck_usage[tag]
         predicted_score = 50 * round((fame_earned_today + (expected_decks_to_use * fame_per_deck)) / 50)
-        predicted_outcomes.append((clan["name"], tag, predicted_score, win_rate, expected_decks_to_use))
+        predicted_outcomes.append((clan['clan_name'], tag, predicted_score, win_rate, expected_decks_to_use))
 
     predicted_outcomes.sort(key = lambda x : x[2], reverse=True)
 
     if len(predicted_outcomes) > 0 and predicted_outcomes[0][1] != PRIMARY_CLAN_TAG:
         for clan in clans:
-            if clan["tag"] == PRIMARY_CLAN_TAG:
-                decks_available = 200 - clan["decks_used_today"]
-                current_fame = clan["fame"] - saved_clan_info.get(clan["tag"], {"fame": 0})["fame"]
+            if clan['clan_tag'] == PRIMARY_CLAN_TAG:
+                decks_available = 200 - clan['decks_used_today']
+                current_fame = clan['fame'] - saved_clan_info.get(clan['clan_tag'], {'fame': 0})['fame']
                 break
 
         fame_to_catch_up = predicted_outcomes[0][2] - current_fame
@@ -838,7 +838,7 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
         if needed_win_rate is not None:
             needed_win_rate = round(needed_win_rate * 100, 2)
 
-        catch_up_requirements = {"decks": decks_available, "win_rate": needed_win_rate}
+        catch_up_requirements = {'decks': decks_available, 'win_rate': needed_win_rate}
 
     return (predicted_outcomes, completed_clans, catch_up_requirements)
 

@@ -59,3 +59,13 @@ class Participant(TypedDict):
     boat_attacks: int
     decks_used: int
     decks_used_today: int
+
+
+class RiverRaceClan(TypedDict):
+    """Dictionary containing data about a clan's stats in a river race."""
+    clan_tag: str
+    clan_name: str
+    fame: int
+    total_decks_used: int
+    decks_used_today: int
+    completed: bool
