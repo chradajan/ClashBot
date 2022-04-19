@@ -61,6 +61,29 @@ def connect_to_db() -> Tuple[pymysql.Connection, pymysql.cursors.DictCursor]:
     return (database, cursor)
 
 
+def get_clan_id(clan_tag: str, clan_name: str, cursor: pymysql.cursors.DictCursor) -> int:
+    """Get id of clan from clans table. If the clan doesn't exist, insert it.
+
+    Requires an existing database connection. Does not commit changes to database.
+
+    Args:
+        clan_tag: Tag of clan to get id of.
+        clan_name: Name of clan to get id of.
+        cursor: Cursor of existing database connection.
+
+    Returns:
+        id from clans table of specified clan.
+    """
+    cursor.execute("SELECT id FROM clans WHERE clan_tag = %s", (clan_tag))
+    query_result = cursor.fetchone()
+
+    if query_result is None:
+        cursor.execute("INSERT INTO clans VALUES (DEFAULT, %s, %s)", (clan_tag, clan_name))
+        cursor.execute("SELECT id FROM clans WHERE clan_tag = %s", (clan_tag))
+        query_result = cursor.fetchone()
+
+    return query_result['id']
+
 def add_new_user(user_data: CombinedData) -> bool:
     """Add a new user to the database. Only used for users that just joined the Discord server.
 
@@ -72,21 +95,8 @@ def add_new_user(user_data: CombinedData) -> bool:
     """
     database, cursor = connect_to_db()
 
-    # TODO: Create routine to get clan id/insert new clan
-    # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
-    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
-    query_result = cursor.fetchone()
-
-    if query_result is None:
-        insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
-        cursor.execute(insert_clan_query, user_data)
-        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
-        query_result = cursor.fetchone()
-
-    # Add clan_id to user_data for use in user insertion.
-    user_data['clan_id'] = query_result['id']
-
-    # Convert status to string.
+    # Add extra fields to user_data needed for query.
+    user_data['clan_id'] = get_clan_id(user_data['clan_tag'], user_data['clan_name'], cursor)
     user_data['status_str'] = user_data['status'].value
 
     # Check if the user has previously joined the server with a different player tag.
@@ -179,20 +189,8 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     if user_data is None:
         return False
 
-    # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
-    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
-    query_result = cursor.fetchone()
-
-    if query_result is None:
-        insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
-        cursor.execute(insert_clan_query, user_data)
-        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
-        query_result = cursor.fetchone()
-
-    # Add clan_id to user_data for use in user insertion.
-    user_data['clan_id'] = query_result['id']
-
-    # Convert status to string.
+    # Add extra fields to user_data needed for query.
+    user_data['clan_id'] = get_clan_id(user_data['clan_tag'], user_data['clan_name'], cursor)
     user_data['status_str'] = user_data['status'].value
 
     # Insert them
@@ -224,18 +222,8 @@ def update_user(user_data: CombinedData):
     """
     database, cursor = connect_to_db()
 
-    # Get clan_id if clan exists. It clan doesn't exist, add to clans table.
-    cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
-    query_result = cursor.fetchone()
-
-    if query_result is None:
-        insert_clan_query = "INSERT INTO clans VALUES (DEFAULT, %(clan_tag)s, %(clan_name)s)"
-        cursor.execute(insert_clan_query, user_data)
-        cursor.execute("SELECT id FROM clans WHERE clan_tag = %(clan_tag)s", user_data)
-        query_result = cursor.fetchone()
-
     # Add extra fields to user_data needed for query.
-    user_data['clan_id'] = query_result['id']
+    user_data['clan_id'] = get_clan_id(user_data['clan_tag'], user_data['clan_name'], cursor)
     user_data['status_str'] = user_data['status'].value
 
     cursor.execute("UPDATE users SET\
