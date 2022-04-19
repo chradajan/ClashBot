@@ -186,7 +186,6 @@ def get_clash_data(message: str) -> Union[ClashData, None]:
     return clash_data
 
 
-# TODO: also return any active members that are not in participants.
 def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, str, int]]:
     """Retrieve a list of players in a clan who have not used 4 war decks today.
 
@@ -206,8 +205,14 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
     for participant in participants:
         player_tag = participant['player_tag']
         remaining_decks = 4 - participant['decks_used_today']
+
         if (remaining_decks != 0) and (player_tag in active_members):
-            decks_remaining_list.append((active_members[player_tag]['player_name'], participant['player_tag'], remaining_decks))
+            decks_remaining_list.append((active_members[player_tag]['player_name'], player_tag, remaining_decks))
+
+        active_members.pop(player_tag, None)
+
+    for player_tag in active_members:
+        decks_remaining_list.append((active_members[player_tag]['player_name'], player_tag, 4))
 
     decks_remaining_list.sort(key = lambda x : (x[2], x[0].lower()))
     return decks_remaining_list
