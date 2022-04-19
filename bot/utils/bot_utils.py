@@ -31,6 +31,7 @@ from utils.util_types import (
     CombinedData,
     DiscordData,
     ReminderTime,
+    ResetTimes,
     Status
 )
 
@@ -404,7 +405,7 @@ async def update_all_members(guild: discord.Guild):
             await update_member(member, player_tag)
         elif player_tag in active_members:
             if (member.display_name != active_members[player_tag]['player_name']
-                    or db_info[member.id]['clan_role'] != active_members[player_tag]['role']
+                    or db_info[member.id]['role'] != active_members[player_tag]['role']
                     or ROLE.visitor() in member.roles):
                 await update_member(member, player_tag)
         elif ROLE.member() in member.roles:
@@ -448,15 +449,14 @@ def break_down_usage_history(deck_usage: int, command_time: datetime.datetime=No
 def should_receive_strike(deck_usage: int,
                           completed_saturday: bool,
                           tracked_since: datetime.datetime,
-                          reset_times: Dict[str, datetime.datetime]) -> Tuple[bool, int, int, bool]:
+                          reset_times: ResetTimes) -> Tuple[bool, int, int, bool]:
     """Based on deck usage and race completion date, determine whether user should receive strike.
 
     Args:
         deck_usage: Concatenated deck usage history value from database.
         completed_saturday: Whether race completed early or not.
         tracked_since: Time that bot started tracking user.
-        reset_times: Dict of river race reset times.
-            {"thursday": datetime, "friday": datetime, "saturday": datetime, "sunday": datetime}
+        reset_times: Dictionary of river race reset times.
 
     Returns:
         Whether the user should receive a strike, how many decks they used and should have used, and whether any data was missing.
@@ -469,11 +469,11 @@ def should_receive_strike(deck_usage: int,
 
     if tracked_since is None:
         decks_required = 16
-    elif tracked_since <= reset_times["thursday"]:
+    elif tracked_since <= reset_times['thursday']:
         decks_required = 16
-    elif tracked_since <= reset_times["friday"]:
+    elif tracked_since <= reset_times['friday']:
         decks_required = 12
-    elif tracked_since <= reset_times["saturday"]:
+    elif tracked_since <= reset_times['saturday']:
         decks_required = 8
     else:
         decks_required = 4
@@ -521,7 +521,7 @@ def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, in
     last_reset_time = db_utils.get_reset_time()
     now = datetime.datetime.now(datetime.timezone.utc)
     upcoming_strikes_list = []
-    race_reset_times: dict
+    race_reset_times: ResetTimes
     war_days_to_check: int
     starting_index: int
 
@@ -568,11 +568,11 @@ def upcoming_strikes(use_race_reset_times: bool) -> List[Tuple[str, str, int, in
         elif is_war_time:
             decks_required = 4 * (now - tracked_since).days
         else:
-            if tracked_since <= race_reset_times["thursday"]:
+            if tracked_since <= race_reset_times['thursday']:
                 decks_required = 16
-            elif tracked_since <= race_reset_times["friday"]:
+            elif tracked_since <= race_reset_times['friday']:
                 decks_required = 12
-            elif tracked_since <= race_reset_times["saturday"]:
+            elif tracked_since <= race_reset_times['saturday']:
                 decks_required = 8
             else:
                 decks_required = 4
@@ -770,10 +770,10 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
         now = datetime.datetime.now(datetime.timezone.utc)
         race_reset_times = db_utils.get_river_race_reset_times()
 
-        if (now - race_reset_times["thursday"]).days > 5:
+        if (now - race_reset_times['thursday']).days > 5:
             win_rates = clash_utils.calculate_river_race_win_rates(db_utils.get_reset_time())
         else:
-            win_rates = clash_utils.calculate_river_race_win_rates(race_reset_times["thursday"]  - datetime.timedelta(days=1))
+            win_rates = clash_utils.calculate_river_race_win_rates(race_reset_times['thursday']  - datetime.timedelta(days=1))
 
         if len(win_rates) == 0:
             win_rates = {clan["tag"]: 0.50 for clan in clans}

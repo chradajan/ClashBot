@@ -14,6 +14,7 @@ from cogs.error_handler import ErrorHandler
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.util_types import DatabaseDataExtended
 
 
 class StatusReports(commands.Cog):
@@ -134,7 +135,7 @@ class StatusReports(commands.Cog):
             await ctx.send("Players below medals threshold\n" + "```\n" + table.get_string() + "```")
 
     @staticmethod
-    async def player_report_helper(ctx: commands.Context, user_data: Dict[str, Union[str, int]]):
+    async def player_report_helper(ctx: commands.Context, user_data: DatabaseDataExtended):
         """Build player report table and send to channel where command was invoked.
 
         Args:
@@ -142,24 +143,24 @@ class StatusReports(commands.Cog):
             user_data: Data of user to send report about.
         """
         general_info_table = PrettyTable()
-        kicks = db_utils.get_kicks(user_data["player_tag"])
+        kicks = db_utils.get_kicks(user_data['player_tag'])
         total_kicks = len(kicks)
         last_kicked = "Never"
         if total_kicks > 0:
             last_kicked = kicks[-1]
 
-        general_info_table.add_row(["Player Name", user_data["player_name"]])
-        general_info_table.add_row(["Player Tag", user_data["player_tag"]])
-        general_info_table.add_row(["Strikes", user_data["strikes"]])
-        general_info_table.add_row(["Permanent Strikes", user_data["permanent_strikes"]])
+        general_info_table.add_row(["Player Name", user_data['player_name']])
+        general_info_table.add_row(["Player Tag", user_data['player_tag']])
+        general_info_table.add_row(["Strikes", user_data['strikes']])
+        general_info_table.add_row(["Permanent Strikes", user_data['permanent_strikes']])
         general_info_table.add_row(["Kicks", total_kicks])
         general_info_table.add_row(["Last Kicked", last_kicked])
-        general_info_table.add_row(["Discord Name", user_data["discord_name"]])
-        general_info_table.add_row(["Clan Name", user_data["clan_name"]])
-        general_info_table.add_row(["Clan Tag", user_data["clan_tag"]])
-        general_info_table.add_row(["Clan Role", user_data["clan_role"].capitalize()])
-        general_info_table.add_row(["On Vacation", "Yes" if user_data["vacation"] else "No"])
-        general_info_table.add_row(["Status", user_data["status"]])
+        general_info_table.add_row(["Discord Name", user_data['discord_name']])
+        general_info_table.add_row(["Clan Name", user_data['clan_name']])
+        general_info_table.add_row(["Clan Tag", user_data['clan_tag']])
+        general_info_table.add_row(["Clan Role", user_data['role'].capitalize()])
+        general_info_table.add_row(["On Vacation", "Yes" if user_data['vacation'] else "No"])
+        general_info_table.add_row(["Status", user_data['status'].value])
 
         general_info_embed = discord.Embed(title="Player Report", url=bot_utils.royale_api_url(user_data['player_tag']))
         general_info_embed.add_field(name=f"{user_data['player_name']}'s general info",
@@ -167,11 +168,11 @@ class StatusReports(commands.Cog):
 
         await ctx.send(embed=general_info_embed)
 
-        decks_used_today = clash_utils.get_user_decks_used_today(user_data["player_tag"])
+        decks_used_today = clash_utils.get_user_decks_used_today(user_data['player_tag'])
         if decks_used_today is None:
             decks_used_today = 0
 
-        usage_history_list = bot_utils.break_down_usage_history(user_data["usage_history"],
+        usage_history_list = bot_utils.break_down_usage_history(user_data['usage_history'],
                                                                 datetime.datetime.now(datetime.timezone.utc))
 
         deck_usage_history_table = PrettyTable()

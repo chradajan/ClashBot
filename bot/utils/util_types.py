@@ -1,5 +1,6 @@
 """Custom types used by bot."""
 
+from datetime import datetime
 from enum import auto, Enum
 from typing import Dict, TypedDict, Union
 
@@ -71,6 +72,16 @@ class RiverRaceClan(TypedDict):
     completed: bool
 
 
+class DatabaseClan(TypedDict):
+    """Dictionary containing data about a clan saved in the river_race_clans table."""
+    clan_tag: str
+    clan_name: str
+    fame: int
+    total_decks_used: int
+    war_decks_used: int
+    num_days: int
+
+
 class RaceStats(TypedDict):
     """Dictionary containing data about a user's stats in a river race."""
     player_tag: str
@@ -84,3 +95,61 @@ class RaceStats(TypedDict):
     duel_match_losses: int
     duel_series_wins: int
     duel_series_losses: int
+
+
+class MatchTypeStats(TypedDict):
+    """Dictionary containing a user's stats for a single game mode (e.g. regular matches or boat attacks)."""
+    wins: int
+    losses: int
+    total: int
+    win_rate: str
+
+
+class AllMatchTypeStats(TypedDict):
+    """Dictionary containing a user's stats for all game modes."""
+    regular: MatchTypeStats
+    special: MatchTypeStats
+    duel_matches: MatchTypeStats
+    duel_series: MatchTypeStats
+    combined_pvp: MatchTypeStats
+    boat_attacks: MatchTypeStats
+
+
+class RecentStats(AllMatchTypeStats):
+    """Dictionary containing a user's stats in most recent river race."""
+    fame: int
+    tracked_since: datetime
+
+
+class RiverRaceStats(TypedDict):
+    """Dictionary containing a user's all time and most recent river race stats."""
+    all: AllMatchTypeStats
+    recent: RecentStats
+
+
+class DatabaseData(TypedDict):
+    """Dictionary containing a user's basic data saved in the database."""
+    player_tag: str
+    player_name: str
+    discord_name: str
+    discord_id: int
+    role: str
+
+
+class DatabaseDataExtended(DatabaseData):
+    """Dictionary containing a user's extended data in the database."""
+    clan_tag: str
+    clan_name: str
+    vacation: bool
+    strikes: int
+    permanent_strikes: int
+    usage_history: int
+    status: Status
+
+
+class ResetTimes(TypedDict):
+    """Dictionary containing reset times of each day of a river race."""
+    thursday: datetime
+    friday: datetime
+    saturday: datetime
+    sunday: datetime

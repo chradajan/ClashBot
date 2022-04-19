@@ -24,8 +24,13 @@ from utils.role_utils import RoleNames
 from utils.util_types import (
     ClashData,
     CombinedData,
+    DatabaseClan,
+    DatabaseData,
+    DatabaseDataExtended,
     RaceStats,
     ReminderTime,
+    ResetTimes,
+    RiverRaceStats,
     Status
 )
 
@@ -56,7 +61,6 @@ def connect_to_db() -> Tuple[pymysql.Connection, pymysql.cursors.DictCursor]:
     return (database, cursor)
 
 
-# TODO: Use TypedDict
 def add_new_user(user_data: CombinedData) -> bool:
     """Add a new user to the database. Only used for users that just joined the Discord server.
 
@@ -257,8 +261,7 @@ def update_user(user_data: CombinedData):
     database.close()
 
 
-# TODO: Use TypedDict
-def get_user_data(player_tag: str) -> Dict[str, Union[str, int]]:
+def get_user_data(player_tag: str) -> DatabaseDataExtended:
     """Get a user's information from the users table.
 
     Args:
@@ -282,25 +285,28 @@ def get_user_data(player_tag: str) -> Dict[str, Union[str, int]]:
     """
     database, cursor = connect_to_db()
 
-    user_data = {}
     cursor.execute("SELECT * FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
 
     if query_result is None:
         return None
 
-    user_data["player_name"] = query_result["player_name"]
-    user_data["player_tag"] = query_result["player_tag"]
-    user_data["discord_name"] = query_result["discord_name"]
-    user_data["clan_role"] = query_result["clan_role"]
-    user_data["vacation"] = query_result["vacation"]
-    user_data["strikes"] = query_result["strikes"]
-    user_data["permanent_strikes"] = query_result["permanent_strikes"]
-    user_data["usage_history"] = query_result["usage_history"]
-    user_data["status"] = query_result["status"]
+    user_data: DatabaseDataExtended = {
+        'player_tag': query_result['player_tag'],
+        'player_name': query_result['player_name'],
+        'discord_name': query_result['discord_name'],
+        'discord_id': query_result['discord_id'],
+        'role': query_result['clan_role'],
+        'clan_tag': "",
+        'clan_name': "",
+        'vacation': query_result['vacation'],
+        'strikes': query_result['strikes'],
+        'permanent_strikes': query_result['permanent_strikes'],
+        'usage_history': query_result['usage_history'],
+        'status': Status(query_result['status'])
+    }
 
     clan_id = query_result["clan_id"]
-
     cursor.execute("SELECT * FROM clans WHERE id = %s", (clan_id))
     query_result = cursor.fetchone()
 
@@ -308,8 +314,8 @@ def get_user_data(player_tag: str) -> Dict[str, Union[str, int]]:
         database.close()
         return None
 
-    user_data["clan_name"] = query_result["clan_name"]
-    user_data["clan_tag"] = query_result["clan_tag"]
+    user_data['clan_tag'] = query_result['clan_tag']
+    user_data['clan_name'] = query_result['clan_name']
 
     database.close()
     return user_data
@@ -598,8 +604,7 @@ def get_reset_time() -> datetime.datetime:
     return reset_time
 
 
-# TODO: Use TypedDict
-def get_river_race_reset_times() -> Dict[str, datetime.datetime]:
+def get_river_race_reset_times() -> ResetTimes:
     """Get the reset time of each day during the most recent river race.
 
     Returns:
@@ -617,10 +622,12 @@ def get_river_race_reset_times() -> Dict[str, datetime.datetime]:
     query_result = cursor.fetchone()
     database.close()
 
-    reset_times = {"thursday":  bot_utils.battletime_to_datetime(query_result["thursday"]),
-                   "friday":    bot_utils.battletime_to_datetime(query_result["friday"]),
-                   "saturday":  bot_utils.battletime_to_datetime(query_result["saturday"]),
-                   "sunday":    bot_utils.battletime_to_datetime(query_result["sunday"])}
+    reset_times: ResetTimes = {
+        "thursday":  bot_utils.battletime_to_datetime(query_result["thursday"]),
+        "friday":    bot_utils.battletime_to_datetime(query_result["friday"]),
+        "saturday":  bot_utils.battletime_to_datetime(query_result["saturday"]),
+        "sunday":    bot_utils.battletime_to_datetime(query_result["sunday"])
+    }
 
     return reset_times
 
@@ -963,7 +970,6 @@ def record_deck_usage_today(deck_usage: Dict[str, int]):
         deck_usage = {}
         default_deck_usage = 7
 
-    # TODO: look into using cursor.executemany() to improve performance.
     for player_tag in deck_usage:
         db_users.discard(player_tag)
         cursor.execute("SELECT player_tag, usage_history FROM users WHERE player_tag = %s", (player_tag))
@@ -1079,12 +1085,11 @@ def clean_up_db(active_members: Dict[str, ClashData]=None):
     database.close()
 
 
-# TODO: Use TypedDict
-def get_server_members_info() -> Dict[int, Dict[str, Union[str, int]]]:
+def get_server_members_info() -> Dict[int, DatabaseData]:
     """Get database information of all members in the server.
 
     Returns:
-        Dictionary containing info about server members.
+        Dictionary mapping Discord id to database data of a user..
             {
                 discord_id: {
                     "player_tag": str,
@@ -1104,7 +1109,17 @@ def get_server_members_info() -> Dict[int, Dict[str, Union[str, int]]]:
     if query_result is None:
         return {}
 
-    player_info = {user["discord_id"]: user for user in query_result}
+    player_info = {
+        user["discord_id"]: {
+            'player_tag': user['player_tag'],
+            'player_name': user['player_name'],
+            'discord_name': user['discord_name'],
+            'discord_id': user['discord_id'],
+            'role': user['clan_role']
+        }
+        for user in query_result
+    }
+
     return player_info
 
 
@@ -1164,7 +1179,7 @@ def set_users_last_check_time(player_tag: str, last_check_time: datetime.datetim
     database.close()
 
 
-# TODO: Use TypedDict and cursor.executemany()
+# TODO: Use cursor.executemany()
 def update_match_history(user_performance_list: List[RaceStats]):
     """Add each player's game stats to the match_history tables.
 
@@ -1310,36 +1325,24 @@ def save_clans_in_race_info(post_race: bool):
     database.close()
 
 
-# TODO: Use TypedDict
-def get_saved_clans_in_race_info() -> Dict[str, Dict[str, Union[str, int]]]:
+def get_saved_clans_in_race_info() -> Dict[str, DatabaseClan]:
     """Get saved clans fame and decks used.
 
     Returns:
         Dictionary mapping clan tags to dictionary containing saved data from that clan.
-        {
-            clan_tag: {
-                "clan_tag": str,
-                "clan_name": str,
-                "fame": int,
-                "total_decks_used": int,
-                "war_decks_used": int,
-                "num_days": int
-            }
-        }
     """
     database, cursor = connect_to_db()
 
     cursor.execute("SELECT * FROM river_race_clans")
     query_result = cursor.fetchall()
 
-    clans_info = {clan["clan_tag"]: clan for clan in query_result}
+    clans_info = {clan['clan_tag']: clan for clan in query_result}
 
     database.close()
     return clans_info
 
 
-# TODO: Use TypedDict
-def get_match_performance_dict(player_tag: str) -> Dict[str, Dict[str, Union[int, datetime.datetime, Dict[str, int]]]]:
+def get_match_performance_dict(player_tag: str) -> RiverRaceStats:
     """Get a dictionary containing a user's river race statistics.
 
     Args:
@@ -1347,54 +1350,6 @@ def get_match_performance_dict(player_tag: str) -> Dict[str, Dict[str, Union[int
 
     Returns:
         Dictionary containing specified users's stats.
-            {
-                "all/recent": {
-                    "fame": int, (recent only)
-                    "tracked_since": datetime.datetime, (recent only)
-                    "regular":
-                    {
-                        "wins": int,
-                        "losses": int,
-                        "total": int,
-                        "win_rate": str
-                    },
-                    "special":
-                    {
-                        "wins": int,
-                        "losses": int,
-                        "total": int,
-                        "win_rate": str
-                    },
-                    "duel_matches":
-                    {
-                        "wins": int,
-                        "losses": int,
-                        "total": int,
-                        "win_rate": str
-                    },
-                    "duel_series":
-                    {
-                        "wins": int,
-                        "losses": int,
-                        "total": int,
-                        "win_rate": str
-                    },
-                    "combined_pvp":
-                    {
-                        "wins": int,
-                        "losses": int,
-                        "total": int,
-                        "win_rate": str
-                    },
-                    "boat_attacks":
-                    {
-                        "wins": int,
-                        "losses": int,
-                        "total": int,
-                        "win_rate": str
-                    }
-                }
-            }
     """
     database, cursor = connect_to_db()
 
