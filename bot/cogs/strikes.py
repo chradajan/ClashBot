@@ -34,7 +34,9 @@ class Strikes(commands.Cog):
         old_strikes, new_strikes, old_permanent_strikes, new_permanent_strikes = db_utils.update_strikes(player_tag, delta)
 
         if old_strikes is None:
-            await ctx.send(f"Something went wrong while updating {player_name}'s strikes. This should not happen.")
+            embed = discord.Embed(title=f"Something went wrong while updating {player_name}'s strikes. This should not happen.",
+                                  color=discord.Color.red())
+            await ctx.send(embed=embed)
             return
 
         message = "has received a strike" if delta > 0 else "has had a strike removed"

@@ -33,7 +33,10 @@ class StatusReports(commands.Cog):
         users_on_vacation = db_utils.get_users_on_vacation()
 
         if not usage_info:
-            await ctx.send("Something went wrong. There might be issues accessing the Clash Royale API right now.")
+            embed = discord.Embed(title="Something went wrong. There might be issues accessing the Clash Royale API right now.",
+                                  color=discord.Color.red())
+            await ctx.send(embed=embed)
+            return
 
         embed = discord.Embed(title="Deck Usage Report",
                               description=(f"{usage_info['participants']} players have participated in war today.\n"

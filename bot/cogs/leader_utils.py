@@ -163,11 +163,16 @@ class LeaderUtils(commands.Cog):
                 member_string += f"{member.mention} - Fame: {fame}" + "\n"
 
         if not member_string and not non_member_string:
-            await ctx.send("There are currently no members below the threshold you specified.")
+            embed = discord.Embed(title="There are currently no members below the threshold you specified.",
+                                  color=discord.Color.green())
+            await ctx.send(embed=embed)
             return
 
         fame_string = f"The following members are below {threshold} medals:" + "\n" + member_string + non_member_string
         await CHANNEL.fame().send(fame_string)
+
+        embed = discord.Embed(title="Message successfully sent to fame channel.", color=discord.Color.green())
+        await ctx.send(embed=embed)
 
     @commands.command()
     @bot_utils.is_elder_command_check()
