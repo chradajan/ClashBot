@@ -158,11 +158,11 @@ async def assign_strikes_and_clear_vacation():
                 tracked_since = tracked_since.strftime("%a, %b %d %H:%M UTC")
 
             if player_tag in former_participants:
-                await bot_utils.strike_former_participant(player_name,
-                                                          player_tag,
-                                                          decks_used,
-                                                          decks_required,
-                                                          tracked_since)
+                await bot_utils.send_strike_former_participant_message(player_tag,
+                                                                       player_name,
+                                                                       decks_used,
+                                                                       decks_required,
+                                                                       tracked_since)
                 continue
 
             perfect_week = False

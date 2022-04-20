@@ -11,11 +11,11 @@ from cogs.error_handler import ErrorHandler
 from config.config import DEFAULT_REMINDER_MESSAGE
 
 # Utils
-from utils.channel_utils import CHANNEL
-from utils.role_utils import ROLE
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.channel_utils import CHANNEL
+from utils.role_utils import ROLE
 
 
 class LeaderUtils(commands.Cog):
@@ -188,7 +188,7 @@ class LeaderUtils(commands.Cog):
         else:
             _, player_tag, _ = player_info[0]
 
-        embed = bot_utils.kick(member.display_name, player_tag)
+        embed = await bot_utils.kick(player_tag, member.display_name)
         await ctx.send(embed=embed)
 
     @kick.error
@@ -201,7 +201,7 @@ class LeaderUtils(commands.Cog):
                 embed = ErrorHandler.member_not_found_embed(False)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
-                embed = bot_utils.kick(player_name, player_tag)
+                embed = await bot_utils.kick(player_tag, player_name)
             else:
                 embed = bot_utils.duplicate_names_embed(player_info, "kick")
 

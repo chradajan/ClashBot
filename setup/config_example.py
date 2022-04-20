@@ -31,5 +31,9 @@ TIME_OFF_CHANNEL_NAME = ""
 PRIMARY_CLAN_NAME = ""
 PRIMARY_CLAN_TAG = ""
 
+#Reactions
+CONFIRM_EMOJI = "✅"
+DECLINE_EMOJI = "❌"
+
 # Messages
 DEFAULT_REMINDER_MESSAGE = "Please complete your battles by the end of the day:"

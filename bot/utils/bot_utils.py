@@ -18,12 +18,15 @@ from config.blacklist import BLACKLIST
 from config.config import (
     PRIMARY_CLAN_NAME,
     PRIMARY_CLAN_TAG,
-    DEFAULT_REMINDER_MESSAGE
+    DEFAULT_REMINDER_MESSAGE,
+    CONFIRM_EMOJI,
+    DECLINE_EMOJI
 )
 
 # Utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.callback_utils import CallbackType, CALLBACK_MANAGER
 from utils.channel_utils import CHANNEL
 from utils.role_utils import ROLE
 from utils.util_types import (
@@ -165,10 +168,6 @@ def disallowed_command_check():
 #                                         #
 ###########################################
 
-# TODO: move this into dedicated file set for callback messages.
-STRIKE_MESSAGES = {}
-
-
 def full_name(member: discord.Member) -> str:
     """Get the full Discord name of a member.
 
@@ -250,7 +249,7 @@ async def send_rules_message(user_to_purge: discord.ClientUser):
     rules_channel = CHANNEL.rules()
     await rules_channel.purge(limit=10, check=lambda message: message.author == user_to_purge)
     new_react_message = await rules_channel.send(content="@everyone After you've read the rules, react to this message for roles.")
-    await new_react_message.add_reaction(u"\u2705")
+    await new_react_message.add_reaction(CONFIRM_EMOJI)
 
 
 async def deck_usage_reminder(time_zone: ReminderTime=ReminderTime.ALL,
@@ -723,8 +722,8 @@ def average_fame_per_deck(win_rate: float) -> float:
 def calculate_win_rate_from_average_fame(avg_fame_per_deck: Union[float, None]) -> float:
     """Solve the polynomial described in average_fame_per_deck.
 
-    Determine what win rate is needed to achieve the specified fame per deck. All assumptions descibed above hold true here as well.
-    If no roots can be determined, then None is returned.
+    Determine what win rate is needed to achieve the specified fame per deck. All assumptions described above hold true here as
+    well. If no roots can be determined, then None is returned.
 
     Args:
         avg_fame_per_deck: Average fame per deck to calculate win rate of.
@@ -933,12 +932,12 @@ def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float
     return (predictions_embed, completed_clans_embed, catch_up_embed)
 
 
-def kick(player_name: str, player_tag: str) -> discord.Embed:
+async def kick(player_tag: str, player_name: str, ) -> discord.Embed:
     """Kick the specified player and return an embed confirming the kick.
 
     Args:
-        player_name: Name of player to kick.
         player_tag: Tag of player to kick.
+        player_name: Name of player to kick.
 
     Returns:
         Embed with details about the kick.
@@ -1107,33 +1106,77 @@ async def send_new_member_info(clash_data: ClashData):
         return
 
 
-async def strike_former_participant(player_name: str,
-                                    player_tag: str,
+async def strike_former_participant(player_tag: str,
+                                    player_name: str,
                                     decks_used: int,
                                     decks_required: int,
-                                    tracked_since: str):
+                                    tracked_since: str) -> discord.Embed:
+    """Callback function to strike former participant.
+
+    Args:
+        player_tag: Player tag of user to strike.
+        player_name: Player name of user to strike.
+        decks_used: How many decks the user used in the river race.
+        decks_required: How many decks were expected from the user to not get a strike.
+        tracked_since: Human readable string of time that bot started tracking the user.
+
+    Returns:
+        Embed confirming the strike was given.
+    """
+    _, strikes, _, _ = db_utils.update_strikes(player_tag, 1)
+    strikes_embed = discord.Embed()
+    strikes_embed.add_field(name=player_name,
+                            value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```")
+
+    discord_id = db_utils.get_member_id(player_tag)
+    member: discord.Member = None
+
+    if discord_id is not None:
+        member = discord.utils.get(CHANNEL.strikes().members, id=discord_id)
+
+    if member is not None:
+        await CHANNEL.strikes().send(content=f"{member.mention}", embed=strikes_embed)
+    else:
+        await CHANNEL.strikes().send(embed=strikes_embed)
+
+    confirmation_embed = discord.Embed(title=f"{player_name} received a strike.")
+    return confirmation_embed
+
+
+async def send_strike_former_participant_message(player_tag: str,
+                                                 player_name: str,
+                                                 decks_used: int,
+                                                 decks_required: int,
+                                                 tracked_since: str):
     """Allow leaders to optionally strike members not in primary clan at time that automated strikes message gets sent.
 
     Send an embed to the commands channel that can be used to assign a strike to members who participated in the most recent river
     race, did not participate fully, and are no longer an active member of the clan.
 
     Args:
-        player_name: Player name of user to potentially strike.
         player_tag: Player tag of user to potentially strike.
+        player_name: Player name of user to potentially strike.
         decks_used: How many decks the user used in the river race.
         decks_required: How many decks were expected from the user to not get a strike.
         tracked_since: Human readable string of time that bot started tracking the user.
     """
-    global STRIKE_MESSAGES
-
     embed = discord.Embed()
     embed.add_field(name=f"Should {player_name} receive a strike?",
                     value=f"```Decks: {decks_used}/{decks_required}\nDate: {tracked_since}```")
 
     strike_message = await CHANNEL.commands().send(embed=embed)
-    await strike_message.add_reaction('✅')
-    await strike_message.add_reaction('❌')
-    STRIKE_MESSAGES[strike_message.id] = (player_tag, player_name, decks_used, decks_required, tracked_since)
+    await strike_message.add_reaction(CONFIRM_EMOJI)
+    await strike_message.add_reaction(DECLINE_EMOJI)
+    decline_embed = discord.Embed(title=f"{player_name} did not receive a strike.")
+    CALLBACK_MANAGER.save_callback(strike_message.id,
+                                   CallbackType.STRIKE,
+                                   strike_former_participant,
+                                   decline_embed,
+                                   player_tag,
+                                   player_name,
+                                   decks_used,
+                                   decks_required,
+                                   tracked_since)
 
 
 def duplicate_names_embed(users: List[Tuple[str, str, str]], command_name: str) -> discord.Embed:

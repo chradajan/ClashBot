@@ -4,14 +4,20 @@ import discord
 from discord.ext import commands
 
 # Config
-from config.config import PRIMARY_CLAN_TAG, PRIMARY_CLAN_NAME
+from config.config import (
+    PRIMARY_CLAN_TAG,
+    PRIMARY_CLAN_NAME,
+    CONFIRM_EMOJI,
+    DECLINE_EMOJI
+)
 
 # Utils
-from utils.channel_utils import CHANNEL
-from utils.role_utils import ROLE
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.callback_utils import CallbackType, CALLBACK_MANAGER
+from utils.channel_utils import CHANNEL
+from utils.role_utils import ROLE
 
 
 class Listeners(commands.Cog):
@@ -20,7 +26,6 @@ class Listeners(commands.Cog):
     def __init__(self, bot):
         """Store bot and kick messages."""
         self.bot = bot
-        self.kick_messages = {}
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
@@ -36,7 +41,7 @@ class Listeners(commands.Cog):
         db_utils.remove_user(member.id)
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         """Monitor welcome channel for users posting player tags and kicks channel for people posting images of kick screenshots."""
         if message.author.bot:
             return
@@ -86,67 +91,22 @@ class Listeners(commands.Cog):
                     embed.add_field(name="React to log this kick if everything looks correct.",
                                     value=f"```Name: {player_name}\nTag: {player_tag}```")
                     kick_message = await message.channel.send(embed=embed)
-                    await kick_message.add_reaction('✅')
-                    await kick_message.add_reaction('❌')
-                    self.kick_messages[kick_message.id] = (player_tag, player_name)
+                    await kick_message.add_reaction(CONFIRM_EMOJI)
+                    await kick_message.add_reaction(DECLINE_EMOJI)
+                    decline_embed = discord.Embed(title=f"A kick was not logged for {player_name}.")
+                    CALLBACK_MANAGER.save_callback(kick_message.id,
+                                                   CallbackType.KICK,
+                                                   bot_utils.kick,
+                                                   decline_embed,
+                                                   player_tag, player_name)
 
     @commands.Cog.listener()
-    async def on_reaction_add(self, reaction, user):
+    async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
         """Monitor reacts to kick and strike messages."""
-        kick_info = self.kick_messages.get(reaction.message.id)
-        strike_info = bot_utils.STRIKE_MESSAGES.get(reaction.message.id)
-
-        if (kick_info is None and strike_info is None) or user.bot:
+        if user.bot:
             return
 
-        if kick_info is not None:
-            player_tag, player_name = kick_info
-            self.kick_messages.pop(reaction.message.id, None)
-
-            if reaction.emoji == '✅':
-                edited_embed = bot_utils.kick(player_name, player_tag)
-                await reaction.message.edit(embed=edited_embed)
-                await reaction.message.clear_reaction('✅')
-                await reaction.message.clear_reaction('❌')
-            elif reaction.emoji == '❌':
-                edited_embed = discord.Embed(title=f"A kick was not logged for {player_name}.")
-                await reaction.message.edit(embed=edited_embed)
-                await reaction.message.clear_reaction('✅')
-                await reaction.message.clear_reaction('❌')
-
-        elif strike_info is not None:
-            if not bot_utils.is_leader_or_higher(user):
-                return
-
-            player_tag, player_name, decks_used, decks_required, tracked_since = strike_info
-            bot_utils.STRIKE_MESSAGES.pop(reaction.message.id, None)
-
-            if reaction.emoji == '✅':
-                _, strikes, _, _ = db_utils.update_strikes(player_tag, 1)
-                embed = discord.Embed()
-                embed.add_field(name=player_name,
-                                value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```")
-
-                discord_id = db_utils.get_member_id(player_tag)
-                member = None
-
-                if discord_id is not None:
-                    member = discord.utils.get(CHANNEL.strikes().members, id=discord_id)
-
-                if member is not None:
-                    await CHANNEL.strikes().send(content=f"{member.mention}", embed=embed)
-                else:
-                    await CHANNEL.strikes().send(embed=embed)
-
-                edited_embed = discord.Embed(title=f"{player_name} received a strike.")
-                await reaction.message.edit(embed=edited_embed)
-                await reaction.message.clear_reaction('✅')
-                await reaction.message.clear_reaction('❌')
-            elif reaction.emoji == '❌':
-                edited_embed = discord.Embed(title=f"{player_name} did not receive a strike.")
-                await reaction.message.edit(embed=edited_embed)
-                await reaction.message.clear_reaction('✅')
-                await reaction.message.clear_reaction('❌')
+        await CALLBACK_MANAGER.handle_callback(reaction, user)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):

@@ -1485,15 +1485,22 @@ def kick_user(player_tag: str) -> Tuple[int, str]:
         player_tag: Player tag of user to kick.
 
     Returns:
-        databaseTuple of total number of kicks and last time user was kicked.
+        Tuple of total number of kicks and last time user was kicked.
     """
     kick_time = bot_utils.get_current_battletime()
     database, cursor = connect_to_db()
 
     cursor.execute("SELECT id FROM users WHERE player_tag = %s", (player_tag))
     query_result = cursor.fetchone()
-    user_id = query_result["id"]
 
+    if query_result is None:
+        database.close()
+        add_new_unregistered_user(player_tag)
+        database, cursor = connect_to_db()
+        cursor.execute("SELECT id FROM users WHERE player_tag = %s", (player_tag))
+        query_result = cursor.fetchone()
+
+    user_id = query_result['id']
     cursor.execute("INSERT INTO kicks VALUES (%s, %s)", (user_id, kick_time))
 
     database.commit()
