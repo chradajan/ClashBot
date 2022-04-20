@@ -171,7 +171,7 @@ class LeaderUtils(commands.Cog):
         fame_string = f"The following members are below {threshold} medals:" + "\n" + member_string + non_member_string
         await CHANNEL.fame().send(fame_string)
 
-        embed = discord.Embed(title="Message successfully sent to fame channel.", color=discord.Color.green())
+        embed = discord.Embed(title=f"Message successfully sent to {CHANNEL.fame().mention}.", color=discord.Color.green())
         await ctx.send(embed=embed)
 
     @commands.command()
