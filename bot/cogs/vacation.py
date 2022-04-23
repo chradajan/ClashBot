@@ -26,8 +26,8 @@ class Vacation(commands.Cog):
         vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
         await CHANNEL.time_off().send(f"Updated vacation status of {member.mention} to: {vacation_status_string}.")
 
-        confirmation_embed = discord.Embed(title=(f"Status sucessfully updated and {member.display_name} "
-                                                  f"was notified in {CHANNEL.time_off().mention}."),
+        confirmation_embed = discord.Embed(title=(f"Status successfully updated and {member.display_name} "
+                                                  f"was notified in #{CHANNEL.time_off().name}."),
                                            color=discord.Color.green())
         await ctx.send(embed=confirmation_embed)
 

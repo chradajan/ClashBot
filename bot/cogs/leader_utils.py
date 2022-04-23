@@ -108,7 +108,7 @@ class LeaderUtils(commands.Cog):
             reminder_message = DEFAULT_REMINDER_MESSAGE
         await bot_utils.deck_usage_reminder(message=reminder_message, automated=False)
 
-        confirmation_embed = discord.Embed(title=f"Reminder message sent to {CHANNEL.reminder().mention}.",
+        confirmation_embed = discord.Embed(title=f"Reminder message sent to #{CHANNEL.reminder().name}.",
                                            color=discord.Color.green())
         await ctx.send(embed=confirmation_embed)
 
@@ -132,7 +132,7 @@ class LeaderUtils(commands.Cog):
         except:
             await CHANNEL.fame().send("Top members by medals\n" + "```\n" + table.get_string() + "```")
 
-        confirmation_embed = discord.Embed(title=f"Message successfully sent to {CHANNEL.fame().mention}.",
+        confirmation_embed = discord.Embed(title=f"Message successfully sent to #{CHANNEL.fame().name}.",
                                            color=discord.Color.green())
         await ctx.send(embed=confirmation_embed)
 
@@ -171,7 +171,7 @@ class LeaderUtils(commands.Cog):
         fame_string = f"The following members are below {threshold} medals:" + "\n" + member_string + non_member_string
         await CHANNEL.fame().send(fame_string)
 
-        embed = discord.Embed(title=f"Message successfully sent to {CHANNEL.fame().mention}.", color=discord.Color.green())
+        embed = discord.Embed(title=f"Message successfully sent to #{CHANNEL.fame().name}.", color=discord.Color.green())
         await ctx.send(embed=embed)
 
     @commands.command()
