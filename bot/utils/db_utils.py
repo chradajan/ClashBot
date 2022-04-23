@@ -1008,7 +1008,7 @@ def get_all_user_deck_usage_history() -> List[Tuple[str, str, int, int, datetime
     return usage_list
 
 
-def clean_up_db(active_members: Dict[str, ClashData]=None):
+def clean_up_db() -> bool:
     """Updates database to ensure status column is up to date.
 
     Checks that every user in the database has an appropriate status.
@@ -1017,16 +1017,15 @@ def clean_up_db(active_members: Dict[str, ClashData]=None):
     INACTIVE users that are now part of the clan are moved to ACTIVE.
     DEPARTED users that are now part of the clan are moved to UNREGISTERED.
 
-    Args:
-        active_members: Active members of primary clan. Will fetch if not provided.
+    Returns:
+        Whether clean up operation was successful.
     """
     database, cursor = connect_to_db()
 
-    if active_members is None:
-        active_members = clash_utils.get_active_members_in_clan()
+    active_members = clash_utils.get_active_members_in_clan()
 
     if not active_members:
-        return
+        return False
 
     cursor.execute("SELECT player_name, player_tag, discord_name, status FROM users")
     query_result = cursor.fetchall()
@@ -1070,6 +1069,7 @@ def clean_up_db(active_members: Dict[str, ClashData]=None):
 
     database.commit()
     database.close()
+    return True
 
 
 def get_server_members_info() -> Dict[int, DatabaseData]:
@@ -1416,17 +1416,13 @@ def get_match_performance_dict(player_tag: str) -> RiverRaceStats:
     return match_performance_dict
 
 
-def get_non_active_participants(active_members: Dict[str, ClashData]=None) -> Set[str]:
+def get_non_active_participants() -> Set[str]:
     """Get a set of player tags of users who were tracked in the most recent river race but are not currently active members.
-
-    Args:
-        active_members (optional): Dictionary of active members of primary clan.
 
     Returns:
         Set of player tags.
     """
-    if active_members is None:
-        active_members = clash_utils.get_active_members_in_clan(PRIMARY_CLAN_TAG)
+    active_members = clash_utils.get_active_members_in_clan(PRIMARY_CLAN_TAG)
 
     if not active_members:
         return set()
@@ -1447,20 +1443,19 @@ def get_non_active_participants(active_members: Dict[str, ClashData]=None) -> Se
     return former_participants
 
 
-def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[str, ClashData]=None):
+def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
     """Add any active members not in the database as UNREGISTERED users.
 
     Args:
         clan_tag (optional): Clan to get users from. Defaults to primary clan.
-        active_members (optional): Dictionary of active members of clan_tag.
+
+    Returns:
+        Whether adding users was successful.
     """
-    if active_members is None:
-        active_members = clash_utils.get_active_members_in_clan(clan_tag)
-    else:
-        active_members = active_members.copy()
+    active_members = clash_utils.get_active_members_in_clan(clan_tag).copy()
 
     if not active_members:
-        return
+        return False
 
     database, cursor = connect_to_db()
 
@@ -1469,13 +1464,18 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[
     database.close()
 
     if query_result is None:
-        return
+        return False
 
     for user in query_result:
         active_members.pop(user['player_tag'], None)
 
+    all_users_successfully_inserted = True
+
     for player_tag in active_members:
-        add_new_unregistered_user(player_tag)
+        if not add_new_unregistered_user(player_tag):
+            all_users_successfully_inserted = False
+
+    return all_users_successfully_inserted
 
 
 def kick_user(player_tag: str) -> Tuple[int, str]:
@@ -1610,9 +1610,8 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         Path to generated spreadsheet.
     """
     # Clean up the database and add any members of the clan to it that aren't already in it.
-    active_members = clash_utils.get_active_members_in_clan()
     clean_up_db()
-    add_unregistered_users(active_members=active_members)
+    add_unregistered_users()
 
     database, cursor = connect_to_db()
 
@@ -1717,7 +1716,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         card_levels_percentile_sheet.write_row(0, 0, card_levels_headers)
 
     # Get data
-    deck_usage_today = clash_utils.get_deck_usage_today(active_members=active_members)
+    deck_usage_today = clash_utils.get_deck_usage_today()
 
     # Write data
     row = 1

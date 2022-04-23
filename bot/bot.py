@@ -242,12 +242,11 @@ async def determine_reset_time():
     if RESET_OCCURRED:
         return
 
-    active_members = clash_utils.get_active_members_in_clan()
     weekday = datetime.datetime.utcnow().date().weekday()
-    usage_list = clash_utils.get_deck_usage_today(active_members=active_members)
+    usage_list = clash_utils.get_deck_usage_today()
     current_sum = 0
 
-    if not active_members or not usage_list:
+    if not usage_list:
         return
 
     for decks_used in usage_list.values():
@@ -255,7 +254,7 @@ async def determine_reset_time():
 
     if current_sum < PREV_DECK_USAGE_SUM:
         RESET_OCCURRED = True
-        db_utils.clean_up_db(active_members=active_members)
+        db_utils.clean_up_db()
         db_utils.record_deck_usage_today(PREV_DECK_USAGE)
 
         if weekday == 3:
@@ -278,9 +277,8 @@ async def reset_globals():
     global RESET_OCCURRED
 
     if not RESET_OCCURRED:
-        active_members = clash_utils.get_active_members_in_clan()
         weekday = datetime.datetime.utcnow().date().weekday()
-        db_utils.clean_up_db(active_members=active_members)
+        db_utils.clean_up_db()
         db_utils.record_deck_usage_today(PREV_DECK_USAGE)
 
         if weekday == 3:

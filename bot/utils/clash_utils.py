@@ -33,31 +33,40 @@ def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, Clas
         Dictionary of active members, or empty dict if API request fails. best_trophies, cards, found_cards, total_cards, and
             clan_name fields are all populated but do not contain actual data.
     """
-    req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members",
-                       headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
+    if not hasattr(get_active_members_in_clan, 'cached_members'):
+        get_active_members_in_clan.cached_members = {}
+        get_active_members_in_clan.last_check_time = None
 
-    if req.status_code != 200:
-        return {}
+    now = datetime.datetime.utcnow()
 
-    json_obj = req.json()
-    active_members = {}
+    if get_active_members_in_clan.last_check_time is None or (now - get_active_members_in_clan.last_check_time).seconds > 60:
+        req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/members",
+                            headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
 
-    for member in json_obj['items']:
-        active_members[member['tag']] = {
-            'player_tag': member['tag'],
-            'player_name': member['name'],
-            'role': member['role'],
-            'exp_level': member['expLevel'],
-            'trophies': member['trophies'],
-            'best_trophies': -1,
-            'cards': {},
-            'found_cards': -1,
-            'total_cards': -1,
-            'clan_name': "",
-            'clan_tag': clan_tag
-        }
+        if req.status_code != 200:
+            return {}
 
-    return active_members
+        json_obj = req.json()
+        get_active_members_in_clan.cached_members = {}
+
+        for member in json_obj['items']:
+            get_active_members_in_clan.cached_members[member['tag']] = {
+                'player_tag': member['tag'],
+                'player_name': member['name'],
+                'role': member['role'],
+                'exp_level': member['expLevel'],
+                'trophies': member['trophies'],
+                'best_trophies': -1,
+                'cards': {},
+                'found_cards': -1,
+                'total_cards': -1,
+                'clan_name': "",
+                'clan_tag': clan_tag
+            }
+        
+        get_active_members_in_clan.last_check_time = now
+
+    return get_active_members_in_clan.cached_members
 
 
 def get_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Participant]:
@@ -69,24 +78,35 @@ def get_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Particip
     Returns:
         List of participants in specified clan's current river race, or empty list if API request fails.
     """
-    req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace",
-                       headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
+    if not hasattr(get_river_race_participants, 'cached_participants'):
+        get_river_race_participants.cached_participants = []
+        get_river_race_participants.last_check_time = None
 
-    if req.status_code != 200:
-        return []
+    now = datetime.datetime.utcnow()
 
-    json_obj = req.json()
-    participants = json_obj["clan"]["participants"]
+    if get_river_race_participants.last_check_time is None or (now - get_river_race_participants.last_check_time).seconds > 60:
+        req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{clan_tag[1:]}/currentriverrace",
+                        headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
 
-    for participant in participants:
-        participant['player_tag'] = participant.pop('tag')
-        participant['player_name'] = participant.pop('name')
-        participant['repair_points'] = participant.pop('repairPoints')
-        participant['boat_attacks'] = participant.pop('boatAttacks')
-        participant['decks_used'] = participant.pop('decksUsed')
-        participant['decks_used_today'] = participant.pop('decksUsedToday')
+        if req.status_code != 200:
+            return []
 
-    return participants
+        get_river_race_participants.cached_participants = []
+        json_obj = req.json()
+        participants = json_obj["clan"]["participants"]
+
+        for participant in participants:
+            participant['player_tag'] = participant.pop('tag')
+            participant['player_name'] = participant.pop('name')
+            participant['repair_points'] = participant.pop('repairPoints')
+            participant['boat_attacks'] = participant.pop('boatAttacks')
+            participant['decks_used'] = participant.pop('decksUsed')
+            participant['decks_used_today'] = participant.pop('decksUsedToday')
+            get_river_race_participants.cached_participants.append(participant)
+
+        get_river_race_participants.last_check_time = now
+
+    return get_river_race_participants.cached_participants
 
 
 def get_last_river_race_participants(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Participant]:
@@ -197,7 +217,7 @@ def get_remaining_decks_today(clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str,
         List of player names, player tags, and remaining decks of users in the specified clan that have not used 4 decks today.
     """
     participants = get_river_race_participants(clan_tag)
-    active_members = get_active_members_in_clan(clan_tag)
+    active_members = get_active_members_in_clan(clan_tag).copy()
     decks_remaining_list = []
 
     if not active_members:
@@ -280,22 +300,17 @@ def get_remaining_decks_today_dicts(clan_tag: str=PRIMARY_CLAN_TAG) -> DecksRepo
     return return_info
 
 
-def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[str, ClashData]=None) -> Dict[str, int]:
+def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, int]:
     """Get a list of players in a clan and how many decks each player used today.
 
     Args:
         clan_tag (optional): Clan to get deck usage info from. Defaults to primary clan.
-        active_members (optional): Dictionary of active members. Defaults to retrieving active members in specified clan.
 
     Returns:
         Dictionary mapping player tags to their deck usage today.
     """
     participants = get_river_race_participants(clan_tag)
-
-    if active_members is None:
-        active_members = get_active_members_in_clan(clan_tag)
-    else:
-        active_members = active_members.copy()
+    active_members = get_active_members_in_clan(clan_tag).copy()
 
     if not participants or not active_members:
         return {}
@@ -595,22 +610,19 @@ def calculate_player_win_rate(player_tag: str,
     return player_dict
 
 
-def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG, active_members: Dict[str, ClashData]=None):
+def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG):
     """Get the match performance of each player in the specified clan. Saves results in match_history table.
 
     Args:
         post_race: Whether this check is occuring during or after the river race.
         clan_tag (optional): Check player match performance of players in this clan. Defaults to primary clan.
-        active_members (optional): Dictionary of active members. Gets active members of clan_tag if not provided.
     """
-    if active_members is None:
-        active_members = get_active_members_in_clan(clan_tag)
-
-    if not active_members:
+    clean_up_successful =  db_utils.clean_up_db()
+    add_unregistered_users_successful =  db_utils.add_unregistered_users(clan_tag)
+    
+    if not clean_up_successful or not add_unregistered_users_successful:
         return
 
-    db_utils.clean_up_db(active_members)
-    db_utils.add_unregistered_users(clan_tag, active_members)
     performance_list = []
 
     if post_race:
@@ -743,13 +755,13 @@ def get_total_cards() -> int:
     Returns:
         Total number of cards in the game.
     """
-    if not all(hasattr(get_total_cards, attr) for attr in ["cached_total", "last_check_time"]):
+    if not hasattr(get_total_cards, 'cached_total'):
         get_total_cards.cached_total = 0
         get_total_cards.last_check_time = None
 
     now = datetime.datetime.utcnow()
 
-    if get_total_cards.last_check_time is None or (now - get_total_cards.last_check_time).days > 0:
+    if get_total_cards.last_check_time is None or (now - get_total_cards.last_check_time).seconds > 300:
         req = requests.get(url="https://api.clashroyale.com/v1/cards",
                            headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
 

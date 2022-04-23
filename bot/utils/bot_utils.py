@@ -390,7 +390,7 @@ async def update_all_members(guild: discord.Guild):
         guild: Update members of this Discord server.
     """
     active_members = clash_utils.get_active_members_in_clan()
-    db_utils.clean_up_db(active_members)
+    db_utils.clean_up_db()
     db_info = db_utils.get_server_members_info()
 
     for member in guild.members:
@@ -775,9 +775,9 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
             win_rates = clash_utils.calculate_river_race_win_rates(race_reset_times['thursday']  - datetime.timedelta(days=1))
 
         if not win_rates:
-            win_rates = {clan["tag"]: 0.50 for clan in clans}
+            win_rates = {clan['clan_tag']: 0.50 for clan in clans}
     else:
-        win_rates = {clan["tag"]: 0.50 for clan in clans}
+        win_rates = {clan['clan_tag']: 0.50 for clan in clans}
 
     expected_deck_usage = {}
 
