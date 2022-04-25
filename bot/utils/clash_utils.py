@@ -2,7 +2,6 @@
 
 import datetime
 import re
-from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Tuple, Union
 
 import requests
@@ -479,38 +478,29 @@ def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
 
 def calculate_player_win_rate(player_tag: str,
                               fame: int,
-                              current_check_time: datetime.datetime,
-                              last_check_time: datetime.datetime=None,
-                              clan_tag: str=PRIMARY_CLAN_TAG) -> RaceStats:
+                              current_check_time: datetime.datetime) -> RaceStats:
     """Look at a player's battle log and break down their performance in recent river race battles.
 
     Args:
         player_tag: Player to check match history of.
         fame: Total fame they've accumulated in the current river race.
         current_check_time: Time to set last_check_time after this check.
-        last_check_time: Ignore battles before this time. If not provided, get from database.
-        clan_tag: Only consider battles performed for this clan. Defaults to primary clan.
 
     Returns:
         Number of wins and losses in each river race battle type for the specified player.
     """
-    is_automated = False
+    prev_fame, last_check_time = db_utils.get_and_update_match_history_info(player_tag, fame, current_check_time)
 
-    if last_check_time is None:
-        is_automated = True
-        prev_fame, last_check_time = db_utils.get_and_update_match_history_info(player_tag, fame, current_check_time)
+    # This should only happen when an unregistered user is added but their information can't be retrieved from the API.
+    if prev_fame is None:
+        return {}
 
-        # This should only happen when an unregistered user is added but their information can't be retrieved from the API.
-        if prev_fame is None:
-            return {}
-
-        # If no fame has been acquired since last check, no point in grabbing battlelog.
-        if fame - prev_fame == 0:
-            return {}
+    # If no fame has been acquired since last check, no point in grabbing battlelog.
+    if fame - prev_fame == 0:
+        return {}
 
     LOG.debug(log_message("Getting battlelog of user to check win rate",
                           player_tag=player_tag,
-                          clan_tag=clan_tag,
                           fame=fame,
                           prev_fame=prev_fame,
                           last_check_time=last_check_time))
@@ -519,8 +509,7 @@ def calculate_player_win_rate(player_tag: str,
 
     if req.status_code != 200:
         LOG.warning(log_message(msg="Bad request", status_code=req.status_code))
-        if is_automated:
-            db_utils.set_users_last_check_time(player_tag, last_check_time)
+        db_utils.set_users_last_check_time(player_tag, last_check_time)
         return {}
 
     battles = req.json()
@@ -530,7 +519,7 @@ def calculate_player_win_rate(player_tag: str,
         battle_time = bot_utils.battletime_to_datetime(battle["battleTime"])
         if ((battle["type"].startswith("riverRace") or battle["type"] == "boatBattle")
                 and last_check_time <= battle_time < current_check_time
-                and battle["team"][0]["clan"]["tag"] == clan_tag):
+                and battle["team"][0]["clan"]["tag"] == PRIMARY_CLAN_TAG):
             river_race_battle_list.append(battle)
 
     player_dict: RaceStats = {
@@ -571,7 +560,7 @@ def calculate_player_win_rate(player_tag: str,
 
         elif battle["type"].startswith("riverRaceDuel"):
             # During colosseum week, clan fame will exceed 10,000 so this ensures that strikes/reminders go out correctly.
-            if is_automated and battle["type"] == "riverRaceDuelColosseum":
+            if battle["type"] == "riverRaceDuelColosseum":
                 db_utils.set_colosseum_week_status(True)
 
             # Determine duel series outcome by result of final game
@@ -642,61 +631,6 @@ def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG)
 
     db_utils.update_match_history(performance_list)
     db_utils.set_last_check_time(check_time)
-
-
-def calculate_river_race_win_rates(last_check_time: datetime.datetime) -> Dict[str, float]:
-    """Calculate win rate of clans in current river race based on river race matches played since last_check_time.
-
-    Args:
-        last_check_time: Only consider battles that have occurred after this time.
-
-    Returns:
-        Dictionary mapping clan tags to their win rates.
-    """
-    now = datetime.datetime.now(datetime.timezone.utc)
-    clan_tag = ""
-
-    def win_rate_helper(tag: str) -> RaceStats:
-        return calculate_player_win_rate(tag, 0, now, last_check_time, clan_tag)
-
-    LOG.info(log_message("Calculating win rates of clans in primary clan's river race", last_check_time=last_check_time))
-    req = requests.get(url=f"https://api.clashroyale.com/v1/clans/%23{PRIMARY_CLAN_TAG[1:]}/currentriverrace",
-                       headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
-
-    if req.status_code != 200:
-        LOG.warning(log_message(msg="Bad request", status_code=req.status_code))
-        return {}
-
-    json_obj = req.json()
-    clan_averages = {}
-
-    for clan in json_obj['clans']:
-        wins = 0
-        total = 0
-        clan_tag = clan['tag']
-        active_members = get_active_members_in_clan(clan_tag)
-
-        if not active_members:
-            clan_averages[clan_tag] = 0
-            continue
-
-        args_list = [participant['tag'] for participant in clan['participants'] if participant['tag'] in active_members]
-
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            results = list(pool.map(win_rate_helper, args_list))
-
-        for result in results:
-            temp_wins = result['battle_wins'] + result['special_battle_wins'] + result['duel_match_wins']
-            temp_losses = result['battle_losses'] + result['special_battle_losses'] + result['duel_match_losses']
-            wins += temp_wins
-            total += temp_wins + temp_losses
-
-        if total == 0:
-            clan_averages[clan_tag] = 0
-        else:
-            clan_averages[clan_tag] = wins/total
-
-    return clan_averages
 
 
 def get_clans_in_race(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG) -> List[RiverRaceClan]:

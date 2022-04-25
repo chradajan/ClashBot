@@ -77,6 +77,7 @@ class DatabaseClan(TypedDict):
     clan_tag: str
     clan_name: str
     fame: int
+    total_fame: int
     total_decks_used: int
     war_decks_used: int
     num_days: int

@@ -113,11 +113,13 @@ class ErrorHandler(commands.Cog):
             embed.set_footer(text="More information about this error has been logged.")
             await ctx.send(embed=embed)
             LOG.exception(error)
+            raise error
 
         else:
             embed = self.unknown_error_embed(ctx.command)
             await ctx.send(embed=embed)
             LOG.exception(error)
+            raise error
 
 
     async def command_not_found_embed(self, not_found_cmd: str, ctx: commands.Context) -> discord.Embed:

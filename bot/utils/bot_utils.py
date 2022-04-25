@@ -736,7 +736,7 @@ def average_fame_per_deck(win_rate: float) -> float:
     return (-25 * win_rate**3) + (25 * win_rate**2) + (125 * win_rate) + 100
 
 
-def calculate_win_rate_from_average_fame(avg_fame_per_deck: Union[float, None]) -> float:
+def calculate_win_rate_from_average_fame(avg_fame_per_deck: float) -> float:
     """Solve the polynomial described in average_fame_per_deck.
 
     Determine what win rate is needed to achieve the specified fame per deck. All assumptions described above hold true here as
@@ -783,29 +783,43 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
     saved_clan_info = db_utils.get_saved_clans_in_race_info()
 
     if use_historical_win_rates:
-        now = datetime.datetime.now(datetime.timezone.utc)
-        race_reset_times = db_utils.get_river_race_reset_times()
+        win_rates = {}
+        is_colosseum_week = db_utils.is_colosseum_week()
 
-        if (now - race_reset_times['thursday']).days > 5:
-            win_rates = clash_utils.calculate_river_race_win_rates(db_utils.get_reset_time())
-        else:
-            win_rates = clash_utils.calculate_river_race_win_rates(race_reset_times['thursday']  - datetime.timedelta(days=1))
+        for clan in clans:
+            clan_tag = clan['clan_tag']
 
-        if not win_rates:
-            win_rates = {clan['clan_tag']: 0.50 for clan in clans}
+            if saved_clan_info[clan_tag]['num_days'] == 0 or saved_clan_info[clan_tag]['total_decks_used'] == 0:
+                win_rates[clan_tag] = (165.625, 0.50)
+                continue
+
+            if is_colosseum_week:
+                total_war_decks_used = saved_clan_info[clan_tag]['war_decks_used']
+                total_fame_earned = saved_clan_info[clan_tag]['total_fame']
+            else:
+                total_war_decks_used = clan['decks_used_today'] + saved_clan_info[clan_tag]['war_decks_used']
+                total_fame_earned = (clan['fame'] - saved_clan_info[clan_tag]['fame']) + saved_clan_info[clan_tag]['total_fame']
+
+            fame_per_deck = total_fame_earned / total_war_decks_used
+            win_rate = calculate_win_rate_from_average_fame(fame_per_deck)
+
+            if win_rate is None:
+                win_rates[clan_tag] = (165.625, 0.50)
+            else:
+                win_rates[clan_tag] = (fame_per_deck, win_rate)
     else:
-        win_rates = {clan['clan_tag']: 0.50 for clan in clans}
+        win_rates = {clan['clan_tag']: (165.625, 0.50) for clan in clans}
 
     expected_deck_usage = {}
 
     if use_historical_deck_usage:
         for clan in clans:
-            tag = clan['clan_tag']
+            clan_tag = clan['clan_tag']
 
-            if saved_clan_info[tag]['num_days'] == 0:
+            if saved_clan_info[clan_tag]['num_days'] == 0:
                 expected_decks_to_use = 200 - clan['decks_used_today']
             else:
-                avg_deck_usage = round(saved_clan_info[tag]['war_decks_used'] / saved_clan_info[tag]['num_days'])
+                avg_deck_usage = round(saved_clan_info[clan_tag]['war_decks_used'] / saved_clan_info[clan_tag]['num_days'])
                 current_deck_usage = clan['decks_used_today']
 
                 if current_deck_usage > avg_deck_usage:
@@ -813,30 +827,27 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
                 else:
                     expected_decks_to_use = avg_deck_usage - current_deck_usage
 
-            expected_deck_usage[tag] = expected_decks_to_use
+            expected_deck_usage[clan_tag] = expected_decks_to_use
     else:
         for clan in clans:
-            tag = clan['clan_tag']
             expected_decks_to_use = 200 - clan['decks_used_today']
-            expected_deck_usage[tag] = expected_decks_to_use
+            expected_deck_usage[clan['clan_tag']] = expected_decks_to_use
 
     predicted_outcomes = []
     completed_clans = {}
     catch_up_requirements = {}
 
     for clan in clans:
-        tag = clan['clan_tag']
+        clan_tag = clan['clan_tag']
 
         if clan['completed']:
-            completed_clans[tag] = clan['clan_name']
+            completed_clans[clan_tag] = clan['clan_name']
 
-        win_rate = win_rates[tag]
-        saved_fame = saved_clan_info.get(tag, {"fame": 0})["fame"]
-        fame_earned_today = clan['fame'] - saved_fame
-        fame_per_deck = average_fame_per_deck(win_rate)
-        expected_decks_to_use = expected_deck_usage[tag]
+        fame_per_deck, win_rate = win_rates[clan_tag]
+        fame_earned_today = clan['fame'] - saved_clan_info[clan_tag]['fame']
+        expected_decks_to_use = expected_deck_usage[clan_tag]
         predicted_score = 50 * round((fame_earned_today + (expected_decks_to_use * fame_per_deck)) / 50)
-        predicted_outcomes.append((clan['clan_name'], tag, predicted_score, win_rate, expected_decks_to_use))
+        predicted_outcomes.append((clan['clan_name'], clan_tag, predicted_score, win_rate, expected_decks_to_use))
 
     predicted_outcomes.sort(key = lambda x : x[2], reverse=True)
 
