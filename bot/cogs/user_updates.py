@@ -39,11 +39,11 @@ class UserUpdates(commands.Cog):
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
-    async def update_user(self, ctx: commands.Context, member: discord.Member, player_tag: str=None):
-        """Update a member. Optionally specify a player tag to associate the member with that instead of their current one."""
-        LOG.command_start(ctx, member=member, player_tag=player_tag)
+    async def update_user(self, ctx: commands.Context, member: discord.Member):
+        """Update a member of the Discord server."""
+        LOG.command_start(ctx, member=member)
 
-        if not await bot_utils.update_member(member, player_tag):
+        if not await bot_utils.update_member(member):
             embed = discord.Embed(color=discord.Color.red())
             embed.add_field(name="An unexpected error has occurred",
                             value=("This is likely due to the Clash Royale API being down. "
@@ -58,15 +58,6 @@ class UserUpdates(commands.Cog):
 
         await ctx.send(embed=embed)
         LOG.command_end()
-
-    @update_user.error
-    async def update_user_error(self, ctx: commands.Context, error: discord.DiscordException):
-        """!update_user error handler."""
-        if isinstance(error, commands.errors.CommandInvokeError):
-            embed = ErrorHandler.invoke_error_embed(("Another player on this server is already associated "
-                                                     "with the player tag you entered."))
-            await ctx.send(embed=embed)
-            LOG.exception(error)
 
     @commands.command()
     @bot_utils.is_admin_command_check()

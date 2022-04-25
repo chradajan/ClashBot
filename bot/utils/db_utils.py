@@ -262,20 +262,7 @@ def get_user_data(player_tag: str) -> DatabaseDataExtended:
         player_tag(str): Player tag of user to get info about.
 
     Returns:
-        dict: Dict of user's info.
-            {
-                "player_tag": str,
-                "player_name": str,
-                "discord_name": str,
-                "clan_role": str,
-                "clan_name": str,
-                "clan_tag": str,
-                "vacation": bool,
-                "strikes": int,
-                "permanent_strikes": int,
-                "usage_history": int,
-                "status": str
-            }
+        Dictionary of user's info from database.
     """
     database, cursor = connect_to_db()
 
