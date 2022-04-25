@@ -1,5 +1,7 @@
 """Strikes cog. Various commands to update strike counts."""
 
+from typing import Tuple
+
 import discord
 from discord.ext import commands
 from prettytable import PrettyTable
@@ -52,6 +54,62 @@ class Strikes(commands.Cog):
         else:
             await CHANNEL.strikes().send(f"{member.mention} {message}.  {old_strikes} -> {new_strikes}")
 
+    @staticmethod
+    async def multiple_strikes_helper(ctx: commands.Context, delta: int, users: Tuple[str]):
+        """Give or remove a strike to multiple users. Send a confirmation back to ctx channel and strikes channel.
+
+        Args:
+            ctx: Context used to send confirmation message back to.
+            delta: Number of strikes to give or remove.
+            users: Names of users to give or remove strikes to.
+        """
+        if not users:
+            confirmation_embed = discord.Embed(title="You did not specify any users.", color=discord.Color.red())
+        else:
+            confirmation_embed = discord.Embed(title="Strike results", color=discord.Color.green())
+
+        strikes_message = ""
+        message = "has received a strike" if delta > 0 else "has had a strike removed"
+
+        for user in users:
+            player_info = db_utils.find_user_in_db(user)
+
+            if not player_info:
+                confirmation_embed.add_field(name=user, value="```Could not be found in database```", inline=False)
+            elif len(player_info) == 1:
+                player_name, player_tag, _ = player_info[0]
+                old_strikes, new_strikes, old_permanent_strikes, new_permanent_strikes = db_utils.update_strikes(player_tag, delta)
+                confirmation_embed.add_field(name=f"{player_name} updated",
+                                             value=(f"```Strikes: {old_strikes} -> {new_strikes}\n"
+                                                    f"Permanent Strikes: {old_permanent_strikes} -> {new_permanent_strikes}```"),
+                                             inline=False)
+                discord_id = db_utils.get_member_id(player_tag)
+                member = None
+
+                if discord_id is not None:
+                    member = ctx.guild.get_member(discord_id)
+
+                if member is None:
+                    strikes_message += f"{player_name} {message}. {old_strikes} -> {new_strikes}\n"
+                else:
+                    strikes_message += f"{member.mention} {message}. {old_strikes} -> {new_strikes}\n"
+            else:
+                duplicates_str = ""
+
+                for player_name, player_tag, clan_name in player_info:
+                    duplicates_str += f"Name: {player_name}  Tag: {player_tag}  Clan: {clan_name}\n"
+
+                confirmation_embed.add_field(name="Duplicate names detected. Try using their player tag instead of name.",
+                                             value=f"```{duplicates_str}```",
+                                             inline=False)
+
+        if strikes_message:
+            await CHANNEL.strikes().send(strikes_message)
+
+        await ctx.send(embed=confirmation_embed)
+
+
+
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
@@ -82,12 +140,21 @@ class Strikes(commands.Cog):
                 await ctx.send(embed=embed)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
-                await self.strike_helper(ctx, player_name, player_tag, 1)
+                discord_id = db_utils.get_member_id(player_tag)
+                member = ctx.guild.get_member(discord_id)
+                await self.strike_helper(ctx, player_name, player_tag, 1, member)
             else:
                 embed = bot_utils.duplicate_names_embed(player_info, "give_strike")
                 await ctx.send(embed=embed)
 
             LOG.command_end()
+
+    @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.commands_channel_check()
+    async def give_strikes(self, ctx: commands.Context, *members):
+        """Increment strikes by 1 for all specified users."""
+        await self.multiple_strikes_helper(ctx, 1, members)
 
     @commands.command()
     @bot_utils.is_leader_command_check()
@@ -120,12 +187,21 @@ class Strikes(commands.Cog):
                 await ctx.send(embed=embed)
             elif len(player_info) == 1:
                 player_name, player_tag, _ = player_info[0]
-                await self.strike_helper(ctx, player_name, player_tag, -1)
+                discord_id = db_utils.get_member_id(player_tag)
+                member = ctx.guild.get_member(discord_id)
+                await self.strike_helper(ctx, player_name, player_tag, -1, member)
             else:
                 embed = bot_utils.duplicate_names_embed(player_info, "remove_strike")
                 await ctx.send(embed=embed)
 
             LOG.command_end()
+
+    @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.commands_channel_check()
+    async def remove_strikes(self, ctx: commands.Context, *members):
+        """Decrement strikes by 1 for all specified users."""
+        await self.multiple_strikes_helper(ctx, -1, members)
 
     @commands.command()
     @bot_utils.is_leader_command_check()
