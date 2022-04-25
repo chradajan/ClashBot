@@ -7,5 +7,5 @@ from .listeners import *
 from .member_utils import *
 from .status_reports import *
 from .strikes import *
-from .user_updates import *
+from .update_utils import *
 from .vacation import *

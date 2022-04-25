@@ -1,10 +1,7 @@
-"""User updates cog. Various commands for leadership to update Discord members."""
+"""Update members cog. Various commands for leadership to update Discord members."""
 
 import discord
 from discord.ext import commands
-
-# Cogs
-from cogs.error_handler import ErrorHandler
 
 # Utils
 import utils.bot_utils as bot_utils
@@ -13,8 +10,8 @@ from utils.logging_utils import LOG
 from utils.role_utils import ROLE
 
 
-class UserUpdates(commands.Cog):
-    """Commands for updating/resetting users."""
+class UpdateUtils(commands.Cog):
+    """Commands for updating/resetting Discord members."""
 
     def __init__(self, bot):
         """Save bot."""
@@ -39,7 +36,7 @@ class UserUpdates(commands.Cog):
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
-    async def update_user(self, ctx: commands.Context, member: discord.Member):
+    async def update_member(self, ctx: commands.Context, member: discord.Member):
         """Update a member of the Discord server."""
         LOG.command_start(ctx, member=member)
 
@@ -60,10 +57,21 @@ class UserUpdates(commands.Cog):
         LOG.command_end()
 
     @commands.command()
+    @bot_utils.is_leader_command_check()
+    @bot_utils.commands_channel_check()
+    async def update_all_members(self, ctx: commands.Context):
+        """Update all members in the server and apply any necessary Discord role updates."""
+        LOG.command_start(ctx)
+        await bot_utils.update_all_members(ctx.guild)
+        embed = discord.Embed(title="Update complete", color=discord.Color.green())
+        await ctx.send(embed=embed)
+        LOG.command_end()
+
+    @commands.command()
     @bot_utils.is_admin_command_check()
     @bot_utils.commands_channel_check()
-    async def reset_user(self, ctx: commands.Context, member: discord.Member):
-        """Reset a user back to the welcome channel."""
+    async def reset_member(self, ctx: commands.Context, member: discord.Member):
+        """Reset a member back to the welcome channel."""
         LOG.command_start(ctx, member=member)
         await self.reset_user_helper(member)
         embed = discord.Embed(title=f"{member.display_name} has been reset", color=discord.Color.green())
@@ -74,7 +82,7 @@ class UserUpdates(commands.Cog):
     @bot_utils.is_admin_command_check()
     @bot_utils.disallowed_command_check()
     @bot_utils.commands_channel_check()
-    async def reset_all_users(self, ctx: commands.Context, confirmation: str):
+    async def reset_all_member(self, ctx: commands.Context, confirmation: str):
         """Deletes all users from database and resets everyone back to the welcome channel."""
         LOG.command_start(ctx, confirmation=confirmation)
         confirmation_message = "Yes, I really want to drop all players from the database and reset roles."

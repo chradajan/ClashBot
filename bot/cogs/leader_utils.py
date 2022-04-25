@@ -37,17 +37,6 @@ class LeaderUtils(commands.Cog):
         LOG.command_end()
 
     @commands.command()
-    @bot_utils.is_leader_command_check()
-    @bot_utils.commands_channel_check()
-    async def update_all_users(self, ctx: commands.Context):
-        """Update all members in the server and apply any necessary Discord role updates."""
-        LOG.command_start(ctx)
-        await bot_utils.update_all_members(ctx.guild)
-        embed = discord.Embed(title="Update complete", color=discord.Color.green())
-        await ctx.send(embed=embed)
-        LOG.command_end()
-
-    @commands.command()
     @bot_utils.is_admin_command_check()
     @bot_utils.commands_channel_check()
     async def force_rules_check(self, ctx: commands.Context):

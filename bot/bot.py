@@ -15,7 +15,7 @@ from cogs.listeners import Listeners
 from cogs.member_utils import MemberUtils
 from cogs.status_reports import StatusReports
 from cogs.strikes import Strikes
-from cogs.user_updates import UserUpdates
+from cogs.update_utils import UpdateUtils
 from cogs.vacation import Vacation
 
 # Config
@@ -61,7 +61,7 @@ bot.add_cog(Listeners(bot))
 bot.add_cog(MemberUtils(bot))
 bot.add_cog(StatusReports(bot))
 bot.add_cog(Strikes(bot))
-bot.add_cog(UserUpdates(bot))
+bot.add_cog(UpdateUtils(bot))
 bot.add_cog(Vacation(bot))
 bot.add_cog(ErrorHandler(bot))
 
