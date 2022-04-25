@@ -28,6 +28,7 @@ import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
 from utils.callback_utils import CallbackType, CALLBACK_MANAGER
 from utils.channel_utils import CHANNEL
+from utils.logging_utils import LOG, log_message
 from utils.role_utils import ROLE
 from utils.util_types import (
     ClashData,
@@ -342,12 +343,14 @@ async def update_member(member: discord.Member, player_tag: str=None) -> bool:
         Whether the update was successful or not.
     """
     if member.bot or (ROLE.new() in member.roles) or (ROLE.check_rules() in member.roles):
+        LOG.debug(log_message("Skipping member update", member=member, player_tag=player_tag))
         return False
 
     if player_tag is None:
         player_info = db_utils.find_user_in_db(member.id)
 
         if len(player_info) != 1:
+            LOG.warning(log_message("Attempted update of player not in database", member=member, player_tag=player_tag))
             return False
 
         _, player_tag, _ = player_info[0]
@@ -355,12 +358,15 @@ async def update_member(member: discord.Member, player_tag: str=None) -> bool:
     user_data = get_combined_data(player_tag, member)
 
     if user_data is None:
+        LOG.warning(log_message("Failed to get data during member update", member=member, player_tag=player_tag))
         return False
 
+    LOG.info(log_message("Updating member", member=member, player_tag=player_tag))
     db_utils.update_user(user_data)
 
     if not is_admin(member):
         if user_data['player_name'] != member.display_name:
+            LOG.debug(log_message("Updating nickname", Previous=member.display_name, New=user_data['player_name']))
             await member.edit(nick=user_data['player_name'])
 
         current_roles = set(member.roles).intersection({ROLE.member(), ROLE.visitor(), ROLE.elder()})
@@ -372,9 +378,14 @@ async def update_member(member: discord.Member, player_tag: str=None) -> bool:
             correct_roles.add(ROLE.elder())
 
         if correct_roles != current_roles:
+            LOG.debug(log_message("Updating roles",
+                                  member=member,
+                                  current_roles=[role.name for role in current_roles],
+                                  correct_roles=[role.name for role in correct_roles]))
             await member.remove_roles(*list(current_roles - correct_roles))
             await member.add_roles(*list(correct_roles))
 
+    LOG.info("Update member successful")
     return True
 
 
@@ -389,6 +400,7 @@ async def update_all_members(guild: discord.Guild):
     Args:
         guild: Update members of this Discord server.
     """
+    LOG.info("Starting update on all Discord members")
     active_members = clash_utils.get_active_members_in_clan()
     db_utils.clean_up_db()
     db_info = db_utils.get_server_members_info()
@@ -401,14 +413,19 @@ async def update_all_members(guild: discord.Guild):
         current_discord_name = full_name(member)
 
         if current_discord_name != db_info[member.id]['discord_name']:
+            LOG.debug(log_message("Updating member due to new Discord name", member=member))
             await update_member(member, player_tag)
         elif player_tag in active_members:
             if (member.display_name != active_members[player_tag]['player_name']
                     or db_info[member.id]['role'] != active_members[player_tag]['role']
                     or ROLE.visitor() in member.roles):
+                LOG.debug(log_message("Updating active member of clan", member=member))
                 await update_member(member, player_tag)
         elif ROLE.member() in member.roles:
+            LOG.debug(log_message("Updating visitor that is now a member", member=member))
             await update_member(member, player_tag)
+    
+    LOG.info("Update all members complete")
 
 
 def break_down_usage_history(deck_usage: int, command_time: datetime.datetime=None) -> List[Tuple[int, str]]:

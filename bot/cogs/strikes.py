@@ -12,6 +12,7 @@ import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
 from utils.channel_utils import CHANNEL
+from utils.logging_utils import LOG
 
 
 class Strikes(commands.Cog):
@@ -56,21 +57,25 @@ class Strikes(commands.Cog):
     @bot_utils.commands_channel_check()
     async def give_strike(self, ctx: commands.Context, member: discord.Member):
         """Increment specified user's strikes by 1."""
+        LOG.command_start(ctx, member=member)
         player_info = db_utils.find_user_in_db(member.id)
 
         if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
+            LOG.command_end("Attempted to get data of Discord member not in database")
             return
 
         _, player_tag, _ = player_info[0]
         await self.strike_helper(ctx, member.display_name, player_tag, 1, member)
+        LOG.command_end()
 
     @give_strike.error
     async def give_strike_error(self, ctx: commands.Context, error: discord.DiscordException):
         """!give_strike error handler."""
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
+            LOG.command_start(ctx, give_strike_error_argument=error.argument, player_info=player_info)
 
             if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
@@ -82,27 +87,33 @@ class Strikes(commands.Cog):
                 embed = bot_utils.duplicate_names_embed(player_info, "give_strike")
                 await ctx.send(embed=embed)
 
+            LOG.command_end()
+
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
     async def remove_strike(self, ctx: commands.Context, member: discord.Member):
         """Decrement specified user's strikes by 1."""
+        LOG.command_start(ctx, member=member)
         player_info = db_utils.find_user_in_db(member.id)
 
         if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
+            LOG.command_end("Attempted to get data of Discord member not in database")
             return
         else:
             _, player_tag, _ = player_info[0]
 
         await self.strike_helper(ctx, member.display_name, player_tag, -1, member)
+        LOG.command_end()
 
     @remove_strike.error
     async def remove_strike_error(self, ctx: commands.Context, error: discord.DiscordException):
         """!remove_strike error handler."""
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
+            LOG.command_start(ctx, remove_strike_error_argument=error.argument, player_info=player_info)
 
             if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
@@ -114,11 +125,14 @@ class Strikes(commands.Cog):
                 embed = bot_utils.duplicate_names_embed(player_info, "remove_strike")
                 await ctx.send(embed=embed)
 
+            LOG.command_end()
+
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
     async def reset_all_strikes(self, ctx: commands.Context):
         """Reset everyone's strikes to 0. Permanent strikes are not affected."""
+        LOG.command_start(ctx)
         db_utils.reset_strikes()
 
         strikes_channel_embed = discord.Embed(color=discord.Color.green())
@@ -127,12 +141,14 @@ class Strikes(commands.Cog):
 
         confirmation_embed = discord.Embed(title="Strikes successfully reset to 0.", color=discord.Color.green())
         await ctx.send(embed=confirmation_embed)
+        LOG.command_end()
 
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
     async def strikes_report(self, ctx: commands.Context):
         """Get a report of players with strikes."""
+        LOG.command_start(ctx)
         strikes = db_utils.get_users_with_strikes()
         active_members = clash_utils.get_active_members_in_clan()
 
@@ -176,12 +192,15 @@ class Strikes(commands.Cog):
             embed.add_field(name="Strikes Report", value="No users currently have strikes")
             await ctx.send(embed=embed)
 
+        LOG.command_end()
+
 
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
     async def upcoming_strikes(self, ctx: commands.Context):
         """Get a list of users who will receive strikes for lack of participation in the current river race."""
+        LOG.command_start(ctx)
         upcoming_strikes_list = bot_utils.upcoming_strikes(True)
         embed_one = discord.Embed(title="Upcoming Strikes", color=discord.Color.green())
         embed_two = discord.Embed(title="Upcoming Strikes", color=discord.Color.green())
@@ -200,6 +219,7 @@ class Strikes(commands.Cog):
                 embed.set_footer(text="Automated strikes are currently disabled.")
 
             await ctx.send(embed=embed)
+            LOG.command_end()
             return
 
         for player_name, _, decks_used, decks_required, strikes in upcoming_strikes_list:
@@ -218,3 +238,5 @@ class Strikes(commands.Cog):
 
         if send_second_embed:
             await ctx.send(embed=embed_two)
+
+        LOG.command_end()

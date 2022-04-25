@@ -14,6 +14,7 @@ from cogs.error_handler import ErrorHandler
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
+from utils.logging_utils import LOG
 from utils.util_types import DatabaseDataExtended
 
 
@@ -29,6 +30,7 @@ class StatusReports(commands.Cog):
     @bot_utils.commands_channel_check()
     async def decks_report(self, ctx: commands.Context):
         """Get a report of players with remaining battles today."""
+        LOG.command_start(ctx)
         usage_info = clash_utils.get_remaining_decks_today_dicts()
         users_on_vacation = db_utils.get_users_on_vacation()
 
@@ -36,6 +38,7 @@ class StatusReports(commands.Cog):
             embed = discord.Embed(title="Something went wrong. There might be issues accessing the Clash Royale API right now.",
                                   color=discord.Color.red())
             await ctx.send(embed=embed)
+            LOG.command_end("Could not get usage_info")
             return
 
         embed = discord.Embed(title="Deck Usage Report",
@@ -113,11 +116,14 @@ class StatusReports(commands.Cog):
             except:
                 await ctx.send("Members currently on vacation\n" + "```\n" + table.get_string() + "```")
 
+        LOG.command_end()
+
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
     async def medals_report(self, ctx: commands.Context, threshold: int):
         """Get a report of players below the specified medal count."""
+        LOG.command_start(ctx, threshold=threshold)
         hall_of_shame = clash_utils.get_hall_of_shame(threshold)
         users_on_vacation = db_utils.get_users_on_vacation()
         table = PrettyTable()
@@ -136,6 +142,8 @@ class StatusReports(commands.Cog):
             await ctx.send(embed=embed)
         except:
             await ctx.send("Players below medals threshold\n" + "```\n" + table.get_string() + "```")
+
+        LOG.command_end()
 
     @staticmethod
     async def player_report_helper(ctx: commands.Context, user_data: DatabaseDataExtended):
@@ -196,11 +204,13 @@ class StatusReports(commands.Cog):
     @bot_utils.commands_channel_check()
     async def player_report(self, ctx: commands.Context, member: discord.Member):
         """Get information about a member."""
+        LOG.command_start(ctx, member=member)
         player_info = db_utils.find_user_in_db(member.id)
 
         if not player_info:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
+            LOG.command_end("Attempted to get data of Discord member not in database")
             return
 
         _, player_tag, _ = player_info[0]
@@ -209,15 +219,18 @@ class StatusReports(commands.Cog):
         if user_data is None:
             embed = ErrorHandler.missing_db_info(member.display_name)
             await ctx.send(embed=embed)
+            LOG.command_end("Attempted to get data of Discord member not in database")
             return
 
         await self.player_report_helper(ctx, user_data)
+        LOG.command_end()
 
     @player_report.error
     async def player_report_error(self, ctx: commands.Context, error: discord.DiscordException):
         """!player_report error handler."""
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
+            LOG.command_start(ctx, player_report_error_argument=error.argument, player_info=player_info)
 
             if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
@@ -229,18 +242,22 @@ class StatusReports(commands.Cog):
                 if user_data is None:
                     embed = ErrorHandler.missing_db_info(player_name)
                     await ctx.send(embed=embed)
+                    LOG.command_end("Attempted to get data of Discord member not in database")
                     return
 
                 await self.player_report_helper(ctx, user_data)
             else:
                 embed = bot_utils.duplicate_names_embed(player_info, "player_report")
                 await ctx.send(embed=embed)
+            
+            LOG.command_end()
 
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
     async def stats_report(self, ctx: commands.Context, member: discord.Member):
         """Get specified user's river race statistics."""
+        LOG.command_start(ctx, member=member)
         player_info = db_utils.find_user_in_db(member.id)
 
         if not player_info:
@@ -252,12 +269,14 @@ class StatusReports(commands.Cog):
 
         embed = bot_utils.create_match_performance_embed(member.display_name, player_tag)
         await ctx.send(embed=embed)
+        LOG.command_end()
 
     @stats_report.error
     async def stats_report_error(self, ctx: commands.Context, error: discord.DiscordException):
         """!stats_report error handler."""
         if isinstance(error, commands.errors.MemberNotFound):
             player_info = db_utils.find_user_in_db(error.argument)
+            LOG.command_start(ctx, stats_report_error_argument=error.argument, player_info=player_info)
 
             if not player_info:
                 embed = ErrorHandler.member_not_found_embed(False)
@@ -268,3 +287,4 @@ class StatusReports(commands.Cog):
                 embed = bot_utils.duplicate_names_embed(player_info, "stats_report")
 
             await ctx.send(embed=embed)
+            LOG.command_end()

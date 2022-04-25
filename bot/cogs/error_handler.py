@@ -8,6 +8,7 @@ from discord.ext import commands
 # Utils
 import utils.bot_utils as bot_utils
 from utils.channel_utils import CHANNEL
+from utils.logging_utils import LOG, log_message
 
 
 class ErrorHandler(commands.Cog):
@@ -47,6 +48,9 @@ class ErrorHandler(commands.Cog):
     @commands.Cog.listener()
     async def on_command_error(self, ctx: commands.Context, error: discord.DiscordException):
         """Error handler for failed commands."""
+        if LOG.disabled:
+            LOG.disabled = False
+
         if isinstance(error, commands.errors.CommandNotFound):
             if ctx.channel == CHANNEL.welcome():
                 return
@@ -108,12 +112,12 @@ class ErrorHandler(commands.Cog):
             embed = self.invoke_error_embed("This may be the result of a bug.")
             embed.set_footer(text="More information about this error has been logged.")
             await ctx.send(embed=embed)
-            raise error
+            LOG.exception(error)
 
         else:
             embed = self.unknown_error_embed(ctx.command)
             await ctx.send(embed=embed)
-            raise error
+            LOG.exception(error)
 
 
     async def command_not_found_embed(self, not_found_cmd: str, ctx: commands.Context) -> discord.Embed:
@@ -249,7 +253,7 @@ class ErrorHandler(commands.Cog):
         """
         embed = discord.Embed(color=discord.Color.red())
         embed.add_field(name="Invalid channel",
-                        value=f"The channel {invalid_channel} could not be found.")
+                        value=f"The channel #{invalid_channel} could not be found.")
 
         return embed
 

@@ -7,3 +7,4 @@ blacklist.py
 testing_tools.py
 .vscode/
 mysql/
+logs/

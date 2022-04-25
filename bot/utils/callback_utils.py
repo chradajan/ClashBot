@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, Tuple
 import discord
 import utils.bot_utils as bot_utils
 from config.config import CONFIRM_EMOJI, DECLINE_EMOJI
+from utils.logging_utils import LOG, log_message
 
 
 class CallbackType(Enum):
@@ -41,6 +42,9 @@ class CallbackManager:
             self.callback_function = callback_function
             self.decline_embed = decline_embed
             self.callback_args = args
+
+        def __str__(self):
+            return f"Type: {self.callback_type}, Function: {self.callback_function}, Args: {self.callback_args}"
 
         def is_allowed(self, user: discord.User) -> bool:
             """Check if the user who reacted is allowed to react to this message.
@@ -107,13 +111,20 @@ class CallbackManager:
         if saved_message is None:
             return
 
+        LOG.info(log_message("Detected reaction to saved message", emoji=reaction.emoji, user=user, saved_message=saved_message))
+
         if saved_message.is_allowed(user):
             legal_reaction = await saved_message(reaction)
 
             if legal_reaction:
+                LOG.info("Legal reaction made. Removing message from saved messages.")
                 await reaction.message.clear_reactions()
                 self.messages.pop(reaction.message.id)
+            else:
+                LOG.debug("Invalid reaction made")
+                await reaction.message.remove_reaction(reaction.emoji, user)
         else:
+            LOG.debug("Invalid reaction made")
             await reaction.message.remove_reaction(reaction.emoji, user)
 
 

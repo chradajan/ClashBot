@@ -8,6 +8,7 @@ from prettytable import PrettyTable
 import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
 from utils.channel_utils import CHANNEL
+from utils.logging_utils import LOG
 
 
 class Vacation(commands.Cog):
@@ -22,6 +23,7 @@ class Vacation(commands.Cog):
     @bot_utils.commands_channel_check()
     async def set_vacation(self, ctx: commands.Context, member: discord.Member, status: bool):
         """Set vacation status for the specified member."""
+        LOG.command_start(ctx, member=member, status=status)
         vacation_status = db_utils.update_vacation_for_user(member.id, status)
         vacation_status_string = ("NOT " if not vacation_status else "") + "ON VACATION"
         await CHANNEL.time_off().send(f"Updated vacation status of {member.mention} to: {vacation_status_string}.")
@@ -30,12 +32,14 @@ class Vacation(commands.Cog):
                                                   f"was notified in #{CHANNEL.time_off().name}."),
                                            color=discord.Color.green())
         await ctx.send(embed=confirmation_embed)
+        LOG.command_end()
 
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
     async def vacation_list(self, ctx: commands.Context):
         """Get a list of all users currently on vacation."""
+        LOG.command_start(ctx)
         users_on_vacation = db_utils.get_users_on_vacation()
         table = PrettyTable()
         table.field_names = ["Member"]
@@ -50,3 +54,5 @@ class Vacation(commands.Cog):
             await ctx.send(embed=embed)
         except:
             await ctx.send("Vacation List\n" + "```\n" + table.get_string() + "```")
+
+        LOG.command_end()

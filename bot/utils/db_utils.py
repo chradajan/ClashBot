@@ -20,9 +20,9 @@ from config.credentials import (
 # Utils
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
+from utils.logging_utils import LOG, log_message
 from utils.role_utils import RoleNames
 from utils.util_types import (
-    ClashData,
     CombinedData,
     DatabaseClan,
     DatabaseData,
@@ -78,6 +78,7 @@ def get_clan_id(clan_tag: str, clan_name: str, cursor: pymysql.cursors.DictCurso
     query_result = cursor.fetchone()
 
     if query_result is None:
+        LOG.debug(log_message("Inserting new clan into clans table", clan_name=clan_name, clan_tag=clan_tag))
         cursor.execute("INSERT INTO clans VALUES (DEFAULT, %s, %s)", (clan_tag, clan_name))
         cursor.execute("SELECT id FROM clans WHERE clan_tag = %s", (clan_tag))
         query_result = cursor.fetchone()
@@ -105,6 +106,7 @@ def add_new_user(user_data: CombinedData) -> bool:
     query_result = cursor.fetchone()
 
     if query_result is not None:
+        LOG.debug(log_message("User rejoined server with different player tag", previous_player_tag=query_result['player_tag']))
         cursor.execute("UPDATE users SET discord_id = NULL WHERE discord_id = %(discord_id)s", user_data)
 
     # Check if player already exists in table.
@@ -117,6 +119,7 @@ def add_new_user(user_data: CombinedData) -> bool:
             database.close()
             return False
 
+        LOG.debug(log_message("User joined as a previously UNREGISTERED/DEPARTED user", previous_status=query_result['status']))
         cursor.execute("UPDATE users SET\
                         player_name = %(player_name)s,\
                         discord_name = %(discord_name)s,\
@@ -185,6 +188,7 @@ def add_new_unregistered_user(player_tag: str) -> bool:
 
     # Get their data.
     user_data = bot_utils.get_combined_data(player_tag)
+    LOG.debug(log_message("Inserting new unregistered user", user_data=user_data))
 
     if user_data is None:
         return False
@@ -221,6 +225,8 @@ def update_user(user_data: CombinedData):
         user_data: Relevant Clash Royale and Discord data.
     """
     database, cursor = connect_to_db()
+
+    LOG.debug(log_message("Updating user in database", user_data=user_data))
 
     # Add extra fields to user_data needed for query.
     user_data['clan_id'] = get_clan_id(user_data['clan_tag'], user_data['clan_name'], cursor)
@@ -362,6 +368,11 @@ def update_strikes(player_tag: str, delta: int) -> Tuple[int, int, int, int]:
 
     database.commit()
     database.close()
+    LOG.debug(log_message("Updated strikes for user",
+                          player_tag=player_tag,
+                          delta=delta,
+                          strikes=f"{old_strike_count}->{new_strike_count}",
+                          permanent_strikes=f"{old_permanent_strike_count}->{new_permanent_strike_count}"))
 
     return (old_strike_count, new_strike_count, old_permanent_strike_count, new_permanent_strike_count)
 
@@ -1022,6 +1033,7 @@ def clean_up_db() -> bool:
     """
     database, cursor = connect_to_db()
 
+    LOG.info("Cleaning up database")
     active_members = clash_utils.get_active_members_in_clan()
 
     if not active_members:
@@ -1037,6 +1049,7 @@ def clean_up_db() -> bool:
 
         if player_tag in active_members:
             if status in {Status.INACTIVE, Status.DEPARTED}:
+                LOG.debug(log_message("Active user with incorrect status detected", player_tag=player_tag, status=status))
                 user_data = bot_utils.get_combined_data(player_tag)
                 user_data['discord_name'] = discord_name
 
@@ -1053,6 +1066,7 @@ def clean_up_db() -> bool:
                 update_user(user_data)
         else:
             if status in {Status.ACTIVE, Status.UNREGISTERED}:
+                LOG.debug(log_message("Non active user with incorrect status detected", player_tag=player_tag, status=status))
                 user_data = bot_utils.get_combined_data(player_tag)
 
                 if user_data is None:
@@ -1069,6 +1083,7 @@ def clean_up_db() -> bool:
 
     database.commit()
     database.close()
+    LOG.info("Database cleanup complete")
     return True
 
 
@@ -1215,6 +1230,7 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
     Args:
         last_check_time: Do not look at games before this time when match performance is next calculated
     """
+    LOG.info("Preparing for river race")
     set_completed_saturday_status(False)
     set_war_time_status(True)
     set_last_check_time(last_check_time)
@@ -1249,8 +1265,11 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
         if cursor.fetchone() is None:
             reset_clans = True
             break
+    
+    colosseum_week = is_colosseum_week
 
-    if is_colosseum_week() or reset_clans:
+    if colosseum_week or reset_clans:
+        LOG.debug(log_message("Resetting saved clan data", colosseum_week=colosseum_week, reset_clans=reset_clans))
         cursor.execute("DELETE FROM river_race_clans")
         cursor.executemany("INSERT INTO river_race_clans VALUES (%(clan_tag)s, %(clan_name)s, 0, %(total_decks_used)s, 0, 0)",
                            clans)
@@ -1262,6 +1281,7 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
     database.commit()
     database.close()
     set_colosseum_week_status(False)
+    LOG.info("Preparations for river race complete")
 
 
 def save_clans_in_race_info(post_race: bool):
@@ -1443,16 +1463,14 @@ def get_non_active_participants() -> Set[str]:
     return former_participants
 
 
-def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
-    """Add any active members not in the database as UNREGISTERED users.
-
-    Args:
-        clan_tag (optional): Clan to get users from. Defaults to primary clan.
+def add_unregistered_users() -> bool:
+    """Add any active members of the primary clan not in the database as UNREGISTERED users.
 
     Returns:
         Whether adding users was successful.
     """
-    active_members = clash_utils.get_active_members_in_clan(clan_tag).copy()
+    LOG.info("Adding any unregistered users to database")
+    active_members = clash_utils.get_active_members_in_clan().copy()
 
     if not active_members:
         return False
@@ -1475,6 +1493,7 @@ def add_unregistered_users(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
         if not add_new_unregistered_user(player_tag):
             all_users_successfully_inserted = False
 
+    LOG.info(log_message("All unregistered users added", all_users_successfully_inserted=all_users_successfully_inserted))
     return all_users_successfully_inserted
 
 
@@ -1609,6 +1628,9 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
     Returns:
         Path to generated spreadsheet.
     """
+    LOG.info(log_message("Exporting relevant data from database to spreadsheet",
+                         primary_clan_only=primary_clan_only,
+                         include_card_levels=include_card_levels))
     # Clean up the database and add any members of the clan to it that aren't already in it.
     clean_up_db()
     add_unregistered_users()
@@ -1656,6 +1678,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
     all_stats_sheet = workbook.add_worksheet("All Stats")
     card_levels_quantity_sheet = None
     card_levels_percentile_sheet = None
+    LOG.debug(f"Exporting data to {file_path}")
 
     if include_card_levels:
         card_levels_quantity_sheet = workbook.add_worksheet("Card Level Quantities")
@@ -1832,4 +1855,5 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         row += 1
 
     workbook.close()
+    LOG.info("Export complete")
     return file_path

@@ -7,6 +7,7 @@ from prettytable import PrettyTable
 # Utils
 import utils.bot_utils as bot_utils
 import utils.db_utils as db_utils
+from utils.logging_utils import LOG
 
 
 class AutomationTools(commands.Cog):
@@ -21,6 +22,7 @@ class AutomationTools(commands.Cog):
     @bot_utils.commands_channel_check()
     async def automation_status(self, ctx: commands.Context):
         """Get status of automated strikes and reminders."""
+        LOG.command_start(ctx)
         reminder_status = "ENABLED" if db_utils.get_reminder_status() else "DISABLED"
         strike_status = "ENABLED" if db_utils.get_strike_status() else "DISABLED"
 
@@ -31,12 +33,14 @@ class AutomationTools(commands.Cog):
         embed = discord.Embed(color=discord.Color.green())
         embed.add_field(name="Automation Status", value = "```\n" + table.get_string() + "```")
         await ctx.send(embed=embed)
+        LOG.command_end()
 
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
     async def set_automated_reminders(self, ctx: commands.Context, status: bool):
         """Set automated reminders on/off."""
+        LOG.command_start(ctx, status=status)
         db_utils.set_reminder_status(status)
 
         if status:
@@ -47,12 +51,14 @@ class AutomationTools(commands.Cog):
         embed.add_field(name="Automated reminders status updated",
                         value=f"Automated reminders are now {'ENABLED' if status else 'DISABLED'}")
         await ctx.send(embed=embed)
+        LOG.command_end()
 
     @commands.command()
     @bot_utils.is_leader_command_check()
     @bot_utils.commands_channel_check()
     async def set_automated_strikes(self, ctx: commands.Context, status: bool):
         """Set automated strikes on/off."""
+        LOG.command_start(ctx, status=status)
         db_utils.set_strike_status(status)
 
         if status:
@@ -63,3 +69,4 @@ class AutomationTools(commands.Cog):
         embed.add_field(name="Automated strikes status updated",
                         value=f"Automated strikes are now {'ENABLED' if status else 'DISABLED'}")
         await ctx.send(embed=embed)
+        LOG.command_end()
