@@ -99,6 +99,7 @@ def add_new_user(user_data: CombinedData) -> bool:
     # Add extra fields to user_data needed for query.
     user_data['clan_id'] = get_clan_id(user_data['clan_tag'], user_data['clan_name'], cursor)
     user_data['status_str'] = user_data['status'].value
+    user_data['first_joined'] = bot_utils.get_current_battletime() if user_data['status'] == Status.ACTIVE else None
 
     # Check if the user has previously joined the server with a different player tag.
     # If they have, set their previous associated account's discord_id to NULL and create a new entry.
@@ -129,10 +130,13 @@ def add_new_user(user_data: CombinedData) -> bool:
                         status = %(status_str)s\
                         WHERE player_tag = %(player_tag)s",
                         user_data)
+        cursor.execute("UPDATE users SET first_joined = %(first_joined)s\
+                        WHERE first_joined IS NULL AND player_tag = %(player_tag)s",
+                        user_data)
     else:
         cursor.execute("INSERT INTO users VALUES\
-                        (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s,\
-                        %(discord_id)s, %(role)s, 'US', FALSE, 0, 0, 0, %(status_str)s, %(clan_id)s)",
+                        (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, %(discord_id)s,\
+                        %(role)s, 'US', FALSE, 0, 0, 0, %(status_str)s, %(first_joined)s, %(clan_id)s)",
                         user_data)
 
     # Get id of newly inserted user.
@@ -196,11 +200,12 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     # Add extra fields to user_data needed for query.
     user_data['clan_id'] = get_clan_id(user_data['clan_tag'], user_data['clan_name'], cursor)
     user_data['status_str'] = user_data['status'].value
+    user_data['first_joined'] = bot_utils.get_current_battletime()
 
     # Insert them
     cursor.execute("INSERT INTO users VALUES\
-                    (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s,\
-                    NULL, %(role)s, 'US', FALSE, 0, 0, 0, %(status_str)s, %(clan_id)s)",
+                    (DEFAULT, %(player_tag)s, %(player_name)s, %(discord_name)s, NULL,\
+                    %(role)s, 'US', FALSE, 0, 0, 0, %(status_str)s, %(first_joined)s, %(clan_id)s)",
                     user_data)
 
     # Create match_history entries.
@@ -242,14 +247,20 @@ def update_user(user_data: CombinedData):
                     WHERE player_tag = %(player_tag)s",
                     user_data)
 
-    if user_data['status'] in {Status.ACTIVE, Status.UNREGISTERED} and is_war_time():
-        last_check_time = get_last_check_time()
-        tracked_since = bot_utils.get_current_battletime()
-        cursor.execute("UPDATE match_history_recent SET\
-                        last_check_time = %s,\
-                        tracked_since = %s\
-                        WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s) AND tracked_since IS NULL",
-                        (last_check_time, tracked_since, user_data["player_tag"]))
+    if user_data['status'] in {Status.ACTIVE, Status.UNREGISTERED}:
+        user_data['first_joined'] = bot_utils.get_current_battletime()
+        cursor.execute("UPDATE users SET first_joined = %(first_joined)s\
+                        WHERE first_joined IS NULL AND player_tag = %(player_tag)s",
+                        user_data)
+
+        if is_war_time():
+            last_check_time = get_last_check_time()
+            tracked_since = bot_utils.get_current_battletime()
+            cursor.execute("UPDATE match_history_recent SET\
+                            last_check_time = %s,\
+                            tracked_since = %s\
+                            WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s) AND tracked_since IS NULL",
+                            (last_check_time, tracked_since, user_data["player_tag"]))
 
     database.commit()
     database.close()
@@ -1673,7 +1684,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
 
     # Info sheet headers
     info_headers = ["Player Name", "Player Tag", "Discord Name", "Clan Role", "Time Zone", "On Vacation", "Strikes",
-                    "Permanent Strikes", "Kicks", "Status", "Clan Name", "Clan Tag", "RoyaleAPI"]
+                    "Permanent Strikes", "Kicks", "Status", "Initial Join Date", "Clan Name", "Clan Tag", "RoyaleAPI"]
     info_sheet.write_row(0, 0, info_headers)
 
     # History sheet headers
@@ -1735,9 +1746,16 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         # Get info
         clan_id = user['clan_id']
         kicks = get_kicks(user['player_tag'])
+        first_joined = user['first_joined']
+
+        if first_joined is None:
+            first_joined = "N/A"
+        else:
+            first_joined = bot_utils.battletime_to_datetime(first_joined).strftime("%Y-%m-%d %H:%M")
+
         info_row = [user['player_name'], user['player_tag'], user['discord_name'], user['clan_role'], user['time_zone'],
                      "Yes" if user['vacation'] else "No",
-                     user['strikes'], user['permanent_strikes'], len(kicks), user['status'],
+                     user['strikes'], user['permanent_strikes'], len(kicks), user['status'], first_joined,
                      clans_dict[clan_id]['clan_name'], clans_dict[clan_id]['clan_tag'],
                      bot_utils.royale_api_url(user['player_tag'])]
 
@@ -1770,7 +1788,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         if tracked_since is None:
             tracked_since = "N/A"
         else:
-            tracked_since = tracked_since.strftime("%Y-%m-%d, %H:%M")
+            tracked_since = tracked_since.strftime("%Y-%m-%d %H:%M")
 
         recent_stats_row = [user['player_name'], user['player_tag'], match_performance['recent']['fame'], decks_used, tracked_since,
                             match_performance['recent']['regular']['wins'],

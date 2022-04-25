@@ -70,7 +70,7 @@ def get_active_members_in_clan(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, Clas
                 'clan_name': "",
                 'clan_tag': clan_tag
             }
-        
+
         get_active_members_in_clan.last_check_time = now
     else:
         LOG.info(f"Getting cached active members of clan {clan_tag}")
