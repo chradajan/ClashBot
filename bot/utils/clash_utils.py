@@ -332,7 +332,7 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, int]:
     Returns:
         Dictionary mapping player tags to their deck usage today.
     """
-    LOG.info(f"Getting list of users and how many decks they've used in clan {clan_tag}")
+    LOG.info(f"Getting dictionary of users and how many decks they've used in clan {clan_tag}")
     participants = get_river_race_participants(clan_tag)
     active_members = get_active_members_in_clan(clan_tag).copy()
 
@@ -349,45 +349,6 @@ def get_deck_usage_today(clan_tag: str=PRIMARY_CLAN_TAG) -> Dict[str, int]:
         usage_list[player_tag] = 0
 
     return usage_list
-
-
-def get_user_decks_used_today(player_tag: str) -> int:
-    """Return the number of decks used today by a specific player.
-
-    Args:
-        player_tag: Player tag of player to look up.
-
-    Returns:
-        Number of decks used today, or 0 if can't find relevant information.
-    """
-    LOG.info(f"Getting number of decks used by user {player_tag} today")
-    req = requests.get(url=f"https://api.clashroyale.com/v1/players/%23{player_tag[1:]}",
-                       headers={"Accept": "application/json", "authorization": f"Bearer {CLASH_API_KEY}"})
-
-    if req.status_code != 200:
-        LOG.warning(log_message(msg="Bad request", status_code=req.status_code))
-        return 0
-
-    json_obj = req.json()
-    clan_tag = None
-
-    if "clan" in json_obj.keys():
-        clan_tag = json_obj['clan']['tag']
-    else:
-        return 0
-
-    participants = get_river_race_participants(clan_tag)
-
-    if not participants:
-        return 0
-
-    for participant in participants:
-        if participant['player_tag'] != player_tag:
-            continue
-
-        return participant['decks_used_today']
-
-    return 0
 
 
 def get_top_medal_users(top_n: int=3, clan_tag: str=PRIMARY_CLAN_TAG) -> List[Tuple[str, int]]:

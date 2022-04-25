@@ -179,21 +179,24 @@ class StatusReports(commands.Cog):
 
         await ctx.send(embed=general_info_embed)
 
-        decks_used_today = clash_utils.get_user_decks_used_today(user_data['player_tag'])
-        if decks_used_today is None:
+        clan_deck_usage = clash_utils.get_deck_usage_today()
+
+        if user_data['player_tag'] not in clan_deck_usage:
             decks_used_today = 0
+        else:
+            decks_used_today = clan_deck_usage[user_data['player_tag']]
 
         usage_history_list = bot_utils.break_down_usage_history(user_data['usage_history'],
                                                                 datetime.datetime.now(datetime.timezone.utc))
 
         deck_usage_history_table = PrettyTable()
         deck_usage_history_table.field_names = ["Day", "Decks Used"]
+        deck_usage_history_table.add_row(["Today", decks_used_today])
 
         for decks_used, date in usage_history_list:
             deck_usage_history_table.add_row([date, decks_used])
 
         deck_usage_embed = discord.Embed()
-        deck_usage_embed.set_footer(text=f"{user_data['player_name']} has used {decks_used_today} decks today.")
         deck_usage_embed.add_field(name=f"{user_data['player_name']}'s deck usage history",
                         value = "```\n" + deck_usage_history_table.get_string() + "```")
 
