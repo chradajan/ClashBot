@@ -192,6 +192,7 @@ CREATE TABLE `river_race_clans` (
   `clan_tag` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `clan_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fame` int NOT NULL,
+  `total_fame` int NOT NULL,
   `total_decks_used` int NOT NULL,
   `war_decks_used` int NOT NULL,
   `num_days` int NOT NULL,
@@ -220,6 +221,7 @@ CREATE TABLE `users` (
   `permanent_strikes` int NOT NULL,
   `usage_history` int NOT NULL,
   `status` enum('ACTIVE','INACTIVE','UNREGISTERED','DEPARTED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `first_joined` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `clan_id` int NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `player_tag_UNIQUE` (`player_tag`),
@@ -239,4 +241,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-03-12  7:36:20
+-- Dump completed on 2022-04-26 20:23:25
