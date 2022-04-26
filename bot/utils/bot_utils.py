@@ -364,26 +364,26 @@ async def update_member(member: discord.Member, player_tag: str=None) -> bool:
     LOG.info(log_message("Updating member", member=member, player_tag=player_tag))
     db_utils.update_user(user_data)
 
+    current_roles = set(member.roles).intersection({ROLE.member(), ROLE.visitor(), ROLE.elder()})
+    correct_roles = {ROLE.member() if (user_data['status'] == Status.ACTIVE) else ROLE.visitor()}
+
+    if (user_data['role'] in {"elder", "coLeader", "leader"}
+            and user_data['clan_tag'] == PRIMARY_CLAN_TAG
+            and user_data['player_tag'] not in BLACKLIST):
+        correct_roles.add(ROLE.elder())
+
+    if correct_roles != current_roles:
+        LOG.debug(log_message("Updating roles",
+                                member=member,
+                                current_roles=[role.name for role in current_roles],
+                                correct_roles=[role.name for role in correct_roles]))
+        await member.remove_roles(*list(current_roles - correct_roles))
+        await member.add_roles(*list(correct_roles))
+
     if not is_admin(member):
         if user_data['player_name'] != member.display_name:
             LOG.debug(log_message("Updating nickname", Previous=member.display_name, New=user_data['player_name']))
             await member.edit(nick=user_data['player_name'])
-
-        current_roles = set(member.roles).intersection({ROLE.member(), ROLE.visitor(), ROLE.elder()})
-        correct_roles = {ROLE.member() if (user_data['status'] == Status.ACTIVE) else ROLE.visitor()}
-
-        if (user_data['role'] in {"elder", "coLeader", "leader"}
-                and user_data['clan_tag'] == PRIMARY_CLAN_TAG
-                and user_data['player_tag'] not in BLACKLIST):
-            correct_roles.add(ROLE.elder())
-
-        if correct_roles != current_roles:
-            LOG.debug(log_message("Updating roles",
-                                  member=member,
-                                  current_roles=[role.name for role in current_roles],
-                                  correct_roles=[role.name for role in correct_roles]))
-            await member.remove_roles(*list(current_roles - correct_roles))
-            await member.add_roles(*list(correct_roles))
 
     LOG.info("Update member successful")
     return True
@@ -422,7 +422,7 @@ async def update_all_members(guild: discord.Guild):
                 LOG.debug(log_message("Updating active member of clan", member=member))
                 await update_member(member, player_tag)
         elif ROLE.member() in member.roles:
-            LOG.debug(log_message("Updating visitor that is now a member", member=member))
+            LOG.debug(log_message("Updating member that is now a visitor", member=member))
             await update_member(member, player_tag)
     
     LOG.info("Update all members complete")
