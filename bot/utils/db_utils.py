@@ -1309,7 +1309,7 @@ def save_clans_in_race_info(post_race: bool):
                             WHERE clan_tag = %s",
                            (fame_earned_today, total_decks_used, war_decks_used_today, tag))
         else:
-            if clan['completed']:
+            if post_race and clan['completed']:
                 continue
 
             cursor.execute("UPDATE river_race_clans SET\
