@@ -24,7 +24,7 @@ from utils.role_utils import ROLE
 class Listeners(commands.Cog):
     """Various listener functions."""
 
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         """Store bot and kick messages."""
         self.bot = bot
 
@@ -118,36 +118,38 @@ class Listeners(commands.Cog):
                                                    player_tag, player_name)
 
     @commands.Cog.listener()
-    async def on_reaction_add(self, reaction: discord.Reaction, user: discord.User):
-        """Monitor reacts to kick and strike messages."""
-        if user.bot:
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        """Handle reactions to rules message and callback messages."""
+        if payload.member.bot:
             return
 
-        await CALLBACK_MANAGER.handle_callback(reaction, user)
+        channel = self.bot.get_channel(payload.channel_id)
 
-    @commands.Cog.listener()
-    async def on_raw_reaction_add(self, payload):
-        """Monitor rules channel for people reacting to rules message."""
-        guild = self.bot.get_guild(payload.guild_id)
-        channel = await self.bot.fetch_channel(payload.channel_id)
-        member = guild.get_member(payload.user_id)
-
-        if (channel != CHANNEL.rules()) or (ROLE.check_rules() not in member.roles) or member.bot:
+        if channel is None:
             return
 
-        await member.remove_roles(ROLE.check_rules())
+        if channel == CHANNEL.rules() and ROLE.check_rules() in payload.member.roles:
+            await payload.member.remove_roles(ROLE.check_rules())
 
-        if bot_utils.is_admin(member):
-            LOG.info(f"{member} (admin) reacted to the rules message. Assigning all normal roles besides visitor role.")
-            await member.add_roles(*ROLE.normal_roles())
-            await member.remove_roles(ROLE.visitor())
-            return
+            if bot_utils.is_admin(payload.member):
+                LOG.info(f"{payload.member} (admin) reacted to the rules message. Assigning all normal roles besides visitor role.")
+                await payload.member.add_roles(*ROLE.normal_roles())
+                await payload.member.remove_roles(ROLE.visitor())
+                return
 
-        db_roles = db_utils.get_roles(member.id)
-        saved_roles = []
-        LOG.info(log_message(f"{member} reacted to the rules message", db_roles=db_roles))
+            db_roles = db_utils.get_roles(payload.member.id)
+            saved_roles = []
+            LOG.info(log_message(f"{payload.member} reacted to the rules message", db_roles=db_roles))
 
-        for role in db_roles:
-            saved_roles.append(ROLE.get_role_from_name(role))
+            for role in db_roles:
+                saved_roles.append(ROLE.get_role_from_name(role))
 
-        await member.add_roles(*saved_roles)
+            await payload.member.add_roles(*saved_roles)
+        else:
+            try:
+                message = await channel.fetch_message(payload.message_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as error:
+                LOG.exception(error)
+                return
+
+            await CALLBACK_MANAGER.handle_callback(message, payload.emoji, payload.member)

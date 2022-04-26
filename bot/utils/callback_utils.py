@@ -62,20 +62,24 @@ class CallbackManager:
             else:
                 return False
 
-        async def __call__(self, reaction: discord.Reaction) -> bool:
+        async def __call__(self, message: discord.Message, emoji: discord.PartialEmoji) -> bool:
             """Call the callback function.
 
             Args:
-                reaction: Reaction that triggered the callback.
+                message: Message that was reacted to.
+                emoji: Emoji that was reacted with.
+
+            Returns:
+                Whether callback function was called.
             """
             legal_reaction = False
 
-            if reaction.emoji == CONFIRM_EMOJI:
+            if emoji.name == CONFIRM_EMOJI:
                 embed = await self.callback_function(*self.callback_args)
-                await reaction.message.edit(embed=embed)
+                await message.edit(embed=embed)
                 legal_reaction = True
-            elif reaction.emoji == DECLINE_EMOJI:
-                await reaction.message.edit(embed=self.decline_embed)
+            elif emoji.name == DECLINE_EMOJI:
+                await message.edit(embed=self.decline_embed)
                 legal_reaction = True
 
             return legal_reaction
@@ -99,33 +103,34 @@ class CallbackManager:
         """
         self.messages[message_id] = self.CallbackMessage(callback_type, callback_function, decline_embed, args)
 
-    async def handle_callback(self, reaction: discord.Reaction, user: discord.User):
+    async def handle_callback(self, message: discord.Message, emoji: discord.PartialEmoji, member: discord.Member):
         """Determine if reacted to message has a callback function tied to it. Handle callback if so.
 
         Args:
-            reaction: Reaction that triggered this.
-            user: User who reacted to a message.
+            message: Message that was reacted to.
+            emoji: Emoji that was reacted with.
+            member: User who reacted to message.
         """
-        saved_message = self.messages.get(reaction.message.id)
+        saved_message = self.messages.get(message.id)
 
         if saved_message is None:
             return
 
-        LOG.info(log_message("Detected reaction to saved message", emoji=reaction.emoji, user=user, saved_message=saved_message))
+        LOG.info(log_message("Detected reaction to saved message", emoji=emoji, member=member, saved_message=saved_message))
 
-        if saved_message.is_allowed(user):
-            legal_reaction = await saved_message(reaction)
+        if saved_message.is_allowed(member):
+            legal_reaction = await saved_message(message, emoji)
 
             if legal_reaction:
                 LOG.info("Legal reaction made. Removing message from saved messages.")
-                await reaction.message.clear_reactions()
-                self.messages.pop(reaction.message.id)
+                await message.clear_reactions()
+                self.messages.pop(message.id)
             else:
                 LOG.debug("Invalid reaction made")
-                await reaction.message.remove_reaction(reaction.emoji, user)
+                await message.remove_reaction(emoji, member)
         else:
             LOG.debug("Invalid reaction made")
-            await reaction.message.remove_reaction(reaction.emoji, user)
+            await message.remove_reaction(emoji, member)
 
 
 
