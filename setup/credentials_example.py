@@ -4,7 +4,6 @@
 
 # Discord
 BOT_TOKEN = ""
-GUILD_NAME = ""
 
 # Clash
 CLASH_API_KEY = ""

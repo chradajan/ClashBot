@@ -48,6 +48,8 @@ CREATE TABLE `automation_status` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+INSERT INTO `automation_status` VALUES (True, True);
+
 --
 -- Table structure for table `clans`
 --
@@ -77,7 +79,7 @@ CREATE TABLE `discord_roles` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `role_id` (`id`),
   UNIQUE KEY `role_name` (`role_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -164,6 +166,13 @@ CREATE TABLE `race_reset_times` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
+INSERT INTO `race_reset_times` VALUES (
+  '21000101T000000.000Z',
+  '21000101T000000.000Z',
+  '21000101T000000.000Z',
+  '21000101T000000.000Z'
+);
+
 --
 -- Table structure for table `race_status`
 --
@@ -180,6 +189,8 @@ CREATE TABLE `race_status` (
   PRIMARY KEY (`completed_saturday`,`colosseum_week`,`war_time`,`last_check_time`,`reset_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+INSERT INTO `race_status` VALUES (0, 0, 0, '21000101T000000.000Z', '21000101T000000.000Z');
 
 --
 -- Table structure for table `river_race_clans`
