@@ -80,28 +80,31 @@ class UpdateUtils(commands.Cog):
 
     @commands.command()
     @bot_utils.is_admin_command_check()
-    @bot_utils.disallowed_command_check()
     @bot_utils.commands_channel_check()
-    async def reset_all_member(self, ctx: commands.Context, confirmation: str):
+    async def reset_all_members(self, ctx: commands.Context, confirmation: str):
         """Deletes all users from database and resets everyone back to the welcome channel."""
         LOG.command_start(ctx, confirmation=confirmation)
-        confirmation_message = "Yes, I really want to drop all players from the database and reset roles."
+        confirmation_message = "RESET THE BOT"
 
         if confirmation != confirmation_message:
-            await ctx.send(("Users NOT reset. Must type the following confirmation message exactly, "
-                            "in quotes, along with reset_all_users command:\n"
-                            f"{confirmation_message}"))
+            embed = discord.Embed(title="Users were NOT reset.", color=discord.Color.red())
+            embed.add_field(name="You must send the command with the following confirmation message in quotes:",
+                            value=confirmation_message)
+            await ctx.send(embed)
             LOG.command_end("Bad confirmation")
             return
 
-        await ctx.send("Deleting all users from database... This might take a couple minutes.")
+        embed = discord.Embed(title="Reseting all users. This will take a few minutes.", color=0xFFFF00)
+        await ctx.send(embed=embed)
         db_utils.remove_all_users()
 
         for member in ctx.guild.members:
             await self.reset_user_helper(member)
 
         await bot_utils.send_rules_message(self.bot.user)
-        await ctx.send((f"All users have been reset. If you are a {ROLE.admin().mention}, please send your player tag in the "
-                        "welcome channel to be re-added to the database. Then, react to the rules message to automatically get all "
-                        "roles back. Finally, update your Discord nickname to match your in-game username."))
+        embed = discord.Embed(title="All users have been reset.", color= discord.Color.green())
+        embed.add_field(name=f"All users have been assigned the {ROLE.new().name} role.",
+                        value=(f"If you are a {ROLE.admin().name}, you too need to enter your player tag and react to the rules "
+                               "message to get your roles. Don't forget to manually adjust your server nickname too if needed."))
+        await ctx.send(embed=embed)
         LOG.command_end()
