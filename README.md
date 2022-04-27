@@ -1,7 +1,7 @@
 
 # ClashBot
 
-ClashBot is a Discord bot that helpes moderate servers dedicated to Clash Royale clans.
+ClashBot is a Discord bot that helps moderate servers dedicated to Clash Royale clans.
 - Manages server roles
 - Tracks daily participation in river races.
 - Tracks river race match wins/losses for each member of the clan.
@@ -10,7 +10,7 @@ ClashBot is a Discord bot that helpes moderate servers dedicated to Clash Royale
 - Automatically set users' nicknames equal to their in-game usernames.
 ## Discord Server Requirements
 
-ClashBot requires certain roles and channels to be present on the server. The exact names of these roles and channels can be configured (see [Setup](#Setup)).
+ClashBot requires certain roles and channels to be present on the server. The exact names of these roles and channels can be configured (see [Installation](#Installation)).
 A basic template of a server configured to utilize ClashBot can be found [here](https://discord.new/w4MqRZYMERr4).
 
 #### Roles
@@ -128,7 +128,7 @@ cd ../bot
 
 After launching ClashBot for the first time, an admin should run the `!reset_all_members` command in the Commands channel. 
 This will clear the database, remove all roles that the bot manages from all users, and assign everyone the New role. Users 
-can then begin to enter their player tags in the Welcome channel. Admins shoud enter their tags as well and react to the rules 
+can then begin to enter their player tags in the Welcome channel. Admins should enter their tags as well and react to the rules 
 so that they're properly added into the database.  
 
 The bot will now manage roles, send reminders, and track river race statistics. The Member and Visitor roles will automatically be 
