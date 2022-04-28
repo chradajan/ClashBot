@@ -784,21 +784,16 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
 
     if use_historical_win_rates:
         win_rates = {}
-        is_colosseum_week = db_utils.is_colosseum_week()
 
         for clan in clans:
             clan_tag = clan['clan_tag']
 
-            if saved_clan_info[clan_tag]['num_days'] == 0 or saved_clan_info[clan_tag]['total_decks_used'] == 0:
+            total_war_decks_used = clan['decks_used_today'] + saved_clan_info[clan_tag]['war_decks_used']
+            total_fame_earned = (clan['fame'] - saved_clan_info[clan_tag]['fame']) + saved_clan_info[clan_tag]['total_fame']
+
+            if total_war_decks_used == 0:
                 win_rates[clan_tag] = (165.625, 0.50)
                 continue
-
-            if is_colosseum_week:
-                total_war_decks_used = saved_clan_info[clan_tag]['war_decks_used']
-                total_fame_earned = saved_clan_info[clan_tag]['total_fame']
-            else:
-                total_war_decks_used = clan['decks_used_today'] + saved_clan_info[clan_tag]['war_decks_used']
-                total_fame_earned = (clan['fame'] - saved_clan_info[clan_tag]['fame']) + saved_clan_info[clan_tag]['total_fame']
 
             fame_per_deck = total_fame_earned / total_war_decks_used
             win_rate = calculate_win_rate_from_average_fame(fame_per_deck)
@@ -836,6 +831,7 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
     predicted_outcomes = []
     completed_clans = {}
     catch_up_requirements = {}
+    is_colosseum_week = db_utils.is_colosseum_week()
 
     for clan in clans:
         clan_tag = clan['clan_tag']
@@ -844,7 +840,7 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
             completed_clans[clan_tag] = clan['clan_name']
 
         fame_per_deck, win_rate = win_rates[clan_tag]
-        fame_earned_today = clan['fame'] - saved_clan_info[clan_tag]['fame']
+        fame_earned_today = clan['fame'] - (0 if is_colosseum_week else saved_clan_info[clan_tag]['fame'])
         expected_decks_to_use = expected_deck_usage[clan_tag]
         predicted_score = 50 * round((fame_earned_today + (expected_decks_to_use * fame_per_deck)) / 50)
         predicted_outcomes.append((clan['clan_name'], clan_tag, predicted_score, win_rate, expected_decks_to_use))
@@ -890,13 +886,14 @@ def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float
         Tuple of predicted outcomes embed, completed clans embed, and catch up requirements embed.
     """
     primary_clan_placement = 1
+    is_colosseum_week = db_utils.is_colosseum_week()
 
     for _, tag, _, _, _ in predicted_outcomes:
         if tag == PRIMARY_CLAN_TAG:
             break
         primary_clan_placement += 1
 
-    if primary_clan_placement == 1 or (PRIMARY_CLAN_TAG in completed_clans and not db_utils.is_colosseum_week()):
+    if primary_clan_placement == 1 or (PRIMARY_CLAN_TAG in completed_clans and not is_colosseum_week):
         predictions_color = discord.Color.green()
     elif primary_clan_placement == 2:
         predictions_color = 0xFFFF00
@@ -917,7 +914,7 @@ def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float
     placement = 1
 
     for name, tag, score, win_rate, decks_to_use in predicted_outcomes:
-        if tag in completed_clans and not db_utils.is_colosseum_week():
+        if tag in completed_clans and not is_colosseum_week:
             continue
 
         if use_table:
@@ -936,12 +933,10 @@ def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float
     completed_clans_embed = None
     catch_up_embed = None
 
-    if len(completed_clans) > 0:
+    if len(completed_clans) > 0 and not is_colosseum_week:
         clans_str = "\n".join(clan_name for clan_name in completed_clans.values())
-        completed_clans_embed = discord.Embed(title=(
-                                                  f"{clans_str} has already crossed the finish line and "
-                                                  "is excluded from the predicted standings."
-                                              ),
+        completed_clans_embed = discord.Embed(title=(f"{clans_str} has already crossed the finish line and "
+                                                     "is excluded from the predicted standings."),
                                               color=discord.Color.blue())
 
     if len(catch_up_requirements) > 0:

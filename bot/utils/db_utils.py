@@ -1264,7 +1264,7 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
             reset_clans = True
             break
 
-    colosseum_week = is_colosseum_week
+    colosseum_week = is_colosseum_week()
 
     if colosseum_week or reset_clans:
         LOG.debug(log_message("Resetting saved clan data", colosseum_week=colosseum_week, reset_clans=reset_clans))
@@ -1300,26 +1300,17 @@ def save_clans_in_race_info(post_race: bool):
         total_decks_used = clan['total_decks_used']
         war_decks_used_today = total_decks_used - saved_clan_info[tag]['total_decks_used']
 
-        if colosseum_week:
-            cursor.execute("UPDATE river_race_clans SET\
-                            total_fame = total_fame + %s,\
-                            total_decks_used = %s,\
-                            war_decks_used = war_decks_used + %s,\
-                            num_days = num_days + 1\
-                            WHERE clan_tag = %s",
-                           (fame_earned_today, total_decks_used, war_decks_used_today, tag))
-        else:
-            if post_race and clan['completed']:
-                continue
+        if post_race and clan['completed'] and not colosseum_week:
+            continue
 
-            cursor.execute("UPDATE river_race_clans SET\
-                            fame = %s,\
-                            total_fame = total_fame + %s,\
-                            total_decks_used = %s,\
-                            war_decks_used = war_decks_used + %s,\
-                            num_days = num_days + 1\
-                            WHERE clan_tag = %s",
-                           (current_fame, fame_earned_today, total_decks_used, war_decks_used_today, tag))
+        cursor.execute("UPDATE river_race_clans SET\
+                        fame = %s,\
+                        total_fame = total_fame + %s,\
+                        total_decks_used = %s,\
+                        war_decks_used = war_decks_used + %s,\
+                        num_days = num_days + 1\
+                        WHERE clan_tag = %s",
+                        (current_fame, fame_earned_today, total_decks_used, war_decks_used_today, tag))
 
     database.commit()
     database.close()
