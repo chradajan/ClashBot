@@ -402,7 +402,6 @@ async def update_all_members(guild: discord.Guild):
     """
     LOG.info("Starting update on all Discord members")
     active_members = clash_utils.get_active_members_in_clan()
-    db_utils.clean_up_db()
     db_info = db_utils.get_server_members_info()
 
     for member in guild.members:
@@ -424,7 +423,8 @@ async def update_all_members(guild: discord.Guild):
         elif ROLE.member() in member.roles:
             LOG.debug(log_message("Updating member that is now a visitor", member=member))
             await update_member(member, player_tag)
-    
+
+    db_utils.clean_up_db()
     LOG.info("Update all members complete")
 
 
