@@ -142,16 +142,19 @@ def time_off_channel_check():
     return commands.check(predicate)
 
 
+async def not_welcome_or_rules_check_predicate(ctx: commands.Context):
+    """Predicate check to prevent help command and member utils from being sent in welcome or rules channels."""
+    return ctx.channel not in {CHANNEL.welcome(), CHANNEL.rules()}
+
+
 def not_welcome_or_rules_check():
     """Check if a command is not being issued from the welcome or rules channels."""
-    async def predicate(ctx: commands.Context):
-        return (ctx.channel != CHANNEL.welcome()) and (ctx.channel != CHANNEL.rules())
-    return commands.check(predicate)
+    return commands.check(not_welcome_or_rules_check_predicate)
 
 
 def disallowed_command_check():
     """Disables a command."""
-    async def predicate(_ctx: commands.Context):
+    async def predicate(ctx: commands.Context):
         return False
     return commands.check(predicate)
 

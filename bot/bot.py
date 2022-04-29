@@ -50,9 +50,12 @@ menu = DefaultMenu('◀️', '▶️', '❌')
 intents = discord.Intents.default()
 intents.members = True
 activity = discord.Game(name="Clash Royale")
+help_command = PrettyHelp(navigation=menu,
+                          color=discord.Colour.green(),
+                          command_attrs={"checks": [bot_utils.not_welcome_or_rules_check_predicate]})
 bot = commands.Bot(command_prefix='!',
                    activity=activity,
-                   help_command=PrettyHelp(navigation=menu, color=discord.Colour.green()),
+                   help_command=help_command,
                    intents=intents)
 
 bot.add_cog(AutomationTools(bot))
