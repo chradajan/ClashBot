@@ -69,8 +69,12 @@ class Listeners(commands.Cog):
                 if user_data is not None:
                     if db_utils.add_new_user(user_data):
                         LOG.info(log_message("Added new user to database", User=message.author, user_data=user_data))
+                        await message.channel.send(f"Player tag entered successfully! Please move on to {CHANNEL.rules().mention}.",
+                                                   delete_after=15)
+
                         if not bot_utils.is_admin(message.author):
                             await message.author.edit(nick=user_data["player_name"])
+
                         await message.author.add_roles(ROLE.check_rules())
                         await message.author.remove_roles(ROLE.new())
                         await bot_utils.send_new_member_info(user_data)
