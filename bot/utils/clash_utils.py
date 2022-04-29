@@ -608,9 +608,9 @@ def calculate_match_performance(post_race: bool, clan_tag: str=PRIMARY_CLAN_TAG)
         clan_tag (optional): Check player match performance of players in this clan. Defaults to primary clan.
     """
     LOG.info(log_message("Calculating match performance of all users in clan", post_race=post_race, clan_tag=clan_tag))
-    clean_up_successful =  db_utils.clean_up_db()
-    add_unregistered_users_successful =  db_utils.add_unregistered_users()
-    
+    clean_up_successful = db_utils.clean_up_db()
+    add_unregistered_users_successful = db_utils.add_unregistered_users()
+
     if not clean_up_successful or not add_unregistered_users_successful:
         return
 

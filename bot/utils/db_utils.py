@@ -1138,7 +1138,7 @@ def get_and_update_match_history_info(player_tag: str,
     """
     database, cursor = connect_to_db()
 
-    cursor.execute("SELECT last_check_time, fame FROM match_history_recent\
+    cursor.execute("SELECT last_check_time, tracked_since, fame FROM match_history_recent\
                     WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
                     (player_tag))
     query_result = cursor.fetchone()
@@ -1150,11 +1150,18 @@ def get_and_update_match_history_info(player_tag: str,
             return fame_and_time
         fame_and_time = (0, bot_utils.battletime_to_datetime(get_last_check_time()))
     else:
-        fame_and_time = (query_result["fame"], bot_utils.battletime_to_datetime(query_result["last_check_time"]))
+        fame_and_time = (query_result['fame'], bot_utils.battletime_to_datetime(query_result['last_check_time']))
 
-    cursor.execute("UPDATE match_history_recent SET last_check_time = %s, fame = %s\
+    tracked_since = query_result['tracked_since']
+
+    if tracked_since is None and fame > query_result['fame']:
+        tracked_since = bot_utils.get_current_battletime()
+        cursor.execute("UPDATE users SET first_joined = %s WHERE player_tag = %s AND first_joined IS NULL",
+                       (tracked_since, player_tag))
+
+    cursor.execute("UPDATE match_history_recent SET last_check_time = %s, tracked_since = %s, fame = %s\
                     WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
-                   (bot_utils.datetime_to_battletime(new_check_time), fame, player_tag))
+                   (bot_utils.datetime_to_battletime(new_check_time), tracked_since, fame, player_tag))
 
     database.commit()
     database.close()
