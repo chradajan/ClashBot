@@ -101,7 +101,7 @@ class LeaderUtils(commands.Cog):
             return
 
     @commands.command()
-    @bot_utils.is_leader_command_check()
+    @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
     async def send_reminder(self, ctx: commands.Context, *message):
         """Send reminder message to users with remaining decks. Optionally send a custom message with reminder."""
