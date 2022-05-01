@@ -153,6 +153,8 @@ def add_new_user(user_data: CombinedData) -> bool:
         tracked_since = bot_utils.get_current_battletime() if (is_war_time() and (user_data['status'] == Status.ACTIVE)) else None
         cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
                        (user_id, last_check_time, tracked_since))
+        cursor.execute("INSERT INTO match_history_season VALUES (%s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
+                       (user_id, tracked_since))
         cursor.execute("INSERT INTO match_history_all VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)", (user_id))
 
     # Check if new user is member or visitor. Get id of relevant discord_role.
@@ -215,6 +217,8 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     tracked_since = bot_utils.get_current_battletime() if (is_war_time() and user_data['status'] == Status.UNREGISTERED) else None
     cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
                    (query_result['id'], last_check_time, tracked_since))
+    cursor.execute("INSERT INTO match_history_season VALUES (%s, %s 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
+                   (query_result['id'], tracked_since))
     cursor.execute("INSERT INTO match_history_all VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
                    (query_result['id']))
 
@@ -260,7 +264,10 @@ def update_user(user_data: CombinedData):
                             last_check_time = %s,\
                             tracked_since = %s\
                             WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s) AND tracked_since IS NULL",
-                            (last_check_time, tracked_since, user_data["player_tag"]))
+                            (last_check_time, tracked_since, user_data['player_tag']))
+            cursor.execute("UPDATE match_history_season SET tracked_since = %s\
+                            WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s) AND tracked_since IS NULL",
+                            (tracked_since, user_data['player_tag']))
 
     database.commit()
     database.close()
@@ -1138,7 +1145,7 @@ def get_and_update_match_history_info(player_tag: str,
     """
     database, cursor = connect_to_db()
 
-    cursor.execute("SELECT last_check_time, tracked_since, fame FROM match_history_recent\
+    cursor.execute("SELECT user_id, last_check_time, tracked_since, fame FROM match_history_recent\
                     WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
                     (player_tag))
     query_result = cursor.fetchone()
@@ -1148,39 +1155,60 @@ def get_and_update_match_history_info(player_tag: str,
         if not add_new_unregistered_user(player_tag):
             database.close()
             return fame_and_time
+        database.close()
+        database, cursor = connect_to_db()
+        cursor.execute("SELECT id FROM users WHERE player_tag = %s")
+        query_result = cursor.fetchone()
+        query_result['user_id'] = query_result.pop('id')
+        query_result['tracked_since'] = "19700101T000000.000Z"
+        query_result['fame'] = 0
         fame_and_time = (0, bot_utils.battletime_to_datetime(get_last_check_time()))
     else:
         fame_and_time = (query_result['fame'], bot_utils.battletime_to_datetime(query_result['last_check_time']))
 
-    tracked_since = query_result['tracked_since']
+    user_id = query_result['user_id']
+    recent_tracked_since = query_result['tracked_since']
 
-    if tracked_since is None and fame > query_result['fame']:
-        tracked_since = bot_utils.get_current_battletime()
+    if recent_tracked_since is None and fame > query_result['fame']:
+        recent_tracked_since = bot_utils.get_current_battletime()
         cursor.execute("UPDATE users SET first_joined = %s WHERE player_tag = %s AND first_joined IS NULL",
-                       (tracked_since, player_tag))
+                       (recent_tracked_since, player_tag))
 
-    cursor.execute("UPDATE match_history_recent SET last_check_time = %s, tracked_since = %s, fame = %s\
-                    WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
-                   (bot_utils.datetime_to_battletime(new_check_time), tracked_since, fame, player_tag))
+    cursor.execute("UPDATE match_history_recent SET last_check_time = %s, tracked_since = %s, fame = %s WHERE user_id = %s",
+                   (bot_utils.datetime_to_battletime(new_check_time), recent_tracked_since, fame, user_id))
+
+    cursor.execute("SELECT tracked_since FROM match_history_season WHERE user_id = %s", (user_id))
+    season_tracked_since = cursor.fetchone()['tracked_since']
+
+    if season_tracked_since is None and fame > query_result['fame']:
+        season_tracked_since = bot_utils.get_current_battletime()
+
+    cursor.execute("UPDATE match_history_season SET tracked_since = %s, fame = fame + %s WHERE user_id = %s",
+                   (season_tracked_since, fame - query_result['fame'], user_id))
 
     database.commit()
     database.close()
     return fame_and_time
 
 
-def set_users_last_check_time(player_tag: str, last_check_time: datetime.datetime):
-    """Sets the last check time of a specific user.
+def undo_match_history_info_update(player_tag: str, current_fame: int, prev_fame: int, last_check_time: datetime.datetime):
+    """Use to revert an update to a user's fame and last check time.
 
     Args:
         player_tag: Player to update.
+        current_fame: Current fame of user to revert.
+        prev_fame: Fame of user before changes were made.
         last_check_time: Time to set for specified user.
     """
     database, cursor = connect_to_db()
 
+    fame_to_subtract = current_fame - prev_fame
     last_check_time = bot_utils.datetime_to_battletime(last_check_time)
-    cursor.execute("UPDATE match_history_recent SET last_check_time = %s\
+    cursor.execute("UPDATE match_history_recent SET last_check_time = %s, fame = %s\
                     WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
-                   (last_check_time, player_tag))
+                   (last_check_time, prev_fame, player_tag))
+    cursor.execute("UPDATE match_history_season SET fame = fame - %s WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)",
+                   (fame_to_subtract, player_tag))
 
     database.commit()
     database.close()
@@ -1197,6 +1225,19 @@ def update_match_history(user_performance_list: List[RaceStats]):
     user_performance_list = [user for user in user_performance_list if user]
 
     cursor.executemany("UPDATE match_history_recent SET\
+                        battle_wins = battle_wins + %(battle_wins)s,\
+                        battle_losses = battle_losses + %(battle_losses)s,\
+                        special_battle_wins = special_battle_wins + %(special_battle_wins)s,\
+                        special_battle_losses = special_battle_losses + %(special_battle_losses)s,\
+                        boat_attack_wins = boat_attack_wins + %(boat_attack_wins)s,\
+                        boat_attack_losses = boat_attack_losses + %(boat_attack_losses)s,\
+                        duel_match_wins = duel_match_wins + %(duel_match_wins)s,\
+                        duel_match_losses = duel_match_losses + %(duel_match_losses)s,\
+                        duel_series_wins  = duel_series_wins + %(duel_series_wins)s,\
+                        duel_series_losses = duel_series_losses + %(duel_series_losses)s\
+                        WHERE user_id IN (SELECT id FROM users WHERE player_tag = %(player_tag)s)", user_performance_list)
+
+    cursor.executemany("UPDATE match_history_season SET\
                         battle_wins = battle_wins + %(battle_wins)s,\
                         battle_losses = battle_losses + %(battle_losses)s,\
                         special_battle_wins = special_battle_wins + %(special_battle_wins)s,\
@@ -1243,6 +1284,7 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
     database, cursor = connect_to_db()
 
     last_check_time = bot_utils.datetime_to_battletime(last_check_time)
+    colosseum_week = is_colosseum_week()
     cursor.execute("UPDATE match_history_recent SET\
                     last_check_time = %s,\
                     tracked_since = NULL,\
@@ -1262,6 +1304,25 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
                     user_id IN (SELECT id FROM users WHERE status IN (%s, %s))",
                     (last_check_time, Status.ACTIVE.value, Status.UNREGISTERED.value))
 
+    if colosseum_week:
+        cursor.execute("UPDATE match_history_season SET\
+                        tracked_since = NULL,\
+                        fame = 0,\
+                        battle_wins = 0,\
+                        battle_losses = 0,\
+                        special_battle_wins = 0,\
+                        special_battle_losses = 0,\
+                        boat_attack_wins = 0,\
+                        boat_attack_losses = 0,\
+                        duel_match_wins = 0,\
+                        duel_match_losses = 0,\
+                        duel_series_wins  = 0,\
+                        duel_series_losses = 0")
+
+        cursor.execute("UPDATE match_history_season SET tracked_since = %s WHERE\
+                        user_id IN (SELECT id FROM users WHERE status IN (%s, %s))",
+                        (last_check_time, Status.ACTIVE.value, Status.UNREGISTERED.value))
+
     clans = clash_utils.get_clans_in_race(False)
     reset_clans = False
 
@@ -1270,8 +1331,6 @@ def prepare_for_river_race(last_check_time: datetime.datetime):
         if cursor.fetchone() is None:
             reset_clans = True
             break
-
-    colosseum_week = is_colosseum_week()
 
     if colosseum_week or reset_clans:
         LOG.debug(log_message("Resetting saved clan data", colosseum_week=colosseum_week, reset_clans=reset_clans))
@@ -1354,82 +1413,90 @@ def get_match_performance_dict(player_tag: str) -> RiverRaceStats:
     cursor.execute("SELECT * FROM match_history_recent WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
     match_performance_recent = cursor.fetchone()
 
+    cursor.execute("SELECT * FROM match_history_season WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
+    match_performance_season = cursor.fetchone()
+
     cursor.execute("SELECT * FROM match_history_all WHERE user_id IN (SELECT id FROM users WHERE player_tag = %s)", (player_tag))
     match_performance_all = cursor.fetchone()
 
-    if (match_performance_recent is None) or (match_performance_all is None):
+    if not all([match_performance_recent, match_performance_season, match_performance_all]):
         database.close()
         return None
 
-    db_info_dict = {"recent": match_performance_recent, "all": match_performance_all}
-    tracked_since = match_performance_recent["tracked_since"]
+    db_info_dict = {'recent': match_performance_recent, 'season': match_performance_season, 'all': match_performance_all}
+    recent_tracked_since = match_performance_recent['tracked_since']
+    season_tracked_since = match_performance_season['tracked_since']
 
-    if tracked_since is not None:
-        tracked_since = bot_utils.battletime_to_datetime(tracked_since)
+    if recent_tracked_since is not None:
+        recent_tracked_since = bot_utils.battletime_to_datetime(recent_tracked_since)
 
-    match_performance_dict = {"recent": {"fame": match_performance_recent["fame"], "tracked_since": tracked_since},
-                              "all": {}}
+    if season_tracked_since is not None:
+        season_tracked_since = bot_utils.battletime_to_datetime(season_tracked_since)
+
+    match_performance_dict = {'recent': {'fame': match_performance_recent['fame'], 'tracked_since': recent_tracked_since},
+                              'season': {'fame': match_performance_season['fame'], 'tracked_since': season_tracked_since},
+                              'all': {}}
 
     for k in db_info_dict:
         # Regular battles
-        regular_wins = db_info_dict[k]["battle_wins"]
-        regular_losses = db_info_dict[k]["battle_losses"]
+        regular_wins = db_info_dict[k]['battle_wins']
+        regular_losses = db_info_dict[k]['battle_losses']
         total_regular_battles = regular_wins + regular_losses
         regular_battle_win_rate = "0.00%" if total_regular_battles == 0 else "{:.2%}".format(regular_wins / total_regular_battles)
-        match_performance_dict[k]["regular"] = {"wins": regular_wins,
-                                                "losses": regular_losses,
-                                                "total": total_regular_battles,
-                                                "win_rate": regular_battle_win_rate}
+        match_performance_dict[k]['regular'] = {'wins': regular_wins,
+                                                'losses': regular_losses,
+                                                'total': total_regular_battles,
+                                                'win_rate': regular_battle_win_rate}
 
         # Special battles
-        special_wins = db_info_dict[k]["special_battle_wins"]
-        special_losses = db_info_dict[k]["special_battle_losses"]
+        special_wins = db_info_dict[k]['special_battle_wins']
+        special_losses = db_info_dict[k]['special_battle_losses']
         total_special_battles = special_wins + special_losses
         special_battle_win_rate = "0.00%" if total_special_battles == 0 else "{:.2%}".format(special_wins / total_special_battles)
-        match_performance_dict[k]["special"] = {"wins": special_wins,
-                                                "losses": special_losses,
-                                                "total": total_special_battles,
-                                                "win_rate": special_battle_win_rate}
+        match_performance_dict[k]['special'] = {'wins': special_wins,
+                                                'losses': special_losses,
+                                                'total': total_special_battles,
+                                                'win_rate': special_battle_win_rate}
 
         # Duel matches
-        duel_match_wins = db_info_dict[k]["duel_match_wins"]
-        duel_match_losses = db_info_dict[k]["duel_match_losses"]
+        duel_match_wins = db_info_dict[k]['duel_match_wins']
+        duel_match_losses = db_info_dict[k]['duel_match_losses']
         total_duel_matches = duel_match_wins + duel_match_losses
         duel_match_win_rate = "0.00%" if total_duel_matches == 0 else "{:.2%}".format(duel_match_wins / total_duel_matches)
-        match_performance_dict[k]["duel_matches"] = {"wins": duel_match_wins,
-                                                     "losses": duel_match_losses,
-                                                     "total": total_duel_matches,
-                                                     "win_rate": duel_match_win_rate}
+        match_performance_dict[k]['duel_matches'] = {'wins': duel_match_wins,
+                                                     'losses': duel_match_losses,
+                                                     'total': total_duel_matches,
+                                                     'win_rate': duel_match_win_rate}
 
         # Duel series
-        duel_series_wins = db_info_dict[k]["duel_series_wins"]
-        duel_series_losses = db_info_dict[k]["duel_series_losses"]
+        duel_series_wins = db_info_dict[k]['duel_series_wins']
+        duel_series_losses = db_info_dict[k]['duel_series_losses']
         total_duel_series = duel_series_wins + duel_series_losses
         duel_series_win_rate = "0.00%" if total_duel_series == 0 else "{:.2%}".format(duel_series_wins / total_duel_series)
-        match_performance_dict[k]["duel_series"] = {"wins": duel_series_wins,
-                                                    "losses": duel_series_losses,
-                                                    "total": total_duel_series,
-                                                    "win_rate": duel_series_win_rate}
+        match_performance_dict[k]['duel_series'] = {'wins': duel_series_wins,
+                                                    'losses': duel_series_losses,
+                                                    'total': total_duel_series,
+                                                    'win_rate': duel_series_win_rate}
 
         # Boat attacks
-        boat_attack_wins = db_info_dict[k]["boat_attack_wins"]
-        boat_attack_losses = db_info_dict[k]["boat_attack_losses"]
+        boat_attack_wins = db_info_dict[k]['boat_attack_wins']
+        boat_attack_losses = db_info_dict[k]['boat_attack_losses']
         total_boat_attacks = boat_attack_wins + boat_attack_losses
         boat_attack_win_rate = "0.00%" if total_boat_attacks == 0 else "{:.2%}".format(boat_attack_wins / total_boat_attacks)
-        match_performance_dict[k]["boat_attacks"] = {"wins": boat_attack_wins,
-                                                     "losses": boat_attack_losses,
-                                                     "total": total_boat_attacks,
-                                                     "win_rate": boat_attack_win_rate}
+        match_performance_dict[k]['boat_attacks'] = {'wins': boat_attack_wins,
+                                                     'losses': boat_attack_losses,
+                                                     'total': total_boat_attacks,
+                                                     'win_rate': boat_attack_win_rate}
 
         # Combined
         total_pvp_wins = regular_wins + special_wins + duel_match_wins
         total_pvp_losses = regular_losses + special_losses + duel_match_losses
         total_pvp_matches = total_pvp_wins + total_pvp_losses
         overall_win_rate = "0.00%" if total_pvp_matches == 0 else "{:.2%}".format(total_pvp_wins / total_pvp_matches)
-        match_performance_dict[k]["combined_pvp"] = {"wins": total_pvp_wins,
-                                                     "losses": total_pvp_losses,
-                                                     "total": total_pvp_matches,
-                                                     "win_rate": overall_win_rate}
+        match_performance_dict[k]['combined_pvp'] = {'wins': total_pvp_wins,
+                                                     'losses': total_pvp_losses,
+                                                     'total': total_pvp_matches,
+                                                     'win_rate': overall_win_rate}
 
     database.close()
     return match_performance_dict
@@ -1674,6 +1741,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
     history_sheet = workbook.add_worksheet("History")
     kicks_sheet = workbook.add_worksheet("Kicks")
     recent_stats_sheet = workbook.add_worksheet("Recent Stats")
+    season_stats_sheet = workbook.add_worksheet("Season Stats")
     all_stats_sheet = workbook.add_worksheet("All Stats")
     card_levels_quantity_sheet = None
     card_levels_percentile_sheet = None
@@ -1720,6 +1788,16 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
                             "Boat Attack Wins", "Boat Attack Losses", "Boat Attack Win Rate"]
 
     recent_stats_sheet.write_row(0, 0, recent_stats_headers)
+
+    season_stats_headers = ["Player Name", "Player Tag", "Fame", "Decks Used", "Tracked Since",
+                            "Regular PvP Wins", "Regular PvP Losses", "Regular PvP Win Rate",
+                            "Special PvP Wins", "Special PvP Losses", "Special PvP Win Rate",
+                            "Duel Match Wins", "Duel Match Losses", "Duel Match Win Rate",
+                            "Duel Series Wins", "Duel Series Losses", "Duel Series Win Rate",
+                            "Combined PvP Wins", "Combined PvP Losses", "Combined PvP Win Rate",
+                            "Boat Attack Wins", "Boat Attack Losses", "Boat Attack Win Rate"]
+
+    season_stats_sheet.write_row(0, 0, season_stats_headers)
 
     all_stats_headers = ["Player Name", "Player Tag",
                          "Regular PvP Wins", "Regular PvP Losses", "Regular PvP Win Rate",
@@ -1781,17 +1859,31 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         # Get stats
         match_performance = get_match_performance_dict(user['player_tag'])
 
-        decks_used = (match_performance['recent']['combined_pvp']['wins'] + match_performance['recent']['combined_pvp']['losses'] +
-                      match_performance['recent']['boat_attacks']['wins'] + match_performance['recent']['boat_attacks']['losses'])
+        recent_decks_used = (match_performance['recent']['combined_pvp']['wins']
+                             + match_performance['recent']['combined_pvp']['losses']
+                             + match_performance['recent']['boat_attacks']['wins']
+                             + match_performance['recent']['boat_attacks']['losses'])
 
-        tracked_since = match_performance["recent"]["tracked_since"]
+        season_decks_used = (match_performance['season']['combined_pvp']['wins']
+                             + match_performance['season']['combined_pvp']['losses']
+                             + match_performance['season']['boat_attacks']['wins']
+                             + match_performance['season']['boat_attacks']['losses'])
 
-        if tracked_since is None:
-            tracked_since = "N/A"
+        recent_tracked_since = match_performance['recent']['tracked_since']
+        season_tracked_since = match_performance['season']['tracked_since']
+
+        if recent_tracked_since is None:
+            recent_tracked_since = "N/A"
         else:
-            tracked_since = tracked_since.strftime("%Y-%m-%d %H:%M")
+            recent_tracked_since = recent_tracked_since.strftime("%Y-%m-%d %H:%M")
 
-        recent_stats_row = [user['player_name'], user['player_tag'], match_performance['recent']['fame'], decks_used, tracked_since,
+        if season_tracked_since is None:
+            season_tracked_since = "N/A"
+        else:
+            season_tracked_since = season_tracked_since.strftime("%Y-%m-%d %H:%M")
+
+        recent_stats_row = [user['player_name'], user['player_tag'], match_performance['recent']['fame'],
+                            recent_decks_used, recent_tracked_since,
                             match_performance['recent']['regular']['wins'],
                             match_performance['recent']['regular']['losses'],
                             (float(match_performance['recent']['regular']['win_rate'][:-1]) / 100),
@@ -1810,6 +1902,27 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
                             match_performance['recent']['boat_attacks']['wins'],
                             match_performance['recent']['boat_attacks']['losses'],
                             (float(match_performance['recent']['boat_attacks']['win_rate'][:-1]) / 100)]
+
+        season_stats_row = [user['player_name'], user['player_tag'], match_performance['season']['fame'],
+                            season_decks_used, season_tracked_since,
+                            match_performance['season']['regular']['wins'],
+                            match_performance['season']['regular']['losses'],
+                            (float(match_performance['season']['regular']['win_rate'][:-1]) / 100),
+                            match_performance['season']['special']['wins'],
+                            match_performance['season']['special']['losses'],
+                            (float(match_performance['season']['special']['win_rate'][:-1]) / 100),
+                            match_performance['season']['duel_matches']['wins'],
+                            match_performance['season']['duel_matches']['losses'],
+                            (float(match_performance['season']['duel_matches']['win_rate'][:-1]) / 100),
+                            match_performance['season']['duel_series']['wins'],
+                            match_performance['season']['duel_series']['losses'],
+                            (float(match_performance['season']['duel_series']['win_rate'][:-1]) / 100),
+                            match_performance['season']['combined_pvp']['wins'],
+                            match_performance['season']['combined_pvp']['losses'],
+                            (float(match_performance['season']['combined_pvp']['win_rate'][:-1]) / 100),
+                            match_performance['season']['boat_attacks']['wins'],
+                            match_performance['season']['boat_attacks']['losses'],
+                            (float(match_performance['season']['boat_attacks']['win_rate'][:-1]) / 100)]
 
         all_stats_row = [user['player_name'], user['player_tag'],
                          match_performance['all']['regular']['wins'],
@@ -1852,6 +1965,7 @@ def export(primary_clan_only: bool, include_card_levels: bool) -> str:
         history_sheet.write_row(row, 0, history_row)
         kicks_sheet.write_row(row, 0, kicks_row)
         recent_stats_sheet.write_row(row, 0, recent_stats_row)
+        season_stats_sheet.write_row(row, 0, season_stats_row)
         all_stats_sheet.write_row(row, 0, all_stats_row)
 
         if include_card_levels:

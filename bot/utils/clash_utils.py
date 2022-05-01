@@ -460,7 +460,7 @@ def river_race_completed(clan_tag: str=PRIMARY_CLAN_TAG) -> bool:
     Returns:
         Whether the specified clan has accumulated 10,000 fame and crossed the finish line.
     """
-    LOG.info("Checking if clan {clan_tag} has crossed finish line")
+    LOG.info(f"Checking if clan {clan_tag} has crossed finish line")
     if db_utils.is_colosseum_week():
         LOG.debug("Colosseum week detected so no finish line")
         return False
@@ -509,7 +509,7 @@ def calculate_player_win_rate(player_tag: str,
 
     if req.status_code != 200:
         LOG.warning(log_message(msg="Bad request", status_code=req.status_code))
-        db_utils.set_users_last_check_time(player_tag, last_check_time)
+        db_utils.undo_match_history_info_update(player_tag, fame, prev_fame, last_check_time)
         return {}
 
     battles = req.json()

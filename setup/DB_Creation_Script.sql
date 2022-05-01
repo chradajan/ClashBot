@@ -151,6 +151,33 @@ CREATE TABLE `match_history_recent` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `match_history_season`
+--
+
+DROP TABLE IF EXISTS `match_history_season`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `match_history_season` (
+  `user_id` int NOT NULL,
+  `tracked_since` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `fame` int NOT NULL,
+  `battle_wins` int NOT NULL,
+  `battle_losses` int NOT NULL,
+  `duel_match_wins` int NOT NULL,
+  `duel_match_losses` int NOT NULL,
+  `duel_series_wins` int NOT NULL,
+  `duel_series_losses` int NOT NULL,
+  `boat_attack_wins` int NOT NULL,
+  `boat_attack_losses` int NOT NULL,
+  `special_battle_wins` int NOT NULL,
+  `special_battle_losses` int NOT NULL,
+  PRIMARY KEY (`user_id`),
+  UNIQUE KEY `user_id` (`user_id`),
+  CONSTRAINT `match_history_season_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `race_reset_times`
 --
 
@@ -232,7 +259,7 @@ CREATE TABLE `users` (
   `permanent_strikes` int NOT NULL,
   `usage_history` int NOT NULL,
   `status` enum('ACTIVE','INACTIVE','UNREGISTERED','DEPARTED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `first_joined` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `first_joined` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `clan_id` int NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `player_tag_UNIQUE` (`player_tag`),
@@ -252,4 +279,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2022-04-26 20:23:25
+-- Dump completed on 2022-05-02 23:29:19

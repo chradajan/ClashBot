@@ -123,9 +123,10 @@ class RecentStats(AllMatchTypeStats):
 
 
 class RiverRaceStats(TypedDict):
-    """Dictionary containing a user's all time and most recent river race stats."""
-    all: AllMatchTypeStats
+    """Dictionary containing a user's all time, season, and most recent river race stats."""
     recent: RecentStats
+    season: RecentStats
+    all: AllMatchTypeStats
 
 
 class DatabaseData(TypedDict):
