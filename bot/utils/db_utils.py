@@ -217,7 +217,7 @@ def add_new_unregistered_user(player_tag: str) -> bool:
     tracked_since = bot_utils.get_current_battletime() if (is_war_time() and user_data['status'] == Status.UNREGISTERED) else None
     cursor.execute("INSERT INTO match_history_recent VALUES (%s, %s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
                    (query_result['id'], last_check_time, tracked_since))
-    cursor.execute("INSERT INTO match_history_season VALUES (%s, %s 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
+    cursor.execute("INSERT INTO match_history_season VALUES (%s, %s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
                    (query_result['id'], tracked_since))
     cursor.execute("INSERT INTO match_history_all VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)",
                    (query_result['id']))
