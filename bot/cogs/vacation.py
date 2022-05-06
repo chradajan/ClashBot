@@ -41,18 +41,17 @@ class Vacation(commands.Cog):
         """Get a list of all users currently on vacation."""
         LOG.command_start(ctx)
         users_on_vacation = db_utils.get_users_on_vacation()
-        table = PrettyTable()
-        table.field_names = ["Member"]
-        embed = discord.Embed()
 
-        for player_name in users_on_vacation.values():
-            table.add_row([player_name])
+        if users_on_vacation:
+            table = PrettyTable()
+            table.field_names = ["Member"]
 
-        embed.add_field(name="Vacation List", value="```\n" + table.get_string() + "```")
+            for player_name in users_on_vacation.values():
+                table.add_row([player_name])
 
-        try:
-            await ctx.send(embed=embed)
-        except:
-            await ctx.send("Vacation List\n" + "```\n" + table.get_string() + "```")
+            embed = discord.Embed(title="Vacation List", description="```\n" + table.get_string() + "```")
+        else:
+            embed = discord.Embed(title="No users are currently on vacation")
 
+        await ctx.send(embed=embed)
         LOG.command_end()

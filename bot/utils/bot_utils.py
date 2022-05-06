@@ -761,8 +761,9 @@ def calculate_win_rate_from_average_fame(avg_fame_per_deck: float) -> float:
     return win_rate
 
 
-def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usage: bool)\
-        -> Tuple[List[Tuple[str, str, int, float, int]], Dict[str, str], Dict[str, Union[int, float]]]:
+def predict_race_outcome(
+    use_historical_win_rates: bool,
+    use_historical_deck_usage: bool) -> Tuple[List[Tuple[str, str, int, float, int]], Dict[str, str], Dict[str, Union[int, float]]]:
     """Predict the final standings at the end of the day.
 
     Args:
@@ -869,10 +870,10 @@ def predict_race_outcome(use_historical_win_rates: bool, use_historical_deck_usa
     return (predicted_outcomes, completed_clans, catch_up_requirements)
 
 
-def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float, int]],
-                             completed_clans: Dict[str, str],
-                             catch_up_requirements: Dict[str, Union[int, float]],
-                             use_table: bool) -> Tuple[discord.Embed, discord.Embed, discord.Embed]:
+def create_prediction_embeds(
+    predicted_outcomes: List[Tuple[str, str, int, float, int]],
+    completed_clans: Dict[str, str],
+    catch_up_requirements: Dict[str, Union[int, float]]) -> Tuple[discord.Embed, discord.Embed, discord.Embed]:
     """Create 3 embeds from the prediction data.
 
     predicted_outcomes (ordered first to last): [ (clan_name, clan_tag, predicted_score, win_rate, expected_decks_to_use), ... ]
@@ -883,7 +884,6 @@ def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float
         predicted_outcomes: Predicted outcomes today ordered from first to last.
         completed_clans: Clans that have already crossed the finish line.
         catch_up_requirements: Requirements to match predicted score of first place if primary clan is not predicted to win.
-        use_table: Display predicted standings in table instead of embed fields.
 
     Returns:
         Tuple of predicted outcomes embed, completed clans embed, and catch up requirements embed.
@@ -907,12 +907,7 @@ def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float
     elif primary_clan_placement == 5:
         predictions_color = discord.Color.dark_red()
 
-    if use_table:
-        table = PrettyTable()
-        table.field_names = ["Clan", "Score"]
-        predictions_embed = discord.Embed(color=predictions_color)
-    else:
-        predictions_embed = discord.Embed(title="Predicted Outcomes Today", color = predictions_color)
+    predictions_embed = discord.Embed(title="Predicted Outcomes Today", color = predictions_color)
 
     placement = 1
 
@@ -920,18 +915,11 @@ def create_prediction_embeds(predicted_outcomes: List[Tuple[str, str, int, float
         if tag in completed_clans and not is_colosseum_week:
             continue
 
-        if use_table:
-            table.add_row([name, score])
-        else:
-            predictions_embed.add_field(name=f"{placement}. {name}",
-                                        value=f"```Score: {score}\nWin Rate: {round(win_rate * 100, 2)}%\nDecks: {decks_to_use}```",
-                                        inline=False)
+        predictions_embed.add_field(name=f"{placement}. {name}",
+                                    value=f"```Score: {score}\nWin Rate: {round(win_rate * 100, 2)}%\nDecks: {decks_to_use}```",
+                                    inline=False)
 
         placement += 1
-
-    if use_table:
-        predictions_embed.add_field(name="Predicted outcomes today", value="```\n" + table.get_string() + "```")
-        predictions_embed.set_footer(text="Assuming each clan uses all remaining decks at a 50% winrate")
 
     completed_clans_embed = None
     catch_up_embed = None
@@ -1150,9 +1138,9 @@ async def strike_former_participant(player_tag: str,
         Embed confirming the strike was given.
     """
     _, strikes, _, _ = db_utils.update_strikes(player_tag, 1)
-    strikes_embed = discord.Embed()
-    strikes_embed.add_field(name=player_name,
-                            value=f"```Decks: {decks_used}/{decks_required}\nStrikes: {strikes}\nDate: {tracked_since}```")
+    strikes_embed = discord.Embed(title=player_name,
+                                  description=(f"```Decks: {decks_used}/{decks_required}\n"
+                                               f"Strikes: {strikes}\nDate: {tracked_since}```"))
 
     discord_id = db_utils.get_member_id(player_tag)
     member: discord.Member = None
@@ -1186,9 +1174,8 @@ async def send_strike_former_participant_message(player_tag: str,
         decks_required: How many decks were expected from the user to not get a strike.
         tracked_since: Human readable string of time that bot started tracking the user.
     """
-    embed = discord.Embed()
-    embed.add_field(name=f"Should {player_name} receive a strike?",
-                    value=f"```Decks: {decks_used}/{decks_required}\nDate: {tracked_since}```")
+    embed = discord.Embed(title=f"Should {player_name} receive a strike?",
+                          description=f"```Decks: {decks_used}/{decks_required}\nDate: {tracked_since}```")
 
     strike_message = await CHANNEL.commands().send(embed=embed)
     await strike_message.add_reaction(CONFIRM_EMOJI)

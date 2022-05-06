@@ -56,52 +56,36 @@ class StatusReports(commands.Cog):
         await ctx.send(embed=embed)
 
         if len(usage_info['active_members_with_remaining_decks']) > 0:
-            embed = discord.Embed()
             table = PrettyTable()
             table.field_names = ["Member", "Decks"]
 
             for player_name, decks_remaining in usage_info['active_members_with_remaining_decks']:
                 table.add_row([player_name, decks_remaining])
 
-            embed.add_field(name="Active members with remaining decks", value = "```\n" + table.get_string() + "```")
-
-            try:
-                await ctx.send(embed=embed)
-            except:
-                await ctx.send("Active members with remaining decks\n" + "```\n" + table.get_string() + "```")
+            embed = discord.Embed(title="Active members with remaining decks", description="```\n" + table.get_string() + "```")
+            await ctx.send(embed=embed)
 
         if len(usage_info['inactive_members_with_decks_used']) > 0:
-            embed = discord.Embed()
             table = PrettyTable()
             table.field_names = ["Member", "Decks"]
 
             for player_name, decks_remaining in usage_info['inactive_members_with_decks_used']:
                 table.add_row([player_name, decks_remaining])
 
-            embed.add_field(name="Former members with remaining decks", value = "```\n" + table.get_string() + "```")
-
-            try:
-                await ctx.send(embed=embed)
-            except:
-                await ctx.send("Former members with remaining decks\n" + "```\n" + table.get_string() + "```")
+            embed = discord.Embed(title="Former members with remaining decks", description="```\n" + table.get_string() + "```")
+            await ctx.send(embed=embed)
 
         if len(usage_info['locked_out_active_members']) > 0:
-            embed = discord.Embed()
             table = PrettyTable()
             table.field_names = ["Member", "Decks"]
 
             for player_name, decks_remaining in usage_info['locked_out_active_members']:
                 table.add_row([player_name, decks_remaining])
 
-            embed.add_field(name="Active members locked out today", value = "```\n" + table.get_string() + "```")
-
-            try:
-                await ctx.send(embed=embed)
-            except:
-                await ctx.send("Active members locked out today\n" + "```\n" + table.get_string() + "```")
+            embed=discord.Embed(title="Active members locked out today", description="```\n" + table.get_string() + "```")
+            await ctx.send(embed=embed)
 
         if len(users_on_vacation) > 0:
-            embed = discord.Embed()
             table = PrettyTable()
             table.field_names = ["Member", "Decks"]
 
@@ -109,12 +93,8 @@ class StatusReports(commands.Cog):
                 decks_remaining = 4 - clash_utils.get_user_decks_used_today(player_tag)
                 table.add_row([player_name, decks_remaining])
 
-            embed.add_field(name="Members currently on vacation", value = "```\n" + table.get_string() + "```")
-
-            try:
-                await ctx.send(embed=embed)
-            except:
-                await ctx.send("Members currently on vacation\n" + "```\n" + table.get_string() + "```")
+            embed = discord.Embed(title="Members currently on vacation", description="```\n" + table.get_string() + "```")
+            await ctx.send(embed=embed)
 
         LOG.command_end()
 
@@ -196,9 +176,8 @@ class StatusReports(commands.Cog):
         for decks_used, date in usage_history_list:
             deck_usage_history_table.add_row([date, decks_used])
 
-        deck_usage_embed = discord.Embed()
-        deck_usage_embed.add_field(name=f"{user_data['player_name']}'s deck usage history",
-                        value = "```\n" + deck_usage_history_table.get_string() + "```")
+        deck_usage_embed = discord.Embed(title=f"{user_data['player_name']}'s deck usage history",
+                                         description="```\n" + deck_usage_history_table.get_string() + "```")
 
         await ctx.send(embed=deck_usage_embed)
 

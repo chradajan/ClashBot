@@ -102,9 +102,8 @@ class Listeners(commands.Cog):
                     LOG.info(log_message("Parsed data from image in kicks channel", player_name=player_name, player_tag=player_tag))
 
                     if player_tag is None:
-                        embed = discord.Embed()
-                        embed.add_field(name="Unable to parse player info.",
-                                        value="You can still log this kick manually with `!kick <member>`.")
+                        embed = discord.Embed(title="Unable to parse player info.",
+                                              description="You can still log this kick manually with `!kick <member>`.")
                         await message.channel.send(embed=embed)
                         return
 

@@ -250,9 +250,8 @@ async def assign_strikes_and_clear_vacation():
         message = "Automated strikes are currently disabled, so no strikes have been given out for the previous River Race."
 
     db_utils.clear_all_vacation()
-    vacation_embed = discord.Embed()
-    vacation_embed.add_field(name="Vacation status has been reset for all users.",
-                             value="Make sure to use !vacation before the next war if you're going to miss it.")
+    vacation_embed = discord.Embed(title="Vacation status has been reset for all users.",
+                                   description="Make sure to use `!vacation` before the next war if you're going to miss it.")
     await CHANNEL.time_off().send(embed=vacation_embed)
     await CHANNEL.strikes().send(message)
 
@@ -263,10 +262,9 @@ async def assign_strikes_and_clear_vacation():
             await CHANNEL.strikes().send(embed=embed_two)
 
     if send_missing_data_message:
-        missing_data_embed = discord.Embed()
-        missing_data_embed.add_field(name="Missing Data Warning",
-                                     value=("War participation data is missing for one or more days. "
-                                            "Threshold for assigning strikes has been adjusted accordingly."))
+        missing_data_embed = discord.Embed(title="Missing Data Warning",
+                                           description=("War participation data is missing for one or more days. "
+                                                        "Threshold for assigning strikes has been adjusted accordingly."))
         await CHANNEL.strikes().send(embed=missing_data_embed)
 
     LOG.automation_end()

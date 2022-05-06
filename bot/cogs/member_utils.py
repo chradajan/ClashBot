@@ -8,7 +8,7 @@ from prettytable import PrettyTable
 import utils.bot_utils as bot_utils
 import utils.clash_utils as clash_utils
 import utils.db_utils as db_utils
-from utils.logging_utils import LOG, log_message
+from utils.logging_utils import LOG
 from utils.util_types import ReminderTime
 
 
@@ -25,7 +25,6 @@ class MemberUtils(commands.Cog):
         """Send a list of clans in the current river race and how many battles they can still do today."""
         LOG.command_start(ctx, show_predictions=show_predictions)
         clans = clash_utils.get_clan_decks_remaining()
-        embed = discord.Embed()
         table = PrettyTable()
         table.field_names = ["Clan", "Decks"]
 
@@ -33,12 +32,14 @@ class MemberUtils(commands.Cog):
             _, clan_name = clan
             table.add_row([clan_name, decks_remaining])
 
-        embed.add_field(name="Remaining decks for each clan", value="```\n" + table.get_string() + "```")
+        embed = discord.Embed(title="Remaining decks for each clan",
+                              description="```\n" + table.get_string() + "```",
+                              color=discord.Color.green())
         await ctx.send(embed=embed)
 
         if show_predictions and db_utils.is_war_time():
-            predicted_outcomes, completed_clans, _ = bot_utils.predict_race_outcome(False, False)
-            embed, _, _ = bot_utils.create_prediction_embeds(predicted_outcomes, completed_clans, {}, True)
+            predicted_outcomes, completed_clans, _ = bot_utils.predict_race_outcome(True, False)
+            embed, _, _ = bot_utils.create_prediction_embeds(predicted_outcomes, completed_clans, {})
             await ctx.send(embed=embed)
 
         LOG.command_end()
@@ -66,8 +67,7 @@ all possible remaining decks."""
 
         predicted_embed, completed_embed, catch_up_embed = bot_utils.create_prediction_embeds(predicted_outcomes,
                                                                                               completed_clans,
-                                                                                              catch_up_info,
-                                                                                              False)
+                                                                                              catch_up_info)
 
         await ctx.send(embed=predicted_embed)
 

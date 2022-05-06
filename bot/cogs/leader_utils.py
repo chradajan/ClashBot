@@ -128,17 +128,12 @@ class LeaderUtils(commands.Cog):
         top_members = clash_utils.get_top_medal_users()
         table = PrettyTable()
         table.field_names = ["Member", "Medals"]
-        embed = discord.Embed()
 
         for player_name, fame in top_members:
             table.add_row([player_name, fame])
 
-        embed.add_field(name="Top members by medals", value="```\n" + table.get_string() + "```")
-
-        try:
-            await CHANNEL.fame().send(embed=embed)
-        except:
-            await CHANNEL.fame().send("Top members by medals\n" + "```\n" + table.get_string() + "```")
+        embed=discord.Embed(title="Top members by medals", description="```\n" + table.get_string() + "```")
+        await CHANNEL.fame().send(embed=embed)
 
         confirmation_embed = discord.Embed(title=f"Message successfully sent to #{CHANNEL.fame().name}.",
                                            color=discord.Color.green())

@@ -246,8 +246,8 @@ class Strikes(commands.Cog):
                 non_active_table.add_row([player_name, strikes])
 
         if active_members_have_strikes:
-            active_embed = discord.Embed()
-            active_embed.add_field(name="Active members with strikes", value="```\n" + active_table.get_string() + "```")
+            active_embed = discord.Embed(title="Active members with strikes",
+                                         description="```\n" + active_table.get_string() + "```")
 
             try:
                 await ctx.send(embed=active_embed)
@@ -255,17 +255,16 @@ class Strikes(commands.Cog):
                 await ctx.send("Active members with strikes\n" + "```\n" + active_table.get_string() + "```")
 
         if non_active_members_have_strikes:
-            non_active_embed = discord.Embed()
-            non_active_embed.add_field(name="Users not in clan with strikes", value="```\n" + non_active_table.get_string() + "```")
+            non_active_embed = discord.Embed(title="Users not in clan with strikes",
+                                             description="```\n" + non_active_table.get_string() + "```")
 
             try:
                 await ctx.send(embed=non_active_embed)
             except:
-                await ctx.send("Active members with strikes\n" + "```\n" + non_active_table.get_string() + "```")
+                await ctx.send("Users not in clan with strikes\n" + "```\n" + non_active_table.get_string() + "```")
 
         if (not active_members_have_strikes) and (not non_active_members_have_strikes):
-            embed = discord.Embed()
-            embed.add_field(name="Strikes Report", value="No users currently have strikes")
+            embed = discord.Embed(title="Strikes Report", description="No users currently have strikes")
             await ctx.send(embed=embed)
 
         LOG.command_end()
