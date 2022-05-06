@@ -29,10 +29,10 @@ class LeaderUtils(commands.Cog):
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
-    async def export(self, ctx: commands.Context, false_logic_only: bool=True, include_card_levels: bool=False):
+    async def export(self, ctx: commands.Context, primary_clan_only: bool=True, include_card_levels: bool=False):
         """Export database to Excel spreadsheet."""
-        LOG.command_start(ctx, false_logic_only=false_logic_only, include_card_levels=include_card_levels)
-        path = db_utils.export(false_logic_only, include_card_levels)
+        LOG.command_start(ctx, primary_clan_only=primary_clan_only, include_card_levels=include_card_levels)
+        path = db_utils.export(primary_clan_only, include_card_levels)
         await ctx.send(file=discord.File(path))
         LOG.command_end()
 
