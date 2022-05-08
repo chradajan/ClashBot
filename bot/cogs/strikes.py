@@ -75,9 +75,9 @@ class Strikes(commands.Cog):
             converter = commands.MemberConverter()
 
             try:
-                member = converter.convert(ctx, user)
+                member = await converter.convert(ctx, user)
                 player_info = db_utils.find_user_in_db(member.id)
-            except discord.MemberNotFound:
+            except commands.errors.MemberNotFound:
                 player_info = db_utils.find_user_in_db(user)
 
             if not player_info:
