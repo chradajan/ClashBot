@@ -8,3 +8,4 @@ testing_tools.py
 .vscode/
 mysql/
 logs/
+_build/

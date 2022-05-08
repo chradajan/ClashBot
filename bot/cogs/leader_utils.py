@@ -103,17 +103,11 @@ class LeaderUtils(commands.Cog):
     @commands.command()
     @bot_utils.is_elder_command_check()
     @bot_utils.commands_channel_check()
-    async def send_reminder(self, ctx: commands.Context, *message):
+    async def send_reminder(self, ctx: commands.Context, message: str=DEFAULT_REMINDER_MESSAGE):
         """Send reminder message to users with remaining decks. Optionally send a custom message with reminder."""
-        reminder_message = ' '.join(message)
+        LOG.command_start(ctx, message=message)
 
-        if not reminder_message:
-            reminder_message = DEFAULT_REMINDER_MESSAGE
-
-        LOG.command_start(ctx, reminder_message=reminder_message)
-
-        await bot_utils.deck_usage_reminder(message=reminder_message, automated=False)
-
+        await bot_utils.deck_usage_reminder(message=message, automated=False)
         confirmation_embed = discord.Embed(title=f"Reminder message sent to #{CHANNEL.reminder().name}.",
                                            color=discord.Color.green())
         await ctx.send(embed=confirmation_embed)

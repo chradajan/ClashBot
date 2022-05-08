@@ -72,7 +72,13 @@ class Strikes(commands.Cog):
         message = "has received a strike" if delta > 0 else "has had a strike removed"
 
         for user in users:
-            player_info = db_utils.find_user_in_db(user)
+            converter = commands.MemberConverter()
+
+            try:
+                member = converter.convert(ctx, user)
+                player_info = db_utils.find_user_in_db(member.id)
+            except discord.MemberNotFound:
+                player_info = db_utils.find_user_in_db(user)
 
             if not player_info:
                 confirmation_embed.add_field(name=user, value="```Could not be found in database```", inline=False)

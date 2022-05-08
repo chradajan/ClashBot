@@ -1,6 +1,8 @@
 
 # ClashBot
 
+https://clashbot.readthedocs.io/en/latest/
+
 ClashBot is a Discord bot that helps moderate servers dedicated to Clash Royale clans.
 - Manages server roles
 - Tracks daily participation in river races.
