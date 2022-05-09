@@ -18,8 +18,8 @@
 # -- Project information -----------------------------------------------------
 
 project = 'ClashBot'
-copyright = '2022, chradajan'
-author = 'chradajan'
+copyright = '2022, Christopher Janzen'
+author = 'Christopher Janzen'
 
 
 # -- General configuration ---------------------------------------------------

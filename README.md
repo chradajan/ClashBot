@@ -84,8 +84,9 @@ Steps to configure and start ClashBot
 #### Using setup script
 ```bash
 git clone https://github.com/chradajan/ClashBot.git
-cd ClashBot/setup
+cd ClashBot
 pip install -r requirements.txt
+cd setup
 ./setup.sh
 cd ../bot
 python3 bot.py
@@ -95,8 +96,9 @@ The setup script will automatically configure the database with the required sch
 #### Manual Setup (not necessary if using setup script)
 ```bash
 git clone https://github.com/chradajan/ClashBot.git
-cd ClashBot/setup
+cd ClashBot
 pip install -r requirements.txt
+cd setup
 cd ../bot
 ```
 1. After cloning repository, move [ClashBot/setup/blacklist_example.py](setup/blacklist_example.py), [ClashBot/setup/config_example.py](setup/config_example.py), [ClashBot/setup/credentials_example.py](setup/credentials_example.py) to `ClashBot/bot/config/`.

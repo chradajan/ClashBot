@@ -189,3 +189,8 @@ User
     A user in the database that may or may not be a member of the Discord server. ClashBot first assumes that the specified user is
     of type :ref:`discord-member-parameter-type`. If a Discord member is not found, then ClashBot will attempt to find the user in
     the database. You can search for a user either by their in-game name or their player tag.
+
+Database Schema
+===============
+
+.. image:: images/schema.png
