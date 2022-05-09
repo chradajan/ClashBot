@@ -860,10 +860,13 @@ def predict_race_outcome(
 
         fame_to_catch_up = predicted_outcomes[0][2] - current_fame
         avg_fame_needed_per_deck = fame_to_catch_up / decks_available
-        needed_win_rate = calculate_win_rate_from_average_fame(avg_fame_needed_per_deck)
+        if avg_fame_needed_per_deck < 100:
+            needed_win_rate = -1
+        else:
+            needed_win_rate = calculate_win_rate_from_average_fame(avg_fame_needed_per_deck)
 
-        if needed_win_rate is not None:
-            needed_win_rate = round(needed_win_rate * 100, 2)
+            if needed_win_rate is not None:
+                needed_win_rate = round(needed_win_rate * 100, 2)
 
         catch_up_requirements = {'decks': decks_available, 'win_rate': needed_win_rate}
 
@@ -934,14 +937,17 @@ def create_prediction_embeds(
         win_rate = catch_up_requirements["win_rate"]
         decks = catch_up_requirements["decks"]
         if win_rate is not None:
-            catch_up_embed = discord.Embed(title=(
-                                               f"{PRIMARY_CLAN_NAME} needs to use all {decks} remaining decks at a {win_rate}% "
-                                               "win rate to catch up to the predicted score of first place."
-                                           ),
-                                           color=discord.Color.blue())
+            if win_rate == -1:
+                catch_up_embed = discord.Embed(title=(f"{PRIMARY_CLAN_NAME} can surpass the predicted score of first place by using"
+                                                      f" all {decks} remaining decks at any win rate."),
+                                               color=discord.Color.blue())
+            else:
+                catch_up_embed = discord.Embed(title=(f"{PRIMARY_CLAN_NAME} needs to use all {decks} remaining decks at a "
+                                                      f"{win_rate}% win rate to catch up to the predicted score of first place."),
+                                               color=discord.Color.blue())
         else:
             catch_up_embed = discord.Embed(title=f"{PRIMARY_CLAN_NAME} cannot reach the predicted score of first place.",
-                                            color=discord.Color.red())
+                                           color=discord.Color.red())
 
     return (predictions_embed, completed_clans_embed, catch_up_embed)
 
